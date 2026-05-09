@@ -1,0 +1,264 @@
+Build a full-stack church youth registration and attendance tracking web app for Jeremiah Generation (JG Youth AFM). This is an internal tool for a youth group — not a SaaS. Design should be clean, modern, and mobile-first.
+
+---
+
+ROLE HIERARCHY (top to bottom):
+1. Super Admin — head of committee (max 3 accounts). Controls everything: creates leaders, sets what access each leader has, manages all data.
+2. Leader (committee member) — access controlled by Super Admin. Can create events, manage attendance, view dashboard KPIs.
+3. Member — registered returning youth. Has a personal dashboard, can RSVP to events.
+4. Visitor — first-time registrant. Can register, then request to become a member.
+5. Guest — unregistered, sees only the public landing page.
+
+---
+
+TECH STACK:
+- Framework: Next.js 15 (App Router, TypeScript)
+- Auth: Clerk (role-based sessions)
+- Database: Supabase (PostgreSQL + Row Level Security)
+- Cache / Rate limiting: Upstash Redis
+- Emails: Resend
+- Analytics: PostHog
+- Error tracking: Sentry
+- Deployment: Vercel
+- Version control: GitHub
+
+---
+
+PAGES & FEATURES:
+
+1. Public Landing Page (/) — visible to all roles including guests:
+- App name: "Jeremiah Generation" with "JG Youth AFM" as subtitle
+- Tagline: "Register. Show up. Be counted."
+- Live counters: Total Members, Today's Visitors, Today's Attendance
+- Upcoming events list — title, date, time, location (public preview only)
+- CTAs: "Register as First Timer" | "Check In" | "Login"
+- Evergreen public QR code displayed — points to /register, downloadable
+
+When a Member or Visitor is logged in, the landing page also shows:
+- Their profile summary (name, role, membership status)
+- Their upcoming RSVPs and status
+- Personalized event cards with RSVP button
+
+2. First-Timer Registration (/register):
+- Accessible via link or public QR code scan
+- Form fields: Full name, phone (SA format), email (optional), gender, age, how they heard about JG Youth
+- On submit:
+  - Save to Supabase `profiles` with role = 'visitor'
+  - Trigger sendWelcomeNotifications(profile)
+  - Show confirmation screen: "Welcome to Jeremiah Generation! You're registered."
+  - Show a "Become a Member" CTA on the confirmation screen
+- Kiosk mode supported (full screen, auto-reset after submission)
+
+3. Become a Member (/become-member):
+- Only accessible to logged-in visitors
+- Simple request form: why do you want to be a member?
+- Saves a membership_requests record in Supabase
+- Leader or Super Admin approves/rejects from the dashboard
+- On approval, role is updated to 'member' and a notification is sent
+
+4. Check-In Page (/checkin):
+- Leaders mark members present manually from the dashboard
+- Members can also self check-in by entering name or phone
+- QR scan → /checkin → select name from list
+- "Are you a leader?" prompt → redirects to /leader-login
+
+5. Leader QR (/leader-qr):
+- Separate evergreen QR only shared with leaders
+- Scans to /leader-login
+- Not linked publicly
+
+6. Leader / Super Admin Login (/leader-login):
+- PIN-based (4–6 digits, hashed in Supabase)
+- On success, redirect to /dashboard
+- Rate-limited via Upstash Redis (5 attempts per IP per 10 min)
+
+---
+
+MEMBER & VISITOR PERSONAL DASHBOARD (/my):
+- Profile card: name, role badge, joined date, membership status
+- "Upcoming Events" section: list of events with RSVP button per event
+- "My RSVPs" tab: all past and upcoming RSVPs with status
+- "Become a Member" CTA if role is visitor
+- Edit profile button
+
+---
+
+LEADER DASHBOARD (/dashboard):
+Protected — leaders and super admins only. Access level determined by Super Admin settings.
+
+KPI Cards:
+- Total registered members
+- Total all-time visitors
+- Today's attendance count
+- Today's new visitor count
+
+Dashboard Tabs:
+
+a. Today's Attendance
+- List of everyone checked in today: name, role, time, check-in method
+- Manual check-in button per person
+
+b. All Members
+- Full searchable, filterable table (by name, phone, role)
+- Promote visitor to member button
+- Revoke membership button
+
+c. Events
+- List of all events (upcoming + past)
+- "Create Event" button → opens event creation form (see Events section)
+- Per event: attendee count, RSVP count, requirements checklist
+
+d. All-Time Records
+- Attendance per session/date
+- Total headcount per event
+- Export to CSV button
+
+e. Membership Requests
+- Table of pending visitor → member requests
+- Approve / Reject buttons
+- Notification sent to visitor on action
+
+f. Manage Leaders (Super Admin only)
+- Table of current leaders with their access permissions
+- Add leader: select from members list, assign PIN, set permissions
+- Edit permissions per leader (toggle: can create events, can manage members, can view all KPIs, can approve membership)
+- Revoke leader access button
+- Max 3 Super Admins enforced
+
+g. Settings
+- Regenerate public QR code (old slug expires, new one activates)
+- Regenerate leader QR code
+- Update own PIN
+- Super Admin: manage other Super Admin accounts (max 3)
+
+---
+
+EVENTS SYSTEM:
+
+Table: events
+- id (uuid)
+- title (text)
+- description (text)
+- date (date)
+- time (time)
+- location (text)
+- created_by (uuid, FK → profiles)
+- age_min (integer, nullable)
+- age_max (integer, nullable)
+- custom_requirements (jsonb) — array of {label: string, required: boolean}
+  e.g. [{"label": "Bring your Bible", "required": true}, {"label": "Wear uniform", "required": false}]
+- is_public (boolean) — show on landing page or internal only
+- created_at (timestamptz)
+
+Table: rsvps
+- id (uuid)
+- event_id (uuid, FK → events)
+- profile_id (uuid, FK → profiles)
+- status (text: 'going' | 'not_going' | 'maybe')
+- created_at (timestamptz)
+
+Event Creation Form (leaders only):
+- Title, description, date, time, location
+- Age restriction: min age / max age (optional)
+- Custom requirements: add/remove fields dynamically, toggle required on/off
+- Visibility toggle: public (shows on landing) or internal only
+- Save as draft or publish
+
+Members interact with events by RSVP only — check-in on the day is handled manually by leaders from the dashboard.
+
+---
+
+DATABASE TABLES SUMMARY (Supabase):
+
+profiles: id, full_name, phone, email, gender, age, heard_from, role, pin_hash, created_at
+attendance: id, profile_id, event_id (nullable), checked_in_at, session_date, check_in_method
+events: id, title, description, date, time, location, created_by, age_min, age_max, custom_requirements, is_public, created_at
+rsvps: id, event_id, profile_id, status, created_at
+membership_requests: id, profile_id, reason, status ('pending'|'approved'|'rejected'), reviewed_by, created_at
+qr_codes: id, slug, type ('public'|'leader'), active, created_at
+leader_permissions: id, profile_id, can_create_events, can_manage_members, can_view_kpis, can_approve_membership, created_at
+
+RLS: Super Admins and Leaders read/write based on permissions. Members/Visitors read/write own rows only.
+
+---
+
+AUTOMATIONS (/lib/notifications.ts):
+
+Export: sendWelcomeNotifications(profile)
+1. Email via Resend → profile.email if provided
+2. WhatsApp via Meta Cloud API → scaffold fetch to https://graph.facebook.com/v18.0/{PHONE_NUMBER_ID}/messages
+   // TODO: replace with approved Meta message template
+3. iMessage placeholder function
+   // TODO: requires Apple Business Register or third-party relay (e.g. Twilio)
+
+Also create: sendMembershipApprovalNotification(profile) and sendEventReminderNotification(profile, event)
+
+---
+
+QR CODE GENERATION (/lib/qr.ts):
+- Use `qrcode` npm package
+- Public QR → /register or active public slug
+- Leader QR → /leader-login or active leader slug
+- Both exportable as PNG
+- Slug middleware in middleware.ts handles routing + expiry
+
+---
+
+ENV VARS (.env.local):
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+RESEND_API_KEY=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+NEXT_PUBLIC_POSTHOG_KEY=
+SENTRY_DSN=
+WHATSAPP_API_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+
+---
+
+DESIGN DIRECTION:
+- Mobile-first, dark theme default
+- Tailwind CSS + Geist Sans font
+- Public pages (landing, register, checkin): welcoming, large text, one action per screen
+- Member dashboard (/my): personal, card-based, warm
+- Leader dashboard (/dashboard): data-dense, admin tool feel, clear KPI cards
+- Brand: "Jeremiah Generation" as primary name, "JG Youth AFM" as subtitle/badge
+
+---
+
+FOLDER STRUCTURE:
+/app
+  /page.tsx                        (public landing + logged-in view)
+  /register/page.tsx               (first-timer registration)
+  /become-member/page.tsx          (visitor → member request)
+  /checkin/page.tsx                (self check-in)
+  /my/page.tsx                     (member/visitor personal dashboard)
+  /leader-login/page.tsx           (PIN login)
+  /leader-qr/page.tsx              (leader QR display)
+  /dashboard/page.tsx              (leader dashboard)
+  /dashboard/events/page.tsx       (events management)
+  /dashboard/settings/page.tsx     (QR, PIN, Super Admin settings)
+  /qr/[slug]/page.tsx              (QR slug redirect handler)
+/components
+  /RegistrationForm.tsx
+  /CheckInForm.tsx
+  /KPICard.tsx
+  /AttendanceTable.tsx
+  /MemberTable.tsx
+  /EventCard.tsx
+  /EventForm.tsx
+  /RSVPButton.tsx
+  /QRDisplay.tsx
+  /LeaderPINLogin.tsx
+  /MembershipRequestTable.tsx
+  /LeaderPermissionsTable.tsx
+/lib
+  /supabase.ts
+  /notifications.ts
+  /qr.ts
+  /redis.ts
+/middleware.ts

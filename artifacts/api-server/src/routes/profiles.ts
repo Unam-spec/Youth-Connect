@@ -1,0 +1,191 @@
+import { Router } from "express";
+import { getAuth } from "@clerk/express";
+import { eq, ilike, or } from "drizzle-orm";
+import { db, profilesTable } from "@workspace/db";
+import {
+  RegisterVisitorBody,
+  UpdateMyProfileBody,
+  ListProfilesQueryParams,
+} from "@workspace/api-zod";
+
+const router = Router();
+
+router.get("/profiles/me", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    const clerkId = auth?.userId;
+    if (!clerkId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, clerkId),
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    return res.json(profile);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/profiles/me", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    const clerkId = auth?.userId;
+    if (!clerkId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const parsed = UpdateMyProfileBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten() });
+    }
+    const existing = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, clerkId),
+    });
+    if (!existing) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    const [updated] = await db
+      .update(profilesTable)
+      .set(parsed.data)
+      .where(eq(profilesTable.clerk_id, clerkId))
+      .returning();
+    return res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/profiles/register", async (req, res) => {
+  try {
+    const parsed = RegisterVisitorBody.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten() });
+    }
+    const { clerk_id, ...rest } = parsed.data;
+    const [profile] = await db
+      .insert(profilesTable)
+      .values({
+        ...rest,
+        clerk_id: clerk_id ?? null,
+        role: "visitor",
+      })
+      .returning();
+    return res.status(201).json(profile);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/profiles", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const params = ListProfilesQueryParams.safeParse(req.query);
+    const search = typeof req.query.search === "string" ? req.query.search : undefined;
+    const role = typeof req.query.role === "string" ? req.query.role : undefined;
+    const limit = parseInt(String(req.query.limit ?? "50"));
+    const offset = parseInt(String(req.query.offset ?? "0"));
+
+    let query = db.select().from(profilesTable);
+    const conditions = [];
+    if (role) {
+      conditions.push(eq(profilesTable.role, role as any));
+    }
+    if (search) {
+      conditions.push(
+        or(
+          ilike(profilesTable.full_name, `%${search}%`),
+          ilike(profilesTable.phone ?? "", `%${search}%`),
+        ),
+      );
+    }
+    if (conditions.length > 0) {
+      const profiles = await db
+        .select()
+        .from(profilesTable)
+        .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+        .limit(limit)
+        .offset(offset);
+      return res.json(profiles);
+    }
+    const profiles = await db
+      .select()
+      .from(profilesTable)
+      .limit(limit)
+      .offset(offset);
+    return res.json(profiles);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/profiles/:id", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, req.params.id),
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    return res.json(profile);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/profiles/:id/promote", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const [updated] = await db
+      .update(profilesTable)
+      .set({ role: "member" })
+      .where(eq(profilesTable.id, req.params.id))
+      .returning();
+    if (!updated) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    return res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.post("/profiles/:id/revoke-membership", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    const [updated] = await db
+      .update(profilesTable)
+      .set({ role: "visitor" })
+      .where(eq(profilesTable.id, req.params.id))
+      .returning();
+    if (!updated) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+    return res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+export default router;

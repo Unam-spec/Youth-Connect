@@ -3,20 +3,37 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Jeremiah Generation Youth API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: profiles
+    description: User profile operations
+  - name: events
+    description: Event management
+  - name: attendance
+    description: Attendance tracking
+  - name: rsvps
+    description: RSVP operations
+  - name: membership
+    description: Membership requests
+  - name: leaders
+    description: Leader management
+  - name: checkin
+    description: Check-in operations
+  - name: qrcodes
+    description: QR code management
+  - name: dashboard
+    description: Dashboard KPIs and summaries
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +41,747 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # Profiles
+  /profiles/me:
+    get:
+      operationId: getMyProfile
+      tags: [profiles]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: Profile found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "404":
+          description: Profile not found
+    patch:
+      operationId: updateMyProfile
+      tags: [profiles]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /profiles/register:
+    post:
+      operationId: registerVisitor
+      tags: [profiles]
+      summary: Register as a first-time visitor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisitorRegistration"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /profiles:
+    get:
+      operationId: listProfiles
+      tags: [profiles]
+      summary: List all profiles (leader/admin only)
+      parameters:
+        - name: role
+          in: query
+          schema:
+            type: string
+            enum: [super_admin, leader, member, visitor]
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: List of profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Profile"
+
+  /profiles/{id}:
+    get:
+      operationId: getProfile
+      tags: [profiles]
+      summary: Get a profile by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /profiles/{id}/promote:
+    post:
+      operationId: promoteToMember
+      tags: [profiles]
+      summary: Promote visitor to member (leader/admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Promoted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /profiles/{id}/revoke-membership:
+    post:
+      operationId: revokeMembership
+      tags: [profiles]
+      summary: Revoke membership (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  # Events
+  /events:
+    get:
+      operationId: listEvents
+      tags: [events]
+      summary: List events
+      parameters:
+        - name: public_only
+          in: query
+          schema:
+            type: boolean
+        - name: upcoming
+          in: query
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Event"
+    post:
+      operationId: createEvent
+      tags: [events]
+      summary: Create a new event (leader/admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+
+  /events/{id}:
+    get:
+      operationId: getEvent
+      tags: [events]
+      summary: Get event by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+    patch:
+      operationId: updateEvent
+      tags: [events]
+      summary: Update event (leader/admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Event"
+    delete:
+      operationId: deleteEvent
+      tags: [events]
+      summary: Delete event (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+
+  /events/{id}/stats:
+    get:
+      operationId: getEventStats
+      tags: [events]
+      summary: Get attendance and RSVP stats for an event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Event stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventStats"
+
+  # Attendance
+  /attendance:
+    get:
+      operationId: listAttendance
+      tags: [attendance]
+      summary: List attendance records
+      parameters:
+        - name: session_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: event_id
+          in: query
+          schema:
+            type: string
+        - name: profile_id
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRecord"
+    post:
+      operationId: checkIn
+      tags: [attendance]
+      summary: Check in a person
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckInInput"
+      responses:
+        "201":
+          description: Checked in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+
+  /attendance/today:
+    get:
+      operationId: getTodayAttendance
+      tags: [attendance]
+      summary: Get today's attendance list
+      responses:
+        "200":
+          description: Today's attendance
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRecord"
+
+  /attendance/checkin-by-name:
+    post:
+      operationId: checkInByName
+      tags: [attendance]
+      summary: Self check-in by name or phone
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SelfCheckInInput"
+      responses:
+        "201":
+          description: Checked in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+
+  # RSVPs
+  /rsvps:
+    get:
+      operationId: listMyRsvps
+      tags: [rsvps]
+      summary: List current user's RSVPs
+      responses:
+        "200":
+          description: RSVPs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rsvp"
+
+  /rsvps/event/{eventId}:
+    get:
+      operationId: listEventRsvps
+      tags: [rsvps]
+      summary: List RSVPs for a specific event (leader/admin only)
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: RSVPs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rsvp"
+
+  /rsvps/{eventId}:
+    post:
+      operationId: upsertRsvp
+      tags: [rsvps]
+      summary: RSVP to an event (creates or updates)
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RsvpInput"
+      responses:
+        "200":
+          description: RSVP saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rsvp"
+
+  # Membership Requests
+  /membership-requests:
+    get:
+      operationId: listMembershipRequests
+      tags: [membership]
+      summary: List membership requests (leader/admin only)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        "200":
+          description: Requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MembershipRequest"
+    post:
+      operationId: createMembershipRequest
+      tags: [membership]
+      summary: Submit a membership request (visitor only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MembershipRequestInput"
+      responses:
+        "201":
+          description: Request submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembershipRequest"
+
+  /membership-requests/{id}/approve:
+    post:
+      operationId: approveMembershipRequest
+      tags: [membership]
+      summary: Approve a membership request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembershipRequest"
+
+  /membership-requests/{id}/reject:
+    post:
+      operationId: rejectMembershipRequest
+      tags: [membership]
+      summary: Reject a membership request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembershipRequest"
+
+  # Leaders
+  /leaders:
+    get:
+      operationId: listLeaders
+      tags: [leaders]
+      summary: List leaders and their permissions (super admin only)
+      responses:
+        "200":
+          description: Leaders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LeaderWithPermissions"
+    post:
+      operationId: addLeader
+      tags: [leaders]
+      summary: Add a leader (super admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaderInput"
+      responses:
+        "201":
+          description: Leader added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaderWithPermissions"
+
+  /leaders/{profileId}:
+    patch:
+      operationId: updateLeaderPermissions
+      tags: [leaders]
+      summary: Update leader permissions (super admin only)
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaderPermissionsUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeaderWithPermissions"
+    delete:
+      operationId: revokeLeaderAccess
+      tags: [leaders]
+      summary: Revoke leader access (super admin only)
+      parameters:
+        - name: profileId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+
+  /leaders/verify-pin:
+    post:
+      operationId: verifyLeaderPin
+      tags: [leaders]
+      summary: Verify leader PIN for dashboard access
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinVerification"
+      responses:
+        "200":
+          description: PIN verified
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PinVerificationResult"
+        "401":
+          description: Invalid PIN
+
+  /leaders/update-pin:
+    post:
+      operationId: updateLeaderPin
+      tags: [leaders]
+      summary: Update own PIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PinUpdate"
+      responses:
+        "200":
+          description: PIN updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+
+  # Check-in search
+  /checkin/search:
+    get:
+      operationId: searchForCheckIn
+      tags: [checkin]
+      summary: Search members/visitors by name or phone for check-in
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Matching profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Profile"
+
+  # QR Codes
+  /qrcodes/public:
+    get:
+      operationId: getPublicQrCode
+      tags: [qrcodes]
+      summary: Get the active public QR code
+      responses:
+        "200":
+          description: Public QR code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCode"
+
+  /qrcodes/leader:
+    get:
+      operationId: getLeaderQrCode
+      tags: [qrcodes]
+      summary: Get the active leader QR code
+      responses:
+        "200":
+          description: Leader QR code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCode"
+
+  /qrcodes/regenerate:
+    post:
+      operationId: regenerateQrCode
+      tags: [qrcodes]
+      summary: Regenerate a QR code (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QrCodeRegenerateInput"
+      responses:
+        "200":
+          description: New QR code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCode"
+
+  /qrcodes/{slug}:
+    get:
+      operationId: resolveQrSlug
+      tags: [qrcodes]
+      summary: Resolve QR slug to a redirect target
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCodeResolution"
+        "404":
+          description: Slug not found or expired
+
+  # Dashboard
+  /dashboard/kpis:
+    get:
+      operationId: getDashboardKpis
+      tags: [dashboard]
+      summary: Get dashboard KPI summary
+      responses:
+        "200":
+          description: KPIs
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardKpis"
+
+  /dashboard/recent-activity:
+    get:
+      operationId: getRecentActivity
+      tags: [dashboard]
+      summary: Get recent check-ins and registrations
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+
+  /dashboard/attendance-history:
+    get:
+      operationId: getAttendanceHistory
+      tags: [dashboard]
+      summary: Get attendance per session/date (all-time records)
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 30
+      responses:
+        "200":
+          description: Attendance history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceHistoryEntry"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +792,449 @@ components:
       required:
         - status
 
+    Profile:
+      type: object
+      required: [id, full_name, role, created_at]
+      properties:
+        id:
+          type: string
+        clerk_id:
+          type: ["string", "null"]
+        full_name:
+          type: string
+        phone:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        gender:
+          type: ["string", "null"]
+          enum: [male, female, other, "null"]
+        age:
+          type: ["integer", "null"]
+        heard_from:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [super_admin, leader, member, visitor]
+        created_at:
+          type: string
+          format: date-time
+
+    ProfileUpdate:
+      type: object
+      properties:
+        full_name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        gender:
+          type: string
+          enum: [male, female, other]
+        age:
+          type: integer
+        heard_from:
+          type: string
+
+    VisitorRegistration:
+      type: object
+      required: [full_name, phone, gender, age, heard_from]
+      properties:
+        full_name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: ["string", "null"]
+        gender:
+          type: string
+          enum: [male, female, other]
+        age:
+          type: integer
+        heard_from:
+          type: string
+        clerk_id:
+          type: ["string", "null"]
+
+    Event:
+      type: object
+      required: [id, title, date, time, location, is_public, created_at]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: ["string", "null"]
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        location:
+          type: string
+        created_by:
+          type: ["string", "null"]
+        age_min:
+          type: ["integer", "null"]
+        age_max:
+          type: ["integer", "null"]
+        custom_requirements:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/EventRequirement"
+        is_public:
+          type: boolean
+        rsvp_count:
+          type: ["integer", "null"]
+        attendance_count:
+          type: ["integer", "null"]
+        created_at:
+          type: string
+          format: date-time
+
+    EventRequirement:
+      type: object
+      required: [label, required]
+      properties:
+        label:
+          type: string
+        required:
+          type: boolean
+
+    EventInput:
+      type: object
+      required: [title, date, time, location]
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        location:
+          type: string
+        age_min:
+          type: ["integer", "null"]
+        age_max:
+          type: ["integer", "null"]
+        custom_requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventRequirement"
+        is_public:
+          type: boolean
+          default: true
+
+    EventUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        date:
+          type: string
+          format: date
+        time:
+          type: string
+        location:
+          type: string
+        age_min:
+          type: ["integer", "null"]
+        age_max:
+          type: ["integer", "null"]
+        custom_requirements:
+          type: array
+          items:
+            $ref: "#/components/schemas/EventRequirement"
+        is_public:
+          type: boolean
+
+    EventStats:
+      type: object
+      required: [event_id, rsvp_count, going_count, not_going_count, maybe_count, attendance_count]
+      properties:
+        event_id:
+          type: string
+        rsvp_count:
+          type: integer
+        going_count:
+          type: integer
+        not_going_count:
+          type: integer
+        maybe_count:
+          type: integer
+        attendance_count:
+          type: integer
+
+    AttendanceRecord:
+      type: object
+      required: [id, session_date, checked_in_at, check_in_method]
+      properties:
+        id:
+          type: string
+        profile_id:
+          type: ["string", "null"]
+        event_id:
+          type: ["string", "null"]
+        checked_in_at:
+          type: string
+          format: date-time
+        session_date:
+          type: string
+          format: date
+        check_in_method:
+          type: string
+          enum: [manual, self, qr]
+        profile:
+          $ref: "#/components/schemas/Profile"
+
+    CheckInInput:
+      type: object
+      required: [profile_id, check_in_method]
+      properties:
+        profile_id:
+          type: string
+        event_id:
+          type: ["string", "null"]
+        check_in_method:
+          type: string
+          enum: [manual, self, qr]
+
+    SelfCheckInInput:
+      type: object
+      properties:
+        name:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+
+    Rsvp:
+      type: object
+      required: [id, event_id, profile_id, status, created_at]
+      properties:
+        id:
+          type: string
+        event_id:
+          type: string
+        profile_id:
+          type: string
+        status:
+          type: string
+          enum: [going, not_going, maybe]
+        created_at:
+          type: string
+          format: date-time
+        event:
+          $ref: "#/components/schemas/Event"
+
+    RsvpInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [going, not_going, maybe]
+
+    MembershipRequest:
+      type: object
+      required: [id, profile_id, reason, status, created_at]
+      properties:
+        id:
+          type: string
+        profile_id:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        reviewed_by:
+          type: ["string", "null"]
+        created_at:
+          type: string
+          format: date-time
+        profile:
+          $ref: "#/components/schemas/Profile"
+
+    MembershipRequestInput:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+
+    LeaderWithPermissions:
+      type: object
+      required: [profile_id, can_create_events, can_manage_members, can_view_kpis, can_approve_membership]
+      properties:
+        profile_id:
+          type: string
+        can_create_events:
+          type: boolean
+        can_manage_members:
+          type: boolean
+        can_view_kpis:
+          type: boolean
+        can_approve_membership:
+          type: boolean
+        profile:
+          $ref: "#/components/schemas/Profile"
+
+    LeaderInput:
+      type: object
+      required: [profile_id, pin]
+      properties:
+        profile_id:
+          type: string
+        pin:
+          type: string
+        can_create_events:
+          type: boolean
+          default: true
+        can_manage_members:
+          type: boolean
+          default: false
+        can_view_kpis:
+          type: boolean
+          default: true
+        can_approve_membership:
+          type: boolean
+          default: false
+
+    LeaderPermissionsUpdate:
+      type: object
+      properties:
+        can_create_events:
+          type: boolean
+        can_manage_members:
+          type: boolean
+        can_view_kpis:
+          type: boolean
+        can_approve_membership:
+          type: boolean
+
+    PinVerification:
+      type: object
+      required: [phone, pin]
+      properties:
+        phone:
+          type: string
+        pin:
+          type: string
+
+    PinVerificationResult:
+      type: object
+      required: [success, role]
+      properties:
+        success:
+          type: boolean
+        role:
+          type: string
+          enum: [super_admin, leader]
+        profile_id:
+          type: string
+
+    PinUpdate:
+      type: object
+      required: [current_pin, new_pin]
+      properties:
+        current_pin:
+          type: string
+        new_pin:
+          type: string
+
+    SuccessMessage:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    QrCode:
+      type: object
+      required: [id, slug, type, active, created_at]
+      properties:
+        id:
+          type: string
+        slug:
+          type: string
+        type:
+          type: string
+          enum: [public, leader]
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    QrCodeRegenerateInput:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [public, leader]
+
+    QrCodeResolution:
+      type: object
+      required: [slug, type, redirect_to]
+      properties:
+        slug:
+          type: string
+        type:
+          type: string
+          enum: [public, leader]
+        redirect_to:
+          type: string
+
+    DashboardKpis:
+      type: object
+      required: [total_members, total_visitors, today_attendance, today_new_visitors, upcoming_events_count]
+      properties:
+        total_members:
+          type: integer
+        total_visitors:
+          type: integer
+        today_attendance:
+          type: integer
+        today_new_visitors:
+          type: integer
+        upcoming_events_count:
+          type: integer
+
+    ActivityItem:
+      type: object
+      required: [type, description, timestamp]
+      properties:
+        type:
+          type: string
+          enum: [check_in, registration, membership_request, rsvp]
+        description:
+          type: string
+        profile_name:
+          type: ["string", "null"]
+        timestamp:
+          type: string
+          format: date-time
+
+    AttendanceHistoryEntry:
+      type: object
+      required: [session_date, total_count, member_count, visitor_count]
+      properties:
+        session_date:
+          type: string
+          format: date
+        total_count:
+          type: integer
+        member_count:
+          type: integer
+        visitor_count:
+          type: integer
+        event_title:
+          type: ["string", "null"]
