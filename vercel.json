@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "pnpm --filter workspace build",
+  "buildCommand": "cd artifacts/jg-youth && npx vite build",
   "outputDirectory": "artifacts/jg-youth/dist/public",
   "installCommand": "pnpm install --ignore-scripts --no-frozen-lockfile",
   "rewrites": [
