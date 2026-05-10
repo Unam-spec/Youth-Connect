@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd artifacts/jg-youth && node ../../node_modules/.bin/vite build --config vite.config.ts",
+  "buildCommand": "cd artifacts/jg-youth && node node_modules/.bin/vite build --config vite.config.ts",
   "outputDirectory": "artifacts/jg-youth/dist/public",
   "installCommand": "pnpm install --ignore-scripts --no-frozen-lockfile",
   "rewrites": [
