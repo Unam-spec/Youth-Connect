@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pnpm install --ignore-scripts && pnpm --filter @workspace/api-server build"
+
+[deploy]
+startCommand = "pnpm --filter @workspace/api-server start"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
