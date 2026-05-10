@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "cd artifacts/jg-youth && npx vite build",
-  "outputDirectory": "artifacts/jg-youth/dist/public",
+  "buildCommand": "npx vite build --config vite.config.ts",
+  "outputDirectory": "dist/public",
   "installCommand": "pnpm install --ignore-scripts --no-frozen-lockfile",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "https://youth-connect-production.up.railway.app/api/$1" },
