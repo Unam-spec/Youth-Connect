@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "cd artifacts/jg-youth && pnpm exec vite build --config vite.config.ts",
+  "buildCommand": "cd artifacts/jg-youth && pnpm install --no-frozen-lockfile && pnpm exec vite build --config vite.config.ts",
   "outputDirectory": "artifacts/jg-youth/dist/public",
   "installCommand": "pnpm install --no-frozen-lockfile --shamefully-hoist",
   "rewrites": [
