@@ -2,7 +2,7 @@
   "version": 2,
   "buildCommand": "cd artifacts/jg-youth && pnpm install --no-frozen-lockfile --shamefully-hoist && pnpm exec vite build --config vite.config.ts",
   "outputDirectory": "artifacts/jg-youth/dist/public",
-  "installCommand": "echo 'skipping root install'",
+  "installCommand": "rm -f pnpm-lock.yaml && pnpm install --no-frozen-lockfile --shamefully-hoist",
   "rewrites": [
     { "source": "/api/(.*)", "destination": "https://youth-connect-production.up.railway.app/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
