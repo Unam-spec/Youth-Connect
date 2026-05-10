@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "pnpm --filter @workspace/jg-youth build",
+  "buildCommand": "cd artifacts/jg-youth && pnpm run build",
   "outputDirectory": "artifacts/jg-youth/dist/public",
   "installCommand": "pnpm install --ignore-scripts --no-frozen-lockfile",
   "framework": null,
