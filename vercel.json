@@ -2,18 +2,10 @@
   "version": 2,
   "buildCommand": "pnpm --filter @workspace/jg-youth build",
   "outputDirectory": "artifacts/jg-youth/dist/public",
-  "installCommand": "pnpm install --ignore-scripts",
+  "installCommand": "pnpm install --ignore-scripts --no-frozen-lockfile",
   "framework": null,
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "https://your-railway-app.up.railway.app/api/$1"
-    },
+    { "source": "/api/(.*)", "destination": "https://youth-connect-production.up.railway.app/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "env": {
-    "VITE_SUPABASE_URL": "@supabase_url",
-    "VITE_SUPABASE_ANON_KEY": "@supabase_anon_key",
-    "VITE_API_URL": "@api_url"
-  }
+  ]
 }
