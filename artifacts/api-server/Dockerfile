@@ -7,7 +7,7 @@ COPY package.json ./
 COPY tsconfig.base.json ./
 COPY tsconfig.json ./
 COPY lib/ ./lib/
-COPY artifacts/api-server/ ./artifacts/api-server/
+COPY . ./artifacts/api-server/
 RUN pnpm install --ignore-scripts
 RUN pnpm --filter @workspace/api-server build
 EXPOSE 3001
