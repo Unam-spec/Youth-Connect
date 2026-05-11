@@ -14,10 +14,6 @@ const router = Router();
 
 router.get("/dashboard/kpis", async (req, res) => {
   try {
-    const auth = getAuth(req);
-    if (!auth?.userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
     const today = new Date().toISOString().split("T")[0];
 
     const [memberCount] = await db

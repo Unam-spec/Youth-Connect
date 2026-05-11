@@ -8,9 +8,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateMembershipRequest, useGetMyProfile, getGetMyProfileQueryKey } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { ChevronLeft } from "lucide-react";
 import { useState } from "react";
+import { useUser } from "@clerk/react";
 
 const requestSchema = z.object({
   reason: z.string().min(10, "Please provide a slightly more detailed reason (at least 10 characters)"),
@@ -20,8 +21,14 @@ type RequestFormValues = z.infer<typeof requestSchema>;
 
 export default function BecomeMember() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
-  const { data: profile, isLoading } = useGetMyProfile({ query: { enabled: true, queryKey: getGetMyProfileQueryKey() } });
+  const { isLoaded, isSignedIn } = useUser();
+  const { data: profile, isLoading } = useGetMyProfile({
+    query: {
+      enabled: isLoaded && isSignedIn,
+      queryKey: getGetMyProfileQueryKey(),
+      retry: false,
+    },
+  });
   const createRequest = useCreateMembershipRequest();
   const [submitted, setSubmitted] = useState(false);
 
@@ -37,7 +44,7 @@ export default function BecomeMember() {
         onSuccess: () => {
           setSubmitted(true);
         },
-        onError: (error) => {
+        onError: (error: Error) => {
           toast({
             title: "Request Failed",
             description: error.message || "Could not submit your request.",
@@ -48,8 +55,47 @@ export default function BecomeMember() {
     );
   }
 
-  if (isLoading) {
+  if (!isLoaded || (isSignedIn && isLoading)) {
     return <Layout><div className="p-8 text-center">Loading...</div></Layout>;
+  }
+
+  if (!isSignedIn) {
+    return (
+      <Layout>
+        <div className="max-w-md mx-auto pt-10">
+          <Card className="border-primary/20 text-center">
+            <CardHeader>
+              <CardTitle>Create your account first</CardTitle>
+              <CardDescription>
+                Membership requests are linked to your login so leaders can approve the right profile.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Link href="/sign-up">
+                <Button className="w-full">Sign up to become a member</Button>
+              </Link>
+              <Link href="/sign-in">
+                <Button variant="outline" className="w-full">I already have an account</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <Layout>
+        <div className="max-w-md mx-auto pt-10 text-center">
+          <h2 className="text-xl font-bold mb-2">Finish your first-timer registration.</h2>
+          <p className="text-muted-foreground mb-4">
+            We need a profile before you can request membership.
+          </p>
+          <Link href="/register"><Button>Register your profile</Button></Link>
+        </div>
+      </Layout>
+    );
   }
 
   if (profile?.role !== "visitor") {

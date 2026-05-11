@@ -1,68 +1,297 @@
+import { useMemo, useState, type ReactNode } from "react";
+import { format } from "date-fns";
+import { Redirect } from "wouter";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  getGetDashboardKpisQueryKey,
+  getGetTodayAttendanceQueryKey,
+  getListEventsQueryKey,
+  getListLeadersQueryKey,
+  getListMembershipRequestsQueryKey,
+  getListProfilesQueryKey,
+  useApproveMembershipRequest,
+  useCheckIn,
+  useCreateEvent,
+  useGetDashboardKpis,
+  useGetTodayAttendance,
+  useListEvents,
+  useListLeaders,
+  useListMembershipRequests,
+  useListProfiles,
+  usePromoteToMember,
+  useRejectMembershipRequest,
+  useRevokeMembership,
+} from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
+import { getLeaderSession } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getLeaderSession } from "@/lib/auth";
-import { Redirect } from "wouter";
-import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListAttendance, useListEvents, useListProfiles, useListMembershipRequests, useApproveMembershipRequest, useRejectMembershipRequest, useGetTodayAttendance } from "@workspace/api-client-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
-import { Users, UserPlus, CheckCircle, Calendar, ShieldAlert } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Calendar,
+  CheckCircle,
+  ShieldAlert,
+  UserPlus,
+  Users,
+} from "lucide-react";
+
+const today = new Date().toISOString().split("T")[0];
 
 export default function Dashboard() {
   const session = getLeaderSession();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [search, setSearch] = useState("");
+  const [eventForm, setEventForm] = useState({
+    title: "",
+    description: "",
+    date: today,
+    time: "18:00",
+    location: "",
+    age_min: "",
+    age_max: "",
+    is_public: true,
+  });
 
   if (!session) {
     return <Redirect to="/leader-login" />;
   }
 
-  const { data: kpis, isLoading: isKpisLoading } = useGetDashboardKpis({ query: { enabled: true, queryKey: getGetDashboardKpisQueryKey() } });
+  const { data: kpis, isLoading: isKpisLoading } = useGetDashboardKpis({
+    query: { queryKey: getGetDashboardKpisQueryKey() },
+  });
+  const { data: attendance, isLoading: isAttendanceLoading } =
+    useGetTodayAttendance({
+      query: { queryKey: getGetTodayAttendanceQueryKey() },
+    });
+  const { data: profiles, isLoading: isProfilesLoading } = useListProfiles(
+    search ? { search } : undefined,
+    {
+      query: {
+        queryKey: getListProfilesQueryKey(search ? { search } : undefined),
+      },
+    },
+  );
+  const { data: events, isLoading: isEventsLoading } = useListEvents(
+    undefined,
+    {
+      query: { queryKey: getListEventsQueryKey() },
+    },
+  );
+  const { data: requests, isLoading: isRequestsLoading } =
+    useListMembershipRequests(
+      { status: "pending" },
+      {
+        query: {
+          queryKey: getListMembershipRequestsQueryKey({ status: "pending" }),
+        },
+      },
+    );
+  const { data: leaders, isLoading: isLeadersLoading } = useListLeaders({
+    query: {
+      enabled: session.role === "super_admin",
+      queryKey: getListLeadersQueryKey(),
+    },
+  });
+
+  const checkIn = useCheckIn();
+  const createEvent = useCreateEvent();
+  const promoteToMember = usePromoteToMember();
+  const revokeMembership = useRevokeMembership();
+  const approveRequest = useApproveMembershipRequest();
+  const rejectRequest = useRejectMembershipRequest();
+
+  const membersForCheckIn = useMemo(
+    () =>
+      profiles?.filter(
+        (profile: any) =>
+          profile.role === "member" || profile.role === "visitor",
+      ) ?? [],
+    [profiles],
+  );
+
+  function refreshDashboard() {
+    queryClient.invalidateQueries({ queryKey: getGetDashboardKpisQueryKey() });
+    queryClient.invalidateQueries({
+      queryKey: getGetTodayAttendanceQueryKey(),
+    });
+    queryClient.invalidateQueries({ queryKey: getListProfilesQueryKey() });
+    queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+    queryClient.invalidateQueries({
+      queryKey: getListMembershipRequestsQueryKey({ status: "pending" }),
+    });
+    queryClient.invalidateQueries({ queryKey: getListLeadersQueryKey() });
+  }
+
+  function handleManualCheckIn(profileId: string) {
+    checkIn.mutate(
+      { data: { profile_id: profileId, check_in_method: "manual" } },
+      {
+        onSuccess: () => {
+          toast({ title: "Checked in" });
+          refreshDashboard();
+        },
+        onError: (error: Error) =>
+          toast({
+            title: "Check-in failed",
+            description: error.message,
+            variant: "destructive",
+          }),
+      },
+    );
+  }
+
+  function handleCreateEvent() {
+    if (
+      !eventForm.title ||
+      !eventForm.date ||
+      !eventForm.time ||
+      !eventForm.location
+    ) {
+      toast({
+        title: "Missing event details",
+        description: "Title, date, time, and location are required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    createEvent.mutate(
+      {
+        data: {
+          title: eventForm.title,
+          description: eventForm.description || undefined,
+          date: eventForm.date,
+          time: eventForm.time,
+          location: eventForm.location,
+          age_min: eventForm.age_min ? Number(eventForm.age_min) : null,
+          age_max: eventForm.age_max ? Number(eventForm.age_max) : null,
+          custom_requirements: [],
+          is_public: eventForm.is_public,
+        },
+      },
+      {
+        onSuccess: () => {
+          setEventForm({
+            title: "",
+            description: "",
+            date: today,
+            time: "18:00",
+            location: "",
+            age_min: "",
+            age_max: "",
+            is_public: true,
+          });
+          toast({ title: "Event created" });
+          refreshDashboard();
+        },
+        onError: (error: Error) =>
+          toast({
+            title: "Event creation failed",
+            description: error.message,
+            variant: "destructive",
+          }),
+      },
+    );
+  }
+
+  function mutateProfileRole(action: "promote" | "revoke", profileId: string) {
+    const mutation = action === "promote" ? promoteToMember : revokeMembership;
+    mutation.mutate(
+      { id: profileId },
+      {
+        onSuccess: () => {
+          toast({
+            title:
+              action === "promote"
+                ? "Promoted to member"
+                : "Membership revoked",
+          });
+          refreshDashboard();
+        },
+        onError: (error: Error) =>
+          toast({
+            title: "Profile update failed",
+            description: error.message,
+            variant: "destructive",
+          }),
+      },
+    );
+  }
+
+  function mutateRequest(action: "approve" | "reject", requestId: string) {
+    const mutation = action === "approve" ? approveRequest : rejectRequest;
+    mutation.mutate(
+      { id: requestId },
+      {
+        onSuccess: () => {
+          toast({
+            title:
+              action === "approve" ? "Request approved" : "Request rejected",
+          });
+          refreshDashboard();
+        },
+        onError: (error: Error) =>
+          toast({
+            title: "Request update failed",
+            description: error.message,
+            variant: "destructive",
+          }),
+      },
+    );
+  }
 
   return (
     <Layout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Leader Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Welcome back. Here's what's happening today.</p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Leader Dashboard
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Live attendance, members, events, and requests.
+            </p>
+          </div>
+          <Badge
+            variant={session.role === "super_admin" ? "default" : "secondary"}
+          >
+            {session.role.replace("_", " ")}
+          </Badge>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Members</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isKpisLoading ? <Skeleton className="h-7 w-16" /> : <div className="text-2xl font-bold">{kpis?.total_members || 0}</div>}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today's Attendance</CardTitle>
-              <CheckCircle className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              {isKpisLoading ? <Skeleton className="h-7 w-16" /> : <div className="text-2xl font-bold text-primary">{kpis?.today_attendance || 0}</div>}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">New Visitors Today</CardTitle>
-              <UserPlus className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isKpisLoading ? <Skeleton className="h-7 w-16" /> : <div className="text-2xl font-bold">{kpis?.today_new_visitors || 0}</div>}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Upcoming Events</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isKpisLoading ? <Skeleton className="h-7 w-16" /> : <div className="text-2xl font-bold">{kpis?.upcoming_events_count || 0}</div>}
-            </CardContent>
-          </Card>
+          <KpiCard
+            title="Total Members"
+            icon={<Users className="h-4 w-4 text-muted-foreground" />}
+            value={kpis?.total_members}
+            loading={isKpisLoading}
+          />
+          <KpiCard
+            title="Today's Attendance"
+            icon={<CheckCircle className="h-4 w-4 text-primary" />}
+            value={kpis?.today_attendance}
+            loading={isKpisLoading}
+          />
+          <KpiCard
+            title="New Visitors Today"
+            icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
+            value={kpis?.today_new_visitors}
+            loading={isKpisLoading}
+          />
+          <KpiCard
+            title="Upcoming Events"
+            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+            value={kpis?.upcoming_events_count}
+            loading={isKpisLoading}
+          />
         </div>
 
         <Tabs defaultValue="attendance" className="mt-8">
@@ -71,37 +300,391 @@ export default function Dashboard() {
             <TabsTrigger value="members">Members</TabsTrigger>
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="requests">Requests</TabsTrigger>
-            {session.role === "super_admin" && <TabsTrigger value="leaders">Leaders</TabsTrigger>}
+            {session.role === "super_admin" && (
+              <TabsTrigger value="leaders">Leaders</TabsTrigger>
+            )}
           </TabsList>
-          
-          <TabsContent value="attendance" className="p-4 border rounded-xl mt-4 bg-card">
-            <h3 className="text-lg font-semibold mb-4">Today's Check-ins</h3>
-            <p className="text-muted-foreground text-sm">Implementation coming in next phase.</p>
-          </TabsContent>
-          
-          <TabsContent value="members" className="p-4 border rounded-xl mt-4 bg-card">
-            <h3 className="text-lg font-semibold mb-4">Member Directory</h3>
-             <p className="text-muted-foreground text-sm">Implementation coming in next phase.</p>
-          </TabsContent>
-          
-          <TabsContent value="events" className="p-4 border rounded-xl mt-4 bg-card">
-            <h3 className="text-lg font-semibold mb-4">Events Management</h3>
-            <p className="text-muted-foreground text-sm">Implementation coming in next phase.</p>
+
+          <TabsContent
+            value="attendance"
+            className="p-4 border rounded-xl mt-4 bg-card"
+          >
+            <SectionTitle title="Today's Check-ins" />
+            {isAttendanceLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : attendance && attendance.length > 0 ? (
+              <SimpleTable
+                headers={["Name", "Role", "Time", "Method"]}
+                rows={attendance.map((record: any) => [
+                  record.profile?.full_name ?? "Unknown",
+                  record.profile?.role ?? "-",
+                  format(new Date(record.checked_in_at), "HH:mm"),
+                  record.check_in_method,
+                ])}
+              />
+            ) : (
+              <EmptyLine text="No one has checked in today yet." />
+            )}
+
+            <div className="mt-6">
+              <SectionTitle title="Manual Check-in" />
+              <div className="grid gap-2">
+                {membersForCheckIn.slice(0, 8).map((profile: any) => (
+                  <div
+                    key={profile.id}
+                    className="flex items-center justify-between rounded-lg border p-3"
+                  >
+                    <div>
+                      <p className="font-medium">{profile.full_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {profile.phone || "No phone"} · {profile.role}
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => handleManualCheckIn(profile.id)}
+                    >
+                      Check in
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </TabsContent>
 
-          <TabsContent value="requests" className="p-4 border rounded-xl mt-4 bg-card">
-            <h3 className="text-lg font-semibold mb-4">Membership Requests</h3>
-             <p className="text-muted-foreground text-sm">Implementation coming in next phase.</p>
+          <TabsContent
+            value="members"
+            className="p-4 border rounded-xl mt-4 bg-card"
+          >
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <SectionTitle title="Member Directory" />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search name or phone"
+                className="sm:max-w-xs"
+              />
+            </div>
+            {isProfilesLoading ? (
+              <Skeleton className="h-32 w-full" />
+            ) : profiles && profiles.length > 0 ? (
+              <div className="space-y-2">
+                {profiles.map((profile: any) => (
+                  <div
+                    key={profile.id}
+                    className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="font-medium">{profile.full_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {profile.phone || "No phone"} ·{" "}
+                        {profile.email || "No email"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{profile.role}</Badge>
+                      {profile.role === "visitor" && (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            mutateProfileRole("promote", profile.id)
+                          }
+                        >
+                          Make member
+                        </Button>
+                      )}
+                      {profile.role === "member" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            mutateProfileRole("revoke", profile.id)
+                          }
+                        >
+                          Revoke
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyLine text="No profiles found." />
+            )}
+          </TabsContent>
+
+          <TabsContent
+            value="events"
+            className="p-4 border rounded-xl mt-4 bg-card"
+          >
+            <SectionTitle title="Create Event" />
+            <div className="grid gap-3 md:grid-cols-2">
+              <Input
+                value={eventForm.title}
+                onChange={(event) =>
+                  setEventForm((current) => ({
+                    ...current,
+                    title: event.target.value,
+                  }))
+                }
+                placeholder="Event title"
+              />
+              <Input
+                value={eventForm.location}
+                onChange={(event) =>
+                  setEventForm((current) => ({
+                    ...current,
+                    location: event.target.value,
+                  }))
+                }
+                placeholder="Location"
+              />
+              <Input
+                type="date"
+                value={eventForm.date}
+                onChange={(event) =>
+                  setEventForm((current) => ({
+                    ...current,
+                    date: event.target.value,
+                  }))
+                }
+              />
+              <Input
+                type="time"
+                value={eventForm.time}
+                onChange={(event) =>
+                  setEventForm((current) => ({
+                    ...current,
+                    time: event.target.value,
+                  }))
+                }
+              />
+              <Input
+                type="number"
+                value={eventForm.age_min}
+                onChange={(event) =>
+                  setEventForm((current) => ({
+                    ...current,
+                    age_min: event.target.value,
+                  }))
+                }
+                placeholder="Min age"
+              />
+              <Input
+                type="number"
+                value={eventForm.age_max}
+                onChange={(event) =>
+                  setEventForm((current) => ({
+                    ...current,
+                    age_max: event.target.value,
+                  }))
+                }
+                placeholder="Max age"
+              />
+              <Textarea
+                value={eventForm.description}
+                onChange={(event) =>
+                  setEventForm((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+                placeholder="Description"
+                className="md:col-span-2"
+              />
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={eventForm.is_public}
+                  onCheckedChange={(checked) =>
+                    setEventForm((current) => ({
+                      ...current,
+                      is_public: checked,
+                    }))
+                  }
+                />
+                <Label>Show on landing page and member dashboards</Label>
+              </div>
+              <Button
+                onClick={handleCreateEvent}
+                disabled={createEvent.isPending}
+              >
+                {createEvent.isPending ? "Creating..." : "Create event"}
+              </Button>
+            </div>
+
+            <div className="mt-8">
+              <SectionTitle title="Events" />
+              {isEventsLoading ? (
+                <Skeleton className="h-32 w-full" />
+              ) : events && events.length > 0 ? (
+                <SimpleTable
+                  headers={["Title", "Date", "Time", "Location", "Visibility"]}
+                  rows={events.map((event: any) => [
+                    event.title,
+                    format(new Date(event.date), "MMM d, yyyy"),
+                    event.time,
+                    event.location,
+                    event.is_public ? "Public" : "Internal",
+                  ])}
+                />
+              ) : (
+                <EmptyLine text="No events created yet." />
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent
+            value="requests"
+            className="p-4 border rounded-xl mt-4 bg-card"
+          >
+            <SectionTitle title="Membership Requests" />
+            {isRequestsLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : requests && requests.length > 0 ? (
+              <div className="space-y-2">
+                {requests.map((request: any) => (
+                  <div
+                    key={request.id}
+                    className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {request.profile?.full_name ?? "Unknown visitor"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {request.reason}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => mutateRequest("approve", request.id)}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => mutateRequest("reject", request.id)}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyLine text="No pending membership requests." />
+            )}
           </TabsContent>
 
           {session.role === "super_admin" && (
-            <TabsContent value="leaders" className="p-4 border rounded-xl mt-4 bg-card">
-              <h3 className="text-lg font-semibold mb-4">Leader Management</h3>
-               <p className="text-muted-foreground text-sm">Implementation coming in next phase.</p>
+            <TabsContent
+              value="leaders"
+              className="p-4 border rounded-xl mt-4 bg-card"
+            >
+              <SectionTitle title="Leader Management" />
+              {isLeadersLoading ? (
+                <Skeleton className="h-24 w-full" />
+              ) : leaders && leaders.length > 0 ? (
+                <SimpleTable
+                  headers={[
+                    "Name",
+                    "Role",
+                    "Create Events",
+                    "Manage Members",
+                    "KPIs",
+                  ]}
+                  rows={leaders.map((leader: any) => [
+                    leader.profile?.full_name ?? "Unknown",
+                    leader.profile?.role ?? "leader",
+                    leader.can_create_events ? "Yes" : "No",
+                    leader.can_manage_members ? "Yes" : "No",
+                    leader.can_view_kpis ? "Yes" : "No",
+                  ])}
+                />
+              ) : (
+                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                  <ShieldAlert className="mb-2 h-5 w-5" />
+                  No delegated leaders yet. Use the API/Supabase seed path for
+                  the first leader, then leader creation can be added here.
+                </div>
+              )}
             </TabsContent>
           )}
         </Tabs>
       </div>
     </Layout>
+  );
+}
+
+function KpiCard({
+  title,
+  value,
+  loading,
+  icon,
+}: {
+  title: string;
+  value?: number;
+  loading: boolean;
+  icon: ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-7 w-16" />
+        ) : (
+          <div className="text-2xl font-bold">{value ?? 0}</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SectionTitle({ title }: { title: string }) {
+  return <h3 className="mb-4 text-lg font-semibold">{title}</h3>;
+}
+
+function EmptyLine({ text }: { text: string }) {
+  return <p className="text-sm text-muted-foreground">{text}</p>;
+}
+
+function SimpleTable({
+  headers,
+  rows,
+}: {
+  headers: string[];
+  rows: string[][];
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/40 text-left">
+          <tr>
+            {headers.map((header) => (
+              <th key={header} className="px-3 py-2 font-medium">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="border-t">
+              {row.map((cell, cellIndex) => (
+                <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2">
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
