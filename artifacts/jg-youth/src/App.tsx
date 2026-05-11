@@ -1,21 +1,16 @@
-// REPLACE with:
 import { useEffect, useRef } from "react";
 import { ClerkProvider, SignIn, SignUp, useClerk } from "@clerk/react";
 import { shadcn } from "@clerk/themes";
-import {
-  Switch,
-  Route,
-  Redirect,
-  useLocation,
-  Router as WouterRouter,
-} from "wouter";
+import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
 import {
   QueryClient,
   QueryClientProvider,
   useQueryClient,
 } from "@tanstack/react-query";
+
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 
@@ -31,10 +26,8 @@ import QrResolver from "@/pages/qr-resolver";
 
 const queryClient = new QueryClient();
 
-// REPLACE with:
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
-const clerkProxyUrl = undefined;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function stripBase(path: string): string {
@@ -137,14 +130,17 @@ function ClerkQueryClientCacheInvalidator() {
   useEffect(() => {
     const unsubscribe = addListener(({ user }) => {
       const userId = user?.id ?? null;
+
       if (
         prevUserIdRef.current !== undefined &&
         prevUserIdRef.current !== userId
       ) {
         queryClient.clear();
       }
+
       prevUserIdRef.current = userId;
     });
+
     return unsubscribe;
   }, [addListener, queryClient]);
 
@@ -157,7 +153,6 @@ function ClerkProviderWithRoutes() {
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
-      proxyUrl={clerkProxyUrl}
       appearance={clerkAppearance}
       signInUrl={`${basePath}/sign-in`}
       signUpUrl={`${basePath}/sign-up`}
@@ -180,6 +175,7 @@ function ClerkProviderWithRoutes() {
     >
       <QueryClientProvider client={queryClient}>
         <ClerkQueryClientCacheInvalidator />
+
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/register" component={Register} />
