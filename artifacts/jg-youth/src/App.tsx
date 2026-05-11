@@ -7,10 +7,8 @@ import {
   QueryClientProvider,
   useQueryClient,
 } from "@tanstack/react-query";
-
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 
@@ -27,7 +25,6 @@ import QrResolver from "@/pages/qr-resolver";
 const queryClient = new QueryClient();
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function stripBase(path: string): string {
