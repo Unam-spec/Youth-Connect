@@ -253,6 +253,37 @@ export default function Dashboard() {
     }
   }
 
+  async function handleMakeLeader(profileId: string) {
+    try {
+      const response = await fetch(`/api/profiles/${profileId}/role`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role: "leader" }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Failed to promote to leader",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "Promoted to leader successfully" });
+      refreshDashboard();
+    } catch (error) {
+      toast({
+        title: "Failed to promote to leader",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
+  }
+
   function mutateProfileRole(action: "promote" | "revoke", profileId: string) {
     const mutation = action === "promote" ? promoteToMember : revokeMembership;
     mutation.mutate(
@@ -354,6 +385,11 @@ export default function Dashboard() {
             {session.role === "super_admin" && (
               <TabsTrigger value="leaders">Leaders</TabsTrigger>
             )}
+            {session.role === "super_admin" && (
+              <TabsTrigger value="super-admin-slots">
+                Super Admin Slots
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent
@@ -445,15 +481,25 @@ export default function Dashboard() {
                         </Button>
                       )}
                       {profile.role === "member" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            mutateProfileRole("revoke", profile.id)
-                          }
-                        >
-                          Revoke
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              mutateProfileRole("revoke", profile.id)
+                            }
+                          >
+                            Revoke
+                          </Button>
+                          {session.role === "super_admin" && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleMakeLeader(profile.id)}
+                            >
+                              Make Leader
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -691,6 +737,63 @@ export default function Dashboard() {
                   <ShieldAlert className="mb-2 h-5 w-5" />
                   No delegated leaders yet. Use the API/Supabase seed path for
                   the first leader, then leader creation can be added here.
+                </div>
+              )}
+            </TabsContent>
+          )}
+
+          {session.role === "super_admin" && (
+            <TabsContent
+              value="super-admin-slots"
+              className="p-4 border rounded-xl mt-4 bg-card"
+            >
+              <SectionTitle title="Super Admin Slots" />
+              {isProfilesLoading ? (
+                <Skeleton className="h-24 w-full" />
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      {profiles?.filter((p: any) => p.role === "super_admin")
+                        .length || 0}{" "}
+                      of 4 slots filled
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {profiles
+                      ?.filter((p: any) => p.role === "super_admin")
+                      .map((admin: any) => (
+                        <div
+                          key={admin.id}
+                          className="flex items-center justify-between rounded-lg border p-3"
+                        >
+                          <div>
+                            <p className="font-medium">{admin.full_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {admin.phone || "No phone"} ·{" "}
+                              {admin.email || "No email"}
+                            </p>
+                          </div>
+                          <Badge variant="default">Super Admin</Badge>
+                        </div>
+                      ))}
+                  </div>
+                  {(profiles?.filter((p: any) => p.role === "super_admin")
+                    .length || 0) >= 4 ? (
+                    <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                      All slots filled
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() =>
+                        toast({ title: "Transfer feature coming soon" })
+                      }
+                    >
+                      Transfer Super Admin Position
+                    </Button>
+                  )}
                 </div>
               )}
             </TabsContent>
