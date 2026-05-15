@@ -1,11 +1,14 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { eq, and, gte, sql, count } from "drizzle-orm";
-import { db, eventsTable, rsvpsTable, attendanceTable, profilesTable } from "@workspace/db";
 import {
-  CreateEventBody,
-  UpdateEventBody,
-} from "@workspace/api-zod";
+  db,
+  eventsTable,
+  rsvpsTable,
+  attendanceTable,
+  profilesTable,
+} from "@workspace/db";
+import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
 
 const router = Router();
 
@@ -15,15 +18,17 @@ router.get("/events", async (req, res) => {
     const upcoming = req.query.upcoming === "true";
     const today = new Date().toISOString().split("T")[0];
 
-    const events = await db.select().from(eventsTable)
+    const events = await db
+      .select()
+      .from(eventsTable)
       .where(
         publicOnly && upcoming
           ? and(eq(eventsTable.is_public, true), gte(eventsTable.date, today))
           : publicOnly
-          ? eq(eventsTable.is_public, true)
-          : upcoming
-          ? gte(eventsTable.date, today)
-          : undefined
+            ? eq(eventsTable.is_public, true)
+            : upcoming
+              ? gte(eventsTable.date, today)
+              : undefined,
       )
       .orderBy(eventsTable.date);
 
@@ -42,7 +47,7 @@ router.get("/events", async (req, res) => {
           rsvp_count: rsvpResult?.count ?? 0,
           attendance_count: attendResult?.count ?? 0,
         };
-      })
+      }),
     );
     return res.json(eventsWithCounts);
   } catch (err) {
@@ -69,7 +74,7 @@ router.post("/events", async (req, res) => {
       .values({
         title: parsed.data.title,
         description: parsed.data.description,
-        date: String(parsed.data.date),
+        date: parsed.data.date,
         time: parsed.data.time,
         location: parsed.data.location,
         age_min: parsed.data.age_min ?? null,
@@ -79,7 +84,9 @@ router.post("/events", async (req, res) => {
         created_by: creatorProfile?.id ?? null,
       })
       .returning();
-    return res.status(201).json({ ...event, rsvp_count: 0, attendance_count: 0 });
+    return res
+      .status(201)
+      .json({ ...event, rsvp_count: 0, attendance_count: 0 });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
