@@ -155,8 +155,26 @@ router.delete("/events/:id", async (req, res) => {
     if (!auth?.userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
+
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    if (profile.role !== "leader" && profile.role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    // Delete RSVPs first
+    await db.delete(rsvpsTable).where(eq(rsvpsTable.event_id, req.params.id));
+
+    // Delete the event
     await db.delete(eventsTable).where(eq(eventsTable.id, req.params.id));
-    return res.status(204).send();
+
+    return res.json({ message: "Event deleted successfully" });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
