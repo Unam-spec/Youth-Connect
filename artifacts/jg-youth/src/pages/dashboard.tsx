@@ -70,6 +70,8 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
+  const [pin, setPin] = useState("");
+  const [showPinDialog, setShowPinDialog] = useState(false);
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -253,6 +255,77 @@ export default function Dashboard() {
     }
   }
 
+  async function handleMakeLeader(profileId: string) {
+    try {
+      const response = await fetch(`/api/profiles/${profileId}/role`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ role: "leader" }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Failed to promote to leader",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "Promoted to leader successfully" });
+      refreshDashboard();
+    } catch (error) {
+      toast({
+        title: "Failed to promote to leader",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleSavePin() {
+    if (pin.length !== 4) {
+      toast({
+        title: "Invalid PIN",
+        description: "PIN must be 4 digits",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/profiles/me", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pin }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Failed to save PIN",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "PIN saved successfully" });
+      setShowPinDialog(false);
+    } catch (error) {
+      toast({
+        title: "Failed to save PIN",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
+  }
+
   function mutateProfileRole(action: "promote" | "revoke", profileId: string) {
     const mutation = action === "promote" ? promoteToMember : revokeMembership;
     mutation.mutate(
@@ -354,6 +427,11 @@ export default function Dashboard() {
             {session.role === "super_admin" && (
               <TabsTrigger value="leaders">Leaders</TabsTrigger>
             )}
+            {session.role === "super_admin" && (
+              <TabsTrigger value="super-admin-slots">
+                Super Admin Slots
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent
@@ -445,15 +523,25 @@ export default function Dashboard() {
                         </Button>
                       )}
                       {profile.role === "member" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() =>
-                            mutateProfileRole("revoke", profile.id)
-                          }
-                        >
-                          Revoke
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              mutateProfileRole("revoke", profile.id)
+                            }
+                          >
+                            Revoke
+                          </Button>
+                          {session.role === "super_admin" && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleMakeLeader(profile.id)}
+                            >
+                              Make Leader
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -695,6 +783,94 @@ export default function Dashboard() {
               )}
             </TabsContent>
           )}
+
+          {session.role === "super_admin" && (
+            <TabsContent
+              value="super-admin-slots"
+              className="p-4 border rounded-xl mt-4 bg-card"
+            >
+              <SectionTitle title="Super Admin Slots" />
+              {isProfilesLoading ? (
+                <Skeleton className="h-24 w-full" />
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      {profiles?.filter((p: any) => p.role === "super_admin")
+                        .length || 0}{" "}
+                      of 4 slots filled
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {profiles
+                      ?.filter((p: any) => p.role === "super_admin")
+                      .map((admin: any) => (
+                        <div
+                          key={admin.id}
+                          className="flex items-center justify-between rounded-lg border p-3"
+                        >
+                          <div>
+                            <p className="font-medium">{admin.full_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {admin.phone || "No phone"} ·{" "}
+                              {admin.email || "No email"}
+                            </p>
+                          </div>
+                          <Badge variant="default">Super Admin</Badge>
+                        </div>
+                      ))}
+                  </div>
+                  {(profiles?.filter((p: any) => p.role === "super_admin")
+                    .length || 0) >= 4 ? (
+                    <div className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                      All slots filled
+                    </div>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() =>
+                        toast({ title: "Transfer feature coming soon" })
+                      }
+                    >
+                      Transfer Super Admin Position
+                    </Button>
+                  )}
+
+                  <div className="border-t pt-6">
+                    <SectionTitle title="PIN Management" />
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Your PIN</p>
+                          <p className="text-xs text-muted-foreground">
+                            Secure PIN for leader authentication
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowPinDialog(true)}
+                        >
+                          {pin ? "Change PIN" : "Generate PIN"}
+                        </Button>
+                      </div>
+                      {pin && (
+                        <div className="rounded-lg bg-muted p-4">
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Current PIN:
+                          </p>
+                          <p className="text-2xl font-bold tracking-widest">
+                            ••••
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          )}
         </Tabs>
       </div>
 
@@ -717,6 +893,39 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{pin ? "Change PIN" : "Generate PIN"}</DialogTitle>
+            <DialogDescription>
+              {pin
+                ? "Enter your new 4-digit PIN"
+                : "Generate a new 4-digit PIN for secure authentication"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              type="text"
+              placeholder="Enter 4-digit PIN"
+              maxLength={4}
+              value={pin}
+              onChange={(e) =>
+                setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+              }
+              className="text-center text-2xl tracking-widest"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPinDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSavePin}>
+              {pin ? "Update PIN" : "Generate PIN"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
