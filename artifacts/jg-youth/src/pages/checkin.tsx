@@ -340,9 +340,31 @@ export default function CheckIn() {
           <div className="py-6 space-y-3">
             <Button
               className="w-full h-12 text-base"
-              onClick={() => {
-                setShowCheckInPrompt(false);
-                toast({ title: "Member check-in request submitted" });
+              onClick={async () => {
+                try {
+                  const response = await fetch("/api/checkin/requests", {
+                    method: "POST",
+                  });
+                  if (!response.ok) {
+                    const error = await response.json();
+                    toast({
+                      title: "Check-in failed",
+                      description: error.error || "An error occurred",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  setShowCheckInPrompt(false);
+                  toast({
+                    title: "Check-in request submitted - pending approval",
+                  });
+                } catch (error) {
+                  toast({
+                    title: "Check-in failed",
+                    description: "An error occurred",
+                    variant: "destructive",
+                  });
+                }
               }}
             >
               Member Check-in
