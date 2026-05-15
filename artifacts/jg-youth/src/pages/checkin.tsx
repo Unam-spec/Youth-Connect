@@ -228,7 +228,25 @@ export default function CheckIn() {
             <Button
               variant="outline"
               className="w-full h-12 text-base"
-              onClick={() => setShowQrScanner(true)}
+              onClick={() => {
+                const now = new Date();
+                const day = now.getDay(); // 0 = Sunday, 5 = Friday
+                const hours = now.getHours();
+                const minutes = now.getMinutes();
+                const currentTime = hours * 60 + minutes; // Minutes since midnight
+                const targetTime = 18 * 60 + 30; // 18:30 in minutes
+
+                if (day === 5 && currentTime >= targetTime) {
+                  setShowQrScanner(true);
+                } else {
+                  toast({
+                    title: "Check-in unavailable",
+                    description:
+                      "Check-in is only available on Fridays at 18:30",
+                    variant: "destructive",
+                  });
+                }
+              }}
             >
               <QrCode className="w-5 h-5 mr-2" />
               Scan QR Code
