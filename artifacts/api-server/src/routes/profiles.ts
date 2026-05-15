@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, ilike, or } from "drizzle-orm";
+import { eq, ilike, or, and } from "drizzle-orm";
 import { db, profilesTable } from "@workspace/db";
 import {
   RegisterVisitorBody,
@@ -132,7 +132,7 @@ router.get("/profiles", async (req, res) => {
       const profiles = await db
         .select()
         .from(profilesTable)
-        .where(conditions.length === 1 ? conditions[0] : or(...conditions))
+        .where(conditions.length === 1 ? conditions[0] : and(...conditions))
         .limit(limit)
         .offset(offset);
 
