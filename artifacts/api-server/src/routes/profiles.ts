@@ -113,35 +113,32 @@ router.get("/profiles", async (req, res) => {
     const limit = parseInt(String(req.query.limit ?? "50"));
     const offset = parseInt(String(req.query.offset ?? "0"));
 
-    const conditions = [];
+    let whereClause;
 
-    if (role) {
-      conditions.push(eq(profilesTable.role, role as any));
-    }
-
-    if (search) {
-      conditions.push(
+    if (role && search) {
+      // Both role filter AND search term: profile must match role AND contain search term
+      whereClause = and(
+        eq(profilesTable.role, role as any),
         or(
           ilike(profilesTable.full_name, `%${search}%`),
           ilike(profilesTable.phone, `%${search}%`),
         ),
       );
-    }
-
-    if (conditions.length > 0) {
-      const profiles = await db
-        .select()
-        .from(profilesTable)
-        .where(conditions.length === 1 ? conditions[0] : and(...conditions))
-        .limit(limit)
-        .offset(offset);
-
-      return res.json(profiles);
+    } else if (role) {
+      // Role filter only
+      whereClause = eq(profilesTable.role, role as any);
+    } else if (search) {
+      // Search only: match across name fields using OR
+      whereClause = or(
+        ilike(profilesTable.full_name, `%${search}%`),
+        ilike(profilesTable.phone, `%${search}%`),
+      );
     }
 
     const profiles = await db
       .select()
       .from(profilesTable)
+      .where(whereClause)
       .limit(limit)
       .offset(offset);
 

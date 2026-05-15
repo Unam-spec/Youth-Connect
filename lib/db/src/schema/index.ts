@@ -42,6 +42,12 @@ export const rsvpStatusEnum = pgEnum("rsvp_status", [
   "maybe",
 ]);
 
+export const checkInRequestStatusEnum = pgEnum("check_in_request_status", [
+  "pending",
+  "approved",
+  "rejected",
+]);
+
 export const profilesTable = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   clerk_id: text("clerk_id").unique(),
@@ -83,7 +89,9 @@ export const attendanceTable = pgTable("attendance", {
     .notNull()
     .defaultNow(),
   session_date: date("session_date").notNull(),
-  check_in_method: checkInMethodEnum("check_in_method").notNull().default("manual"),
+  check_in_method: checkInMethodEnum("check_in_method")
+    .notNull()
+    .default("manual"),
 });
 
 export const rsvpsTable = pgTable("rsvps", {
@@ -140,6 +148,20 @@ export const leaderPermissionsTable = pgTable("leader_permissions", {
     .defaultNow(),
 });
 
+export const checkInRequestsTable = pgTable("check_in_requests", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  profile_id: uuid("profile_id")
+    .notNull()
+    .references(() => profilesTable.id),
+  session_date: date("session_date").notNull(),
+  status: checkInRequestStatusEnum("status").notNull().default("pending"),
+  requested_at: timestamp("requested_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  reviewed_by: uuid("reviewed_by").references(() => profilesTable.id),
+  reviewed_at: timestamp("reviewed_at", { withTimezone: true }),
+});
+
 export const insertProfileSchema = createInsertSchema(profilesTable).omit({
   id: true,
   created_at: true,
@@ -166,6 +188,9 @@ export const insertQrCodeSchema = createInsertSchema(qrCodesTable).omit({
 export const insertLeaderPermissionsSchema = createInsertSchema(
   leaderPermissionsTable,
 ).omit({ id: true, created_at: true });
+export const insertCheckInRequestSchema = createInsertSchema(
+  checkInRequestsTable,
+).omit({ id: true, requested_at: true });
 
 export type Profile = typeof profilesTable.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -185,3 +210,5 @@ export type LeaderPermissions = typeof leaderPermissionsTable.$inferSelect;
 export type InsertLeaderPermissions = z.infer<
   typeof insertLeaderPermissionsSchema
 >;
+export type CheckInRequest = typeof checkInRequestsTable.$inferSelect;
+export type InsertCheckInRequest = z.infer<typeof insertCheckInRequestSchema>;

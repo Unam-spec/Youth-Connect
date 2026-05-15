@@ -13,11 +13,23 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useRegisterVisitor } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link, useLocation } from "wouter";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 import { useState } from "react";
 
@@ -59,17 +71,26 @@ export default function Register() {
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          // Submit check-in request for first timer
+          try {
+            await fetch("/api/checkin/requests", {
+              method: "POST",
+            });
+          } catch (error) {
+            console.error("Failed to submit check-in request:", error);
+          }
           setIsSuccess(true);
         },
         onError: (error) => {
           toast({
             title: "Registration Failed",
-            description: error.message || "An error occurred during registration",
+            description:
+              error.message || "An error occurred during registration",
             variant: "destructive",
           });
         },
-      }
+      },
     );
   }
 
@@ -85,19 +106,25 @@ export default function Register() {
               </div>
               <CardTitle className="text-2xl">Welcome to JG Youth!</CardTitle>
               <CardDescription className="text-base mt-2">
-                You've successfully registered as a first-timer. We're so glad you're here.
+                You've successfully registered as a first-timer. We're so glad
+                you're here.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6 pb-8 space-y-4">
               <div className="bg-muted p-4 rounded-lg text-sm text-center">
-                Your profile has been created as a Visitor. To get full access to RSVP to events and more, you can become a Member.
+                Your profile has been created as a Visitor. To get full access
+                to RSVP to events and more, you can become a Member.
               </div>
               <div className="flex flex-col gap-3 pt-2">
                 <Link href="/become-member">
-                  <Button className="w-full" size="lg">Become a Member</Button>
+                  <Button className="w-full" size="lg">
+                    Become a Member
+                  </Button>
                 </Link>
                 <Link href="/">
-                  <Button variant="outline" className="w-full">Return Home</Button>
+                  <Button variant="outline" className="w-full">
+                    Return Home
+                  </Button>
                 </Link>
               </div>
             </CardContent>
@@ -112,7 +139,11 @@ export default function Register() {
       <div className="max-w-xl mx-auto py-8">
         <div className="mb-6">
           <Link href="/">
-            <Button variant="ghost" size="sm" className="-ml-3 text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-ml-3 text-muted-foreground"
+            >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back
             </Button>
@@ -123,12 +154,16 @@ export default function Register() {
           <CardHeader>
             <CardTitle className="text-2xl">First Timer Registration</CardTitle>
             <CardDescription>
-              Welcome! Please fill in your details so we can get to know you better.
+              Welcome! Please fill in your details so we can get to know you
+              better.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <form
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-6"
+              >
                 <div className="space-y-4">
                   <FormField
                     control={form.control}
@@ -152,7 +187,11 @@ export default function Register() {
                         <FormItem>
                           <FormLabel>Phone Number *</FormLabel>
                           <FormControl>
-                            <Input type="tel" placeholder="082 123 4567" {...field} />
+                            <Input
+                              type="tel"
+                              placeholder="082 123 4567"
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -166,7 +205,11 @@ export default function Register() {
                         <FormItem>
                           <FormLabel>Email (Optional)</FormLabel>
                           <FormControl>
-                            <Input type="email" placeholder="john@example.com" {...field} />
+                            <Input
+                              type="email"
+                              placeholder="john@example.com"
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -181,7 +224,10 @@ export default function Register() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Gender *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select gender" />
@@ -220,7 +266,10 @@ export default function Register() {
                       <FormItem>
                         <FormLabel>How did you hear about us? *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Friend, Social Media, etc." {...field} />
+                          <Input
+                            placeholder="Friend, Social Media, etc."
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -228,9 +277,9 @@ export default function Register() {
                   />
                 </div>
 
-                <Button 
-                  type="submit" 
-                  className="w-full text-base h-12" 
+                <Button
+                  type="submit"
+                  className="w-full text-base h-12"
                   disabled={registerVisitor.isPending}
                 >
                   {registerVisitor.isPending ? "Registering..." : "Register"}
