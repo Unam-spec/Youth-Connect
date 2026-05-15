@@ -114,7 +114,10 @@ router.post("/rsvps/:eventId", async (req, res) => {
         .set({ status: parsed.data.status })
         .where(eq(rsvpsTable.id, existing.id))
         .returning();
-      return res.json({ ...updated, event: null });
+      const event = await db.query.eventsTable.findFirst({
+        where: eq(eventsTable.id, req.params.eventId),
+      });
+      return res.json({ ...updated, event: event ?? null });
     }
     const [rsvp] = await db
       .insert(rsvpsTable)
@@ -124,7 +127,10 @@ router.post("/rsvps/:eventId", async (req, res) => {
         status: parsed.data.status,
       })
       .returning();
-    return res.json({ ...rsvp, event: null });
+    const event = await db.query.eventsTable.findFirst({
+      where: eq(eventsTable.id, req.params.eventId),
+    });
+    return res.json({ ...rsvp, event: event ?? null });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
