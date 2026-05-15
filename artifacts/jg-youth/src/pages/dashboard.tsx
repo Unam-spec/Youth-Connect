@@ -37,6 +37,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Calendar,
   CheckCircle,
+  QrCode,
   ShieldAlert,
   UserPlus,
   Users,
@@ -513,7 +514,21 @@ export default function Dashboard() {
             </div>
 
             <div className="mt-8">
-              <SectionTitle title="Events" />
+              <div className="flex items-center justify-between mb-4">
+                <SectionTitle title="Events" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    toast({
+                      title: "QR Code generated for this Friday session",
+                    });
+                  }}
+                >
+                  <QrCode className="w-4 h-4 mr-2" />
+                  Generate QR Code
+                </Button>
+              </div>
               {isEventsLoading ? (
                 <Skeleton className="h-32 w-full" />
               ) : events && events.length > 0 ? (
