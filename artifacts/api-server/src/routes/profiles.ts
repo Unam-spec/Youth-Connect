@@ -230,4 +230,47 @@ router.post("/profiles/:id/revoke-membership", async (req, res) => {
   }
 });
 
+router.patch("/profiles/:id/role", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const requesterProfile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+
+    if (!requesterProfile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    if (requesterProfile.role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const { role } = req.body;
+
+    if (!["leader", "member", "visitor", "super_admin"].includes(role)) {
+      return res.status(400).json({ error: "Invalid role" });
+    }
+
+    const [updated] = await db
+      .update(profilesTable)
+      .set({ role })
+      .where(eq(profilesTable.id, req.params.id))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    return res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
