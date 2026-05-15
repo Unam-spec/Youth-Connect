@@ -4,14 +4,48 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useSearchForCheckIn, getSearchForCheckInQueryKey, useCheckIn } from "@workspace/api-client-react";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  useSearchForCheckIn,
+  getSearchForCheckInQueryKey,
+  useCheckIn,
+} from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, ChevronLeft, Search, User, UserCheck } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronLeft,
+  QrCode,
+  Search,
+  User,
+  UserCheck,
+  X,
+} from "lucide-react";
 import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const searchSchema = z.object({
   query: z.string().min(2, "Enter at least 2 characters to search"),
@@ -21,7 +55,12 @@ export default function CheckIn() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [hasSearched, setHasSearched] = useState(false);
-  const [successProfile, setSuccessProfile] = useState<{name: string, role: string} | null>(null);
+  const [successProfile, setSuccessProfile] = useState<{
+    name: string;
+    role: string;
+  } | null>(null);
+  const [showQrScanner, setShowQrScanner] = useState(false);
+  const [showCheckInPrompt, setShowCheckInPrompt] = useState(false);
 
   const form = useForm<z.infer<typeof searchSchema>>({
     resolver: zodResolver(searchSchema),
@@ -30,7 +69,12 @@ export default function CheckIn() {
 
   const { data: searchResults, isLoading: isSearching } = useSearchForCheckIn(
     { query: searchQuery },
-    { query: { enabled: searchQuery.length >= 2, queryKey: getSearchForCheckInQueryKey({ query: searchQuery }) } }
+    {
+      query: {
+        enabled: searchQuery.length >= 2,
+        queryKey: getSearchForCheckInQueryKey({ query: searchQuery }),
+      },
+    },
   );
 
   const checkInMutation = useCheckIn();
@@ -45,8 +89,8 @@ export default function CheckIn() {
       {
         data: {
           profile_id: profileId,
-          check_in_method: "self"
-        }
+          check_in_method: "self",
+        },
       },
       {
         onSuccess: () => {
@@ -60,10 +104,10 @@ export default function CheckIn() {
           toast({
             title: "Check-in Failed",
             description: error.message || "An error occurred.",
-            variant: "destructive"
+            variant: "destructive",
           });
-        }
-      }
+        },
+      },
     );
   }
 
@@ -87,9 +131,9 @@ export default function CheckIn() {
                 You're all set. Enjoy the service!
               </p>
               <div className="flex flex-col gap-3 pt-2">
-                <Button 
-                  className="w-full" 
-                  size="lg" 
+                <Button
+                  className="w-full"
+                  size="lg"
                   onClick={() => {
                     setSuccessProfile(null);
                     setSearchQuery("");
@@ -100,7 +144,9 @@ export default function CheckIn() {
                   Check In Another Person
                 </Button>
                 <Link href="/">
-                  <Button variant="outline" className="w-full">Return Home</Button>
+                  <Button variant="outline" className="w-full">
+                    Return Home
+                  </Button>
                 </Link>
               </div>
             </CardContent>
@@ -115,12 +161,19 @@ export default function CheckIn() {
       <div className="max-w-xl mx-auto py-8">
         <div className="mb-6 flex items-center justify-between">
           <Link href="/">
-            <Button variant="ghost" size="sm" className="-ml-3 text-muted-foreground">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-ml-3 text-muted-foreground"
+            >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back
             </Button>
           </Link>
-          <Link href="/leader-login" className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4">
+          <Link
+            href="/leader-login"
+            className="text-sm text-muted-foreground hover:text-primary underline underline-offset-4"
+          >
             Are you a leader?
           </Link>
         </div>
@@ -134,7 +187,10 @@ export default function CheckIn() {
           </CardHeader>
           <CardContent className="space-y-6">
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSearchSubmit)} className="flex gap-2">
+              <form
+                onSubmit={form.handleSubmit(onSearchSubmit)}
+                className="flex gap-2"
+              >
                 <FormField
                   control={form.control}
                   name="query"
@@ -143,10 +199,10 @@ export default function CheckIn() {
                       <FormControl>
                         <div className="relative">
                           <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
-                          <Input 
-                            placeholder="Name or phone number..." 
-                            className="pl-10 h-12 text-base" 
-                            {...field} 
+                          <Input
+                            placeholder="Name or phone number..."
+                            className="pl-10 h-12 text-base"
+                            {...field}
                           />
                         </div>
                       </FormControl>
@@ -154,9 +210,29 @@ export default function CheckIn() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="h-12 px-6">Search</Button>
+                <Button type="submit" className="h-12 px-6">
+                  Search
+                </Button>
               </form>
             </Form>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or</span>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full h-12 text-base"
+              onClick={() => setShowQrScanner(true)}
+            >
+              <QrCode className="w-5 h-5 mr-2" />
+              Scan QR Code
+            </Button>
 
             <div className="mt-8">
               {isSearching ? (
@@ -167,10 +243,12 @@ export default function CheckIn() {
               ) : hasSearched && searchResults ? (
                 searchResults.length > 0 ? (
                   <div className="space-y-3">
-                    <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">Select your profile</h3>
+                    <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+                      Select your profile
+                    </h3>
                     {searchResults.map((profile) => (
-                      <div 
-                        key={profile.id} 
+                      <div
+                        key={profile.id}
                         className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors"
                       >
                         <div className="flex items-center gap-3">
@@ -178,12 +256,22 @@ export default function CheckIn() {
                             <User className="w-5 h-5" />
                           </div>
                           <div>
-                            <p className="font-medium text-foreground">{profile.full_name}</p>
-                            <p className="text-sm text-muted-foreground capitalize">{profile.role}</p>
+                            <p className="font-medium text-foreground">
+                              {profile.full_name}
+                            </p>
+                            <p className="text-sm text-muted-foreground capitalize">
+                              {profile.role}
+                            </p>
                           </div>
                         </div>
-                        <Button 
-                          onClick={() => handleCheckIn(profile.id, profile.full_name, profile.role)}
+                        <Button
+                          onClick={() =>
+                            handleCheckIn(
+                              profile.id,
+                              profile.full_name,
+                              profile.role,
+                            )
+                          }
                           disabled={checkInMutation.isPending}
                           size="sm"
                         >
@@ -196,7 +284,9 @@ export default function CheckIn() {
                 ) : (
                   <div className="text-center py-10 border rounded-lg border-dashed">
                     <User className="mx-auto h-10 w-10 text-muted-foreground mb-3 opacity-20" />
-                    <p className="text-muted-foreground mb-4">No profiles found matching "{searchQuery}".</p>
+                    <p className="text-muted-foreground mb-4">
+                      No profiles found matching "{searchQuery}".
+                    </p>
                     <Link href="/register">
                       <Button variant="outline">Register as First Timer</Button>
                     </Link>
@@ -207,6 +297,74 @@ export default function CheckIn() {
           </CardContent>
         </Card>
       </div>
+
+      {/* QR Scanner Dialog */}
+      <Dialog open={showQrScanner} onOpenChange={setShowQrScanner}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scan QR Code</DialogTitle>
+            <DialogDescription>
+              Point your camera at the QR code to check in.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-8 flex items-center justify-center">
+            <div className="w-64 h-64 border-2 border-dashed border-muted-foreground/30 rounded-lg flex items-center justify-center">
+              <QrCode className="w-16 h-16 text-muted-foreground/50" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowQrScanner(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowQrScanner(false);
+                setShowCheckInPrompt(true);
+              }}
+            >
+              Simulate Scan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Check-in Type Prompt Dialog */}
+      <Dialog open={showCheckInPrompt} onOpenChange={setShowCheckInPrompt}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Check-in Type</DialogTitle>
+            <DialogDescription>
+              Are you a member checking in or a first timer?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-3">
+            <Button
+              className="w-full h-12 text-base"
+              onClick={() => {
+                setShowCheckInPrompt(false);
+                toast({ title: "Member check-in request submitted" });
+              }}
+            >
+              Member Check-in
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-12 text-base"
+              onClick={() => {
+                setShowCheckInPrompt(false);
+                window.location.href = "/register";
+              }}
+            >
+              First Timer
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowCheckInPrompt(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
