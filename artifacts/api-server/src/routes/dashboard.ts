@@ -14,7 +14,24 @@ const router = Router();
 
 router.get("/dashboard/kpis", async (req, res) => {
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const today = now.toISOString().split("T")[0];
+
+    // Convert to SAST (UTC+2)
+    const sastOffset = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+    const sastTime = new Date(now.getTime() + sastOffset);
+    const sastDay = sastTime.getUTCDay(); // 0 = Sunday, 5 = Friday
+    const sastHours = sastTime.getUTCHours();
+    const sastMinutes = sastTime.getUTCMinutes();
+    const currentTimeInMinutes = sastHours * 60 + sastMinutes;
+    const sessionStart = 18 * 60 + 30; // 18:30 in minutes
+    const sessionEnd = 22 * 60; // 22:00 in minutes
+
+    // Check if we're in a valid Friday session window
+    const isFridaySession =
+      sastDay === 5 &&
+      currentTimeInMinutes >= sessionStart &&
+      currentTimeInMinutes < sessionEnd;
 
     const [memberCount] = await db
       .select({ count: count() })
@@ -26,15 +43,24 @@ router.get("/dashboard/kpis", async (req, res) => {
       .from(profilesTable)
       .where(eq(profilesTable.role, "visitor"));
 
-    const [todayAttendance] = await db
-      .select({ count: count() })
-      .from(attendanceTable)
-      .where(eq(attendanceTable.session_date, today));
+    let todayAttendanceCount = 0;
+    let todayNewVisitorsCount = 0;
 
-    const [todayNewVisitors] = await db
-      .select({ count: count() })
-      .from(profilesTable)
-      .where(sql`date(${profilesTable.created_at}) = ${today}::date`);
+    // Only count attendance and visitors during Friday session
+    if (isFridaySession) {
+      const [todayAttendance] = await db
+        .select({ count: count() })
+        .from(attendanceTable)
+        .where(eq(attendanceTable.session_date, today));
+
+      const [todayNewVisitors] = await db
+        .select({ count: count() })
+        .from(profilesTable)
+        .where(sql`date(${profilesTable.created_at}) = ${today}::date`);
+
+      todayAttendanceCount = Number(todayAttendance?.count ?? 0);
+      todayNewVisitorsCount = Number(todayNewVisitors?.count ?? 0);
+    }
 
     const [upcomingEvents] = await db
       .select({ count: count() })
@@ -44,8 +70,8 @@ router.get("/dashboard/kpis", async (req, res) => {
     return res.json({
       total_members: Number(memberCount?.count ?? 0),
       total_visitors: Number(visitorCount?.count ?? 0),
-      today_attendance: Number(todayAttendance?.count ?? 0),
-      today_new_visitors: Number(todayNewVisitors?.count ?? 0),
+      today_attendance: todayAttendanceCount,
+      today_new_visitors: todayNewVisitorsCount,
       upcoming_events_count: Number(upcomingEvents?.count ?? 0),
     });
   } catch (err) {
@@ -93,7 +119,10 @@ router.get("/dashboard/recent-activity", async (req, res) => {
         status: membershipRequestsTable.status,
       })
       .from(membershipRequestsTable)
-      .leftJoin(profilesTable, eq(membershipRequestsTable.profile_id, profilesTable.id))
+      .leftJoin(
+        profilesTable,
+        eq(membershipRequestsTable.profile_id, profilesTable.id),
+      )
       .orderBy(desc(membershipRequestsTable.created_at))
       .limit(Math.ceil(limit / 3));
 
@@ -117,7 +146,10 @@ router.get("/dashboard/recent-activity", async (req, res) => {
         timestamp: r.timestamp.toISOString(),
       })),
     ]
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+      )
       .slice(0, limit);
 
     return res.json(activity);
