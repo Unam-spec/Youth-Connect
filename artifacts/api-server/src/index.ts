@@ -2,6 +2,10 @@ import "dotenv/config";
 import app from "./app";
 import { logger } from "./lib/logger";
 
+process.on("SIGTERM", () => {
+  logger.info("Received SIGTERM, shutting down gracefully");
+});
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {

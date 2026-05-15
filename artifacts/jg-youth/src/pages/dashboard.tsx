@@ -28,6 +28,24 @@ import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +57,7 @@ import {
   CheckCircle,
   QrCode,
   ShieldAlert,
+  Trash2,
   UserPlus,
   Users,
 } from "lucide-react";
@@ -50,6 +69,7 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
+  const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -201,6 +221,36 @@ export default function Dashboard() {
           }),
       },
     );
+  }
+
+  async function handleDeleteEvent() {
+    if (!deleteEventId) return;
+
+    try {
+      const response = await fetch(`/api/events/${deleteEventId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Delete failed",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "Event deleted successfully" });
+      setDeleteEventId(null);
+      refreshDashboard();
+    } catch (error) {
+      toast({
+        title: "Delete failed",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
   }
 
   function mutateProfileRole(action: "promote" | "revoke", profileId: string) {
@@ -533,13 +583,31 @@ export default function Dashboard() {
                 <Skeleton className="h-32 w-full" />
               ) : events && events.length > 0 ? (
                 <SimpleTable
-                  headers={["Title", "Date", "Time", "Location", "Visibility"]}
+                  headers={[
+                    "Title",
+                    "Date",
+                    "Time",
+                    "Location",
+                    "Visibility",
+                    "Actions",
+                  ]}
                   rows={events.map((event: any) => [
                     event.title,
                     format(new Date(event.date), "MMM d, yyyy"),
                     event.time,
                     event.location,
                     event.is_public ? "Public" : "Internal",
+                    session.role === "leader" ||
+                    session.role === "super_admin" ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteEventId(event.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    ) : null,
                   ])}
                 />
               ) : (
@@ -629,6 +697,26 @@ export default function Dashboard() {
           )}
         </Tabs>
       </div>
+
+      <AlertDialog
+        open={!!deleteEventId}
+        onOpenChange={(open) => !open && setDeleteEventId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this event? This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteEvent}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
 }
