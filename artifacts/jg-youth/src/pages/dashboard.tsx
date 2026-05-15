@@ -70,6 +70,8 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
+  const [pin, setPin] = useState("");
+  const [showPinDialog, setShowPinDialog] = useState(false);
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -278,6 +280,46 @@ export default function Dashboard() {
     } catch (error) {
       toast({
         title: "Failed to promote to leader",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleSavePin() {
+    if (pin.length !== 4) {
+      toast({
+        title: "Invalid PIN",
+        description: "PIN must be 4 digits",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/profiles/me", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pin }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Failed to save PIN",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "PIN saved successfully" });
+      setShowPinDialog(false);
+    } catch (error) {
+      toast({
+        title: "Failed to save PIN",
         description: "An error occurred",
         variant: "destructive",
       });
@@ -751,7 +793,7 @@ export default function Dashboard() {
               {isProfilesLoading ? (
                 <Skeleton className="h-24 w-full" />
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
                       {profiles?.filter((p: any) => p.role === "super_admin")
@@ -794,6 +836,37 @@ export default function Dashboard() {
                       Transfer Super Admin Position
                     </Button>
                   )}
+
+                  <div className="border-t pt-6">
+                    <SectionTitle title="PIN Management" />
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium">Your PIN</p>
+                          <p className="text-xs text-muted-foreground">
+                            Secure PIN for leader authentication
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowPinDialog(true)}
+                        >
+                          {pin ? "Change PIN" : "Generate PIN"}
+                        </Button>
+                      </div>
+                      {pin && (
+                        <div className="rounded-lg bg-muted p-4">
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Current PIN:
+                          </p>
+                          <p className="text-2xl font-bold tracking-widest">
+                            ••••
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </TabsContent>
@@ -820,6 +893,39 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{pin ? "Change PIN" : "Generate PIN"}</DialogTitle>
+            <DialogDescription>
+              {pin
+                ? "Enter your new 4-digit PIN"
+                : "Generate a new 4-digit PIN for secure authentication"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <Input
+              type="text"
+              placeholder="Enter 4-digit PIN"
+              maxLength={4}
+              value={pin}
+              onChange={(e) =>
+                setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+              }
+              className="text-center text-2xl tracking-widest"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPinDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSavePin}>
+              {pin ? "Update PIN" : "Generate PIN"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
