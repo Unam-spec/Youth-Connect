@@ -74,6 +74,9 @@ export default function Dashboard() {
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [showPinDialog, setShowPinDialog] = useState(false);
+  const [confirmLeaderProfile, setConfirmLeaderProfile] = useState<any>(null);
+  const [confirmSuperAdminProfile, setConfirmSuperAdminProfile] =
+    useState<any>(null);
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -129,7 +132,7 @@ export default function Dashboard() {
   // Load current PIN on mount for super admin
   useEffect(() => {
     async function loadPin() {
-      if (session.role === "super_admin") {
+      if (session && session.role === "super_admin") {
         try {
           const response = await apiFetch("/api/profiles/me");
           if (response.ok) {
@@ -144,7 +147,7 @@ export default function Dashboard() {
       }
     }
     loadPin();
-  }, [session.role, apiFetch]);
+  }, [session?.role, apiFetch]);
 
   const checkIn = useCheckIn();
   const createEvent = useCreateEvent();
@@ -294,11 +297,43 @@ export default function Dashboard() {
         return;
       }
 
-      toast({ title: "Promoted to leader successfully" });
+      const profile = profiles?.find((p: any) => p.id === profileId);
+      toast({ title: `${profile?.full_name} is now a Leader` });
+      setConfirmLeaderProfile(null);
       refreshDashboard();
     } catch (error) {
       toast({
         title: "Failed to promote to leader",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleMakeSuperAdmin(profileId: string) {
+    try {
+      const response = await apiFetch(`/api/profiles/${profileId}/role`, {
+        method: "PATCH",
+        body: JSON.stringify({ role: "super_admin" }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Failed to promote to super admin",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const profile = profiles?.find((p: any) => p.id === profileId);
+      toast({ title: `${profile?.full_name} is now a Super Admin` });
+      setConfirmSuperAdminProfile(null);
+      refreshDashboard();
+    } catch (error) {
+      toast({
+        title: "Failed to promote to super admin",
         description: "An error occurred",
         variant: "destructive",
       });
@@ -512,55 +547,112 @@ export default function Dashboard() {
                 className="sm:max-w-xs"
               />
             </div>
+
+            {session.role === "super_admin" && (
+              <div className="mb-4 sticky top-0 z-10 bg-card p-3 rounded-lg border">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-purple-600">
+                    Super Admin Slots:{" "}
+                    {profiles?.filter((p: any) => p.role === "super_admin")
+                      .length || 0}{" "}
+                    / 4 filled
+                  </p>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className={`h-2 rounded-full transition-all ${
+                      (profiles?.filter((p: any) => p.role === "super_admin")
+                        .length || 0) >= 4
+                        ? "bg-red-500"
+                        : "bg-purple-500"
+                    }`}
+                    style={{
+                      width: `${((profiles?.filter((p: any) => p.role === "super_admin").length || 0) / 4) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
             {isProfilesLoading ? (
-              <Skeleton className="h-32 w-full" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[...Array(6)].map((_, i) => (
+                  <Skeleton key={i} className="h-48 w-full" />
+                ))}
+              </div>
             ) : profiles && profiles.length > 0 ? (
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {profiles.map((profile: any) => (
                   <div
                     key={profile.id}
-                    className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
+                    className="flex flex-col gap-3 rounded-lg border p-4 bg-card"
                   >
                     <div>
-                      <p className="font-medium">{profile.full_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {profile.phone || "No phone"} ·{" "}
-                        {profile.email || "No email"}
+                      <p className="text-lg font-bold">{profile.full_name}</p>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Joined:{" "}
+                        {profile.created_at
+                          ? new Date(profile.created_at).toLocaleDateString()
+                          : "Unknown"}
                       </p>
+                      <Badge
+                        variant={
+                          profile.role === "super_admin"
+                            ? "default"
+                            : profile.role === "leader"
+                              ? "secondary"
+                              : "outline"
+                        }
+                        className={
+                          profile.role === "super_admin"
+                            ? "bg-purple-600 hover:bg-purple-700"
+                            : profile.role === "leader"
+                              ? "bg-blue-600 hover:bg-blue-700"
+                              : "bg-gray-600 hover:bg-gray-700"
+                        }
+                      >
+                        {profile.role === "super_admin"
+                          ? "Super Admin"
+                          : profile.role === "leader"
+                            ? "Leader"
+                            : profile.role === "member"
+                              ? "Member"
+                              : profile.role}
+                      </Badge>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{profile.role}</Badge>
-                      {profile.role === "visitor" && (
-                        <Button
-                          size="sm"
-                          onClick={() =>
-                            mutateProfileRole("promote", profile.id)
-                          }
-                        >
-                          Make member
-                        </Button>
-                      )}
-                      {profile.role === "member" && (
-                        <>
+                    <div className="flex gap-2 mt-auto">
+                      {profile.role === "member" &&
+                        session &&
+                        session.role === "super_admin" && (
                           <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              mutateProfileRole("revoke", profile.id)
-                            }
+                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                            onClick={() => setConfirmLeaderProfile(profile)}
                           >
-                            Revoke
+                            Make Leader
                           </Button>
-                          {session.role === "super_admin" && (
-                            <Button
-                              size="sm"
-                              onClick={() => handleMakeLeader(profile.id)}
-                            >
-                              Make Leader
-                            </Button>
-                          )}
-                        </>
-                      )}
+                        )}
+                      {profile.role === "leader" &&
+                        session &&
+                        session.role === "super_admin" && (
+                          <Button
+                            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+                            disabled={
+                              (profiles?.filter(
+                                (p: any) => p.role === "super_admin",
+                              ).length || 0) >= 4
+                            }
+                            title={
+                              (profiles?.filter(
+                                (p: any) => p.role === "super_admin",
+                              ).length || 0) >= 4
+                                ? "All 4 super admin slots are filled"
+                                : ""
+                            }
+                            onClick={() => setConfirmSuperAdminProfile(profile)}
+                          >
+                            Make Super Admin
+                          </Button>
+                        )}
                     </div>
                   </div>
                 ))}
@@ -917,9 +1009,7 @@ export default function Dashboard() {
           <DialogHeader>
             <DialogTitle>{pin ? "Change PIN" : "Generate PIN"}</DialogTitle>
             <DialogDescription>
-              {pin
-                ? "Enter your new 4-digit PIN"
-                : "Generate a new 4-digit PIN for secure authentication"}
+              {pin ? "Enter your new 4-digit PIN" : "Generate a new 4-digit PIN for secure authentication"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -928,9 +1018,7 @@ export default function Dashboard() {
               placeholder="Enter 4-digit PIN"
               maxLength={4}
               value={pin}
-              onChange={(e) =>
-                setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
-              }
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
               className="text-center text-2xl tracking-widest"
             />
           </div>
@@ -944,9 +1032,42 @@ export default function Dashboard() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!confirmLeaderProfile} onOpenChange={() => setConfirmLeaderProfile(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Promote to Leader</AlertDialogTitle>
+            <AlertDialogDescription>
+              Promote {confirmLeaderProfile?.full_name} to Leader? They will gain access to the leader dashboard and event management.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleMakeLeader(confirmLeaderProfile?.id)}>
+              Make Leader
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!confirmSuperAdminProfile} onOpenChange={() => setConfirmSuperAdminProfile(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Promote to Super Admin</AlertDialogTitle>
+            <AlertDialogDescription>
+              Promote {confirmSuperAdminProfile?.full_name} to Super Admin? This will use slot {profiles?.filter((p: any) => p.role === "super_admin").length || 0 + 1} of 4. Super admin slots are limited.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleMakeSuperAdmin(confirmSuperAdminProfile?.id)}>
+              Make Super Admin
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Layout>
   );
-}
 
 function KpiCard({
   title,
