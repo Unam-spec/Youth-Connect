@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { format } from "date-fns";
 import { Redirect } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -68,10 +68,12 @@ export default function Dashboard() {
   const session = getLeaderSession();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const apiFetch = useApiFetch();
   const [search, setSearch] = useState("");
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [showPinDialog, setShowPinDialog] = useState(false);
+  const [checkInRequests, setCheckInRequests] = useState<any[]>([]);
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -370,6 +372,78 @@ export default function Dashboard() {
           }),
       },
     );
+  }
+
+  async function handleApproveCheckIn(requestId: string) {
+    try {
+      const response = await apiFetch(
+        `/api/checkin/requests/${requestId}/approve`,
+        {
+          method: "POST",
+        },
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Approval failed",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Check-in approved" });
+      // Refresh check-in requests
+      const checkInResponse = await apiFetch(
+        "/api/checkin/requests?status=pending",
+      );
+      if (checkInResponse.ok) {
+        const data = await checkInResponse.json();
+        setCheckInRequests(data);
+      }
+      refreshDashboard();
+    } catch (error) {
+      toast({
+        title: "Approval failed",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleRejectCheckIn(requestId: string) {
+    try {
+      const response = await apiFetch(
+        `/api/checkin/requests/${requestId}/reject`,
+        {
+          method: "POST",
+        },
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Rejection failed",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Check-in rejected" });
+      // Refresh check-in requests
+      const checkInResponse = await apiFetch(
+        "/api/checkin/requests?status=pending",
+      );
+      if (checkInResponse.ok) {
+        const data = await checkInResponse.json();
+        setCheckInRequests(data);
+      }
+      refreshDashboard();
+    } catch (error) {
+      toast({
+        title: "Rejection failed",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
   }
 
   return (
@@ -900,7 +974,7 @@ export default function Dashboard() {
             <DialogTitle>{pin ? "Change PIN" : "Generate PIN"}</DialogTitle>
             <DialogDescription>
               {pin
-                ? "Enter your new 4-digit PIN"
+                ? "Update your 4-digit PIN for secure authentication"
                 : "Generate a new 4-digit PIN for secure authentication"}
             </DialogDescription>
           </DialogHeader>
