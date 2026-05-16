@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, useEffect, type ReactNode } from "react";
 import { format } from "date-fns";
 import { Redirect } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -125,6 +125,26 @@ export default function Dashboard() {
       queryKey: getListLeadersQueryKey(),
     },
   });
+
+  // Load current PIN on mount for super admin
+  useEffect(() => {
+    async function loadPin() {
+      if (session.role === "super_admin") {
+        try {
+          const response = await apiFetch("/api/profiles/me");
+          if (response.ok) {
+            const data = await response.json();
+            if (data.pin_hash) {
+              setPin(data.pin_hash);
+            }
+          }
+        } catch (error) {
+          console.error("Failed to load PIN:", error);
+        }
+      }
+    }
+    loadPin();
+  }, [session.role, apiFetch]);
 
   const checkIn = useCheckIn();
   const createEvent = useCreateEvent();
