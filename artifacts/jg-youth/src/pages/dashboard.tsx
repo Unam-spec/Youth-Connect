@@ -995,7 +995,9 @@ export default function Dashboard() {
           <DialogHeader>
             <DialogTitle>{pin ? "Change PIN" : "Generate PIN"}</DialogTitle>
             <DialogDescription>
-              {pin ? "Enter your new 4-digit PIN" : "Generate a new 4-digit PIN for secure authentication"}
+              {pin
+                ? "Enter your new 4-digit PIN"
+                : "Generate a new 4-digit PIN for secure authentication"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1005,7 +1007,9 @@ export default function Dashboard() {
               maxLength={4}
               pattern="[0-9]*"
               value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              onChange={(e) =>
+                setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+              }
               className="text-center text-2xl tracking-widest"
             />
           </div>
@@ -1020,34 +1024,49 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!confirmLeaderProfile} onOpenChange={() => setConfirmLeaderProfile(null)}>
+      <AlertDialog
+        open={!!confirmLeaderProfile}
+        onOpenChange={() => setConfirmLeaderProfile(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Promote to Leader</AlertDialogTitle>
             <AlertDialogDescription>
-              Promote {confirmLeaderProfile?.full_name} to Leader? They will gain access to the leader dashboard and event management.
+              Promote {confirmLeaderProfile?.full_name} to Leader? They will
+              gain access to the leader dashboard and event management.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleMakeLeader(confirmLeaderProfile?.id)}>
+            <AlertDialogAction
+              onClick={() => handleMakeLeader(confirmLeaderProfile?.id)}
+            >
               Make Leader
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!confirmSuperAdminProfile} onOpenChange={() => setConfirmSuperAdminProfile(null)}>
+      <AlertDialog
+        open={!!confirmSuperAdminProfile}
+        onOpenChange={() => setConfirmSuperAdminProfile(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Promote to Super Admin</AlertDialogTitle>
             <AlertDialogDescription>
-              Promote {confirmSuperAdminProfile?.full_name} to Super Admin? This will use slot {profiles?.filter((p: any) => p.role === "super_admin").length || 0 + 1} of 4. Super admin slots are limited.
+              Promote {confirmSuperAdminProfile?.full_name} to Super Admin? This
+              will use slot{" "}
+              {profiles?.filter((p: any) => p.role === "super_admin").length ||
+                0 + 1}{" "}
+              of 4. Super admin slots are limited.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleMakeSuperAdmin(confirmSuperAdminProfile?.id)}>
+            <AlertDialogAction
+              onClick={() => handleMakeSuperAdmin(confirmSuperAdminProfile?.id)}
+            >
               Make Super Admin
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -1056,73 +1075,74 @@ export default function Dashboard() {
     </Layout>
   );
 
-function KpiCard({
-  title,
-  value,
-  loading,
-  icon,
-}: {
-  title: string;
-  value?: number;
-  loading: boolean;
-  icon: ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        {icon}
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <Skeleton className="h-7 w-16" />
-        ) : (
-          <div className="text-2xl font-bold">{value ?? 0}</div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
+  function KpiCard({
+    title,
+    value,
+    loading,
+    icon,
+  }: {
+    title: string;
+    value?: number;
+    loading: boolean;
+    icon: ReactNode;
+  }) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">{title}</CardTitle>
+          {icon}
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <Skeleton className="h-7 w-16" />
+          ) : (
+            <div className="text-2xl font-bold">{value ?? 0}</div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
 
-function SectionTitle({ title }: { title: string }) {
-  return <h3 className="mb-4 text-lg font-semibold">{title}</h3>;
-}
+  function SectionTitle({ title }: { title: string }) {
+    return <h3 className="mb-4 text-lg font-semibold">{title}</h3>;
+  }
 
-function EmptyLine({ text }: { text: string }) {
-  return <p className="text-sm text-muted-foreground">{text}</p>;
-}
+  function EmptyLine({ text }: { text: string }) {
+    return <p className="text-sm text-muted-foreground">{text}</p>;
+  }
 
-function SimpleTable({
-  headers,
-  rows,
-}: {
-  headers: string[];
-  rows: string[][];
-}) {
-  return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/40 text-left">
-          <tr>
-            {headers.map((header) => (
-              <th key={header} className="px-3 py-2 font-medium">
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, rowIndex) => (
-            <tr key={rowIndex} className="border-t">
-              {row.map((cell, cellIndex) => (
-                <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2">
-                  {cell}
-                </td>
+  function SimpleTable({
+    headers,
+    rows,
+  }: {
+    headers: string[];
+    rows: string[][];
+  }) {
+    return (
+      <div className="overflow-x-auto rounded-lg border">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/40 text-left">
+            <tr>
+              {headers.map((header) => (
+                <th key={header} className="px-3 py-2 font-medium">
+                  {header}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+          </thead>
+          <tbody>
+            {rows.map((row, rowIndex) => (
+              <tr key={rowIndex} className="border-t">
+                {row.map((cell, cellIndex) => (
+                  <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
 }
