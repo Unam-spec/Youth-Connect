@@ -30,8 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useRegisterVisitor } from "@workspace/api-client-react";
-import { useAuth } from "@clerk/react";
-import { useApiFetch } from "@/lib/api";
 import { Link, useLocation } from "wouter";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
 
@@ -50,8 +48,7 @@ export default function Register() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [isSuccess, setIsSuccess] = useState(false);
-  const registerVisitor = useRegisterVisitor();
-  const apiFetch = useApiFetch();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -65,36 +62,40 @@ export default function Register() {
     },
   });
 
-  function onSubmit(data: RegisterFormValues) {
-    registerVisitor.mutate(
-      {
-        data: {
+  async function onSubmit(data: RegisterFormValues) {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/profiles/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           ...data,
           email: data.email || null,
-        },
-      },
-      {
-        onSuccess: async () => {
-          // Submit check-in request for first timer
-          try {
-            await apiFetch("/api/checkin/requests", {
-              method: "POST",
-            });
-          } catch (error) {
-            console.error("Failed to submit check-in request:", error);
-          }
-          setIsSuccess(true);
-        },
-        onError: (error) => {
-          toast({
-            title: "Registration Failed",
-            description:
-              error.message || "An error occurred during registration",
-            variant: "destructive",
-          });
-        },
-      },
-    );
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || error.error || "Registration failed");
+      }
+
+      const result = await response.json();
+      setIsSuccess(true);
+      toast({ title: "Registration successful" });
+    } catch (error) {
+      toast({
+        title: "Registration Failed",
+        description:
+          error instanceof Error
+            ? error.message
+            : "An error occurred during registration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   if (isSuccess) {
@@ -283,9 +284,9 @@ export default function Register() {
                 <Button
                   type="submit"
                   className="w-full text-base h-12"
-                  disabled={registerVisitor.isPending}
+                  disabled={isSubmitting}
                 >
-                  {registerVisitor.isPending ? "Registering..." : "Register"}
+                  {isSubmitting ? "Registering..." : "Register"}
                 </Button>
               </form>
             </Form>
