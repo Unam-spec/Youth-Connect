@@ -249,14 +249,29 @@ router.post("/profiles/:id/revoke-membership", async (req, res) => {
 router.patch("/profiles/:id/role", async (req, res) => {
   try {
     const auth = getAuth(req);
+    const leaderSessionHeader = req.headers["x-leader-session"];
 
-    if (!auth?.userId) {
+    let requesterProfile;
+
+    // Check for Clerk auth first
+    if (auth?.userId) {
+      requesterProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, auth.userId),
+      });
+    }
+    // Check for leader session (super admins using PIN-based auth)
+    else if (leaderSessionHeader) {
+      try {
+        const session = JSON.parse(leaderSessionHeader as string);
+        requesterProfile = await db.query.profilesTable.findFirst({
+          where: eq(profilesTable.id, session.profile_id),
+        });
+      } catch {
+        return res.status(401).json({ error: "Invalid session" });
+      }
+    } else {
       return res.status(401).json({ error: "Unauthorized" });
     }
-
-    const requesterProfile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
 
     if (!requesterProfile) {
       return res.status(404).json({ error: "Profile not found" });

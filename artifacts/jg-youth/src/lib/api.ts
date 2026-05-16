@@ -1,4 +1,5 @@
 import { useAuth } from "@clerk/react";
+import { getLeaderSession } from "./auth";
 
 export async function apiFetch(
   url: string,
@@ -26,6 +27,12 @@ export async function apiFetch(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
+  // Add leader session for super admin authentication
+  const leaderSession = getLeaderSession();
+  if (leaderSession) {
+    headers["x-leader-session"] = JSON.stringify(leaderSession);
+  }
+
   return fetch(url, {
     ...options,
     headers,
@@ -46,6 +53,12 @@ export function useApiFetch() {
 
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    // Add leader session for super admin authentication
+    const leaderSession = getLeaderSession();
+    if (leaderSession) {
+      headers["x-leader-session"] = JSON.stringify(leaderSession);
     }
 
     return fetch(url, {
