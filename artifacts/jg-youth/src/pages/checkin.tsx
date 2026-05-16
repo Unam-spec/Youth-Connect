@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAuth } from "@clerk/react";
 import { Layout } from "@/components/layout";
 import { useApiFetch } from "@/lib/api";
+import { useRegisterVisitor } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -23,6 +23,13 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   useSearchForCheckIn,
   getSearchForCheckInQueryKey,
@@ -53,9 +60,21 @@ const searchSchema = z.object({
   query: z.string().min(2, "Enter at least 2 characters to search"),
 });
 
+const registerSchema = z.object({
+  full_name: z.string().min(2, "Full name is required"),
+  phone: z.string().min(10, "Valid phone number is required").max(15),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  gender: z.enum(["male", "female", "other"]),
+  age: z.coerce.number().min(10).max(100),
+  heard_from: z.string().min(2, "Please tell us how you heard about us"),
+});
+
+type RegisterFormValues = z.infer<typeof registerSchema>;
+
 export default function CheckIn() {
   const { toast } = useToast();
   const apiFetch = useApiFetch();
+  const registerVisitor = useRegisterVisitor();
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [hasSearched, setHasSearched] = useState(false);
   const [successProfile, setSuccessProfile] = useState<{
@@ -64,11 +83,61 @@ export default function CheckIn() {
   } | null>(null);
   const [showQrScanner, setShowQrScanner] = useState(false);
   const [showCheckInPrompt, setShowCheckInPrompt] = useState(false);
+  const [showRegisterForm, setShowRegisterForm] = useState(false);
 
   const form = useForm<z.infer<typeof searchSchema>>({
     resolver: zodResolver(searchSchema),
     defaultValues: { query: "" },
   });
+
+  const registerForm = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      full_name: "",
+      phone: "",
+      email: "",
+      gender: "male",
+      age: 18,
+      heard_from: "",
+    },
+  });
+
+  async function handleRegister(data: RegisterFormValues) {
+    registerVisitor.mutate(
+      {
+        data: {
+          ...data,
+          email: data.email || null,
+        },
+      },
+      {
+        onSuccess: async () => {
+          // Submit check-in request for first timer
+          try {
+            await apiFetch("/api/checkin/requests", {
+              method: "POST",
+            });
+          } catch (error) {
+            console.error("Failed to submit check-in request:", error);
+          }
+          setShowRegisterForm(false);
+          toast({
+            title: "Registration successful",
+            description: "Check-in request submitted - pending approval",
+          });
+          registerForm.reset();
+        },
+        onError: (error) => {
+          toast({
+            title: "Registration Failed",
+            description:
+              error.message || "An error occurred during registration",
+            variant: "destructive",
+          });
+        },
+      },
+    );
+  }
 
   const { data: searchResults, isLoading: isSearching } = useSearchForCheckIn(
     { query: searchQuery },
@@ -395,7 +464,7 @@ export default function CheckIn() {
               className="w-full h-12 text-base"
               onClick={() => {
                 setShowCheckInPrompt(false);
-                window.location.href = "/register";
+                setShowRegisterForm(true);
               }}
             >
               First Timer
@@ -406,6 +475,135 @@ export default function CheckIn() {
               Cancel
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRegisterForm} onOpenChange={setShowRegisterForm}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>First Timer Registration</DialogTitle>
+            <DialogDescription>
+              Please fill in your details to register as a first-time visitor
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...registerForm}>
+            <form
+              onSubmit={registerForm.handleSubmit(handleRegister)}
+              className="space-y-4"
+            >
+              <FormField
+                control={registerForm.control}
+                name="full_name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={registerForm.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone Number *</FormLabel>
+                    <FormControl>
+                      <Input type="tel" placeholder="082 123 4567" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={registerForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email (Optional)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="john@example.com"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={registerForm.control}
+                  name="gender"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Gender *</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={registerForm.control}
+                  name="age"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Age *</FormLabel>
+                      <FormControl>
+                        <Input type="number" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={registerForm.control}
+                name="heard_from"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>How did you hear about us? *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Friend, social media, etc."
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={() => setShowRegisterForm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={registerVisitor.isPending}>
+                  {registerVisitor.isPending ? "Registering..." : "Register"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </Layout>
