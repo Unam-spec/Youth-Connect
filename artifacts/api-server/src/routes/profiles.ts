@@ -1,7 +1,18 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
+import { ClerkClient, createClerkClient } from "@clerk/backend";
 import { eq, ilike, or, and } from "drizzle-orm";
-import { db, profilesTable } from "@workspace/db";
+import {
+  db,
+  profilesTable,
+  checkInRequestsTable,
+  attendanceTable,
+  rsvpsTable,
+  messagesTable,
+  leaderPermissionsTable,
+  leaderSlotsTable,
+  superAdminSlotsTable,
+} from "@workspace/db";
 import {
   RegisterVisitorBody,
   UpdateMyProfileBody,
@@ -124,31 +135,63 @@ router.post("/profiles/register", async (req, res) => {
       return res.status(400).json({ error: parsed.error.flatten() });
     }
 
-    const auth = getAuth(req);
-    const { clerk_id, ...rest } = parsed.data;
-    const linkedClerkId = auth?.userId ?? clerk_id ?? null;
+    const { full_name, phone, email, gender, age, heard_from, clerk_id } =
+      parsed.data;
 
-    // Ensure all required fields are present and not null/undefined
-    const insertData = {
-      full_name: rest.full_name || "",
-      phone: rest.phone || "",
-      email: rest.email || null,
-      gender: rest.gender || "other",
-      age: rest.age || 18,
-      heard_from: rest.heard_from || "",
-      clerk_id: linkedClerkId && linkedClerkId.trim() ? linkedClerkId : null,
-      role: "visitor" as const,
-    };
+    // Explicit validation before database call
+    if (!full_name || full_name.trim().length < 2) {
+      return res.status(400).json({ error: "Full name is required" });
+    }
+    if (!phone || phone.trim().length < 10) {
+      return res.status(400).json({ error: "Phone number is required" });
+    }
+    if (!gender) {
+      return res.status(400).json({ error: "Gender is required" });
+    }
+    if (!age) {
+      return res.status(400).json({ error: "Age is required" });
+    }
+    if (!heard_from) {
+      return res
+        .status(400)
+        .json({ error: "Please tell us how you heard about us" });
+    }
 
-    const [profile] = await db
+    // Sanitize fields before insert
+    const sanitizedEmail = email && email.trim() !== "" ? email.trim() : null;
+    const sanitizedAge = parseInt(String(age), 10);
+    if (isNaN(sanitizedAge)) {
+      return res.status(400).json({ error: "Age must be a number" });
+    }
+
+    const [visitor] = await db
       .insert(profilesTable)
-      .values(insertData)
+      .values({
+        full_name: full_name.trim(),
+        phone: phone.trim(),
+        email: sanitizedEmail,
+        gender,
+        age: sanitizedAge,
+        heard_from: heard_from.trim(),
+        clerk_id: clerk_id && clerk_id.trim() ? clerk_id.trim() : null,
+        role: "visitor",
+      })
       .returning();
 
-    return res.status(201).json(profile);
-  } catch (err) {
-    req.log.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    // Insert check-in request for leader approval
+    await db.insert(checkInRequestsTable).values({
+      profile_id: visitor.id,
+      session_date: new Date().toISOString().split("T")[0],
+      status: "pending",
+    });
+
+    return res.status(201).json({ success: true, visitor });
+  } catch (error) {
+    console.error("Registration error:", error);
+    return res.status(500).json({
+      error: "Registration failed",
+      detail: error instanceof Error ? error.message : "Unknown error",
+    });
   }
 });
 
