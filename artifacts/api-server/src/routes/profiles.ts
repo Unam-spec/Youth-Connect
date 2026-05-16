@@ -13,26 +13,36 @@ const router = Router();
 router.get("/profiles/me", async (req, res) => {
   try {
     const auth = getAuth(req);
-    const clerkId = auth?.userId;
+    const leaderSessionHeader = req.headers["x-leader-session"];
 
-    if (!clerkId) {
+    let profile;
+    let whereClause;
+
+    // Check for Clerk auth first
+    if (auth?.userId) {
+      const clerkId = auth.userId;
+      profile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, clerkId),
+      });
+      whereClause = eq(profilesTable.clerk_id, clerkId);
+    }
+    // Check for leader session (super admins using PIN-based auth)
+    else if (leaderSessionHeader) {
+      try {
+        const session = JSON.parse(leaderSessionHeader as string);
+        profile = await db.query.profilesTable.findFirst({
+          where: eq(profilesTable.id, session.profile_id),
+        });
+        whereClause = eq(profilesTable.id, session.profile_id);
+      } catch {
+        return res.status(401).json({ error: "Invalid session" });
+      }
+    } else {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    let profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, clerkId),
-    });
-
     if (!profile) {
-      const [newProfile] = await db
-        .insert(profilesTable)
-        .values({
-          clerk_id: clerkId,
-          full_name: "",
-          role: "member",
-        })
-        .returning();
-      profile = newProfile;
+      return res.status(404).json({ error: "Profile not found" });
     }
 
     return res.json(profile);
@@ -45,24 +55,42 @@ router.get("/profiles/me", async (req, res) => {
 router.patch("/profiles/me", async (req, res) => {
   try {
     const auth = getAuth(req);
-    const clerkId = auth?.userId;
+    const leaderSessionHeader = req.headers["x-leader-session"];
 
-    if (!clerkId) {
+    let profile;
+    let whereClause;
+
+    // Check for Clerk auth first
+    if (auth?.userId) {
+      const clerkId = auth.userId;
+      profile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, clerkId),
+      });
+      whereClause = eq(profilesTable.clerk_id, clerkId);
+    }
+    // Check for leader session (super admins using PIN-based auth)
+    else if (leaderSessionHeader) {
+      try {
+        const session = JSON.parse(leaderSessionHeader as string);
+        profile = await db.query.profilesTable.findFirst({
+          where: eq(profilesTable.id, session.profile_id),
+        });
+        whereClause = eq(profilesTable.id, session.profile_id);
+      } catch {
+        return res.status(401).json({ error: "Invalid session" });
+      }
+    } else {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
     }
 
     const parsed = UpdateMyProfileBody.safeParse(req.body);
 
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten() });
-    }
-
-    const existing = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, clerkId),
-    });
-
-    if (!existing) {
-      return res.status(404).json({ error: "Profile not found" });
     }
 
     // Handle PIN hashing
@@ -76,7 +104,7 @@ router.patch("/profiles/me", async (req, res) => {
     const [updated] = await db
       .update(profilesTable)
       .set(updateData)
-      .where(eq(profilesTable.clerk_id, clerkId))
+      .where(whereClause)
       .returning();
 
     return res.json(updated);
