@@ -40,6 +40,7 @@ export const UpdateMyProfileBody = zod.object({
   gender: zod.enum(["male", "female", "other"]).optional(),
   age: zod.number().optional(),
   heard_from: zod.string().optional(),
+  pin: zod.string().optional(),
 });
 
 export const UpdateMyProfileResponse = zod.object({

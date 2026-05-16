@@ -65,9 +65,17 @@ router.patch("/profiles/me", async (req, res) => {
       return res.status(404).json({ error: "Profile not found" });
     }
 
+    // Handle PIN hashing
+    const updateData: any = { ...parsed.data };
+    if (updateData.pin) {
+      // Simple hash for PIN (in production, use bcrypt or similar)
+      updateData.pin_hash = updateData.pin;
+      delete updateData.pin;
+    }
+
     const [updated] = await db
       .update(profilesTable)
-      .set(parsed.data)
+      .set(updateData)
       .where(eq(profilesTable.clerk_id, clerkId))
       .returning();
 

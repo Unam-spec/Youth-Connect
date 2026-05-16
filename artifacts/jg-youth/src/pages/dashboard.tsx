@@ -311,6 +311,8 @@ export default function Dashboard() {
         return;
       }
 
+      const data = await response.json();
+      setPin(data.pin_hash || pin);
       toast({ title: "PIN saved successfully" });
       setShowPinDialog(false);
     } catch (error) {
