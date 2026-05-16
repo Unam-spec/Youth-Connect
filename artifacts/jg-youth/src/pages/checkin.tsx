@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "@clerk/react";
 import { Layout } from "@/components/layout";
+import { useApiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -54,7 +55,7 @@ const searchSchema = z.object({
 
 export default function CheckIn() {
   const { toast } = useToast();
-  const { getToken } = useAuth();
+  const apiFetch = useApiFetch();
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [hasSearched, setHasSearched] = useState(false);
   const [successProfile, setSuccessProfile] = useState<{
@@ -362,12 +363,8 @@ export default function CheckIn() {
               className="w-full h-12 text-base"
               onClick={async () => {
                 try {
-                  const token = await getToken();
-                  const response = await fetch("/api/checkin/requests", {
+                  const response = await apiFetch("/api/checkin/requests", {
                     method: "POST",
-                    headers: {
-                      Authorization: `Bearer ${token}`,
-                    },
                   });
                   if (!response.ok) {
                     const error = await response.json();

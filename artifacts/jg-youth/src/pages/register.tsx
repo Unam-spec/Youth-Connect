@@ -1,18 +1,27 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Layout } from "@/components/layout";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,17 +30,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useRegisterVisitor } from "@workspace/api-client-react";
-import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@clerk/react";
+import { useApiFetch } from "@/lib/api";
 import { Link, useLocation } from "wouter";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { CheckCircle2, ChevronLeft } from "lucide-react";
-import { useState } from "react";
 
 const registerSchema = z.object({
   full_name: z.string().min(2, "Full name is required"),
@@ -49,6 +51,7 @@ export default function Register() {
   const [, setLocation] = useLocation();
   const [isSuccess, setIsSuccess] = useState(false);
   const registerVisitor = useRegisterVisitor();
+  const apiFetch = useApiFetch();
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -74,7 +77,7 @@ export default function Register() {
         onSuccess: async () => {
           // Submit check-in request for first timer
           try {
-            await fetch("/api/checkin/requests", {
+            await apiFetch("/api/checkin/requests", {
               method: "POST",
             });
           } catch (error) {

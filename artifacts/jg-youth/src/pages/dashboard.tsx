@@ -24,6 +24,7 @@ import {
 } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
 import { getLeaderSession } from "@/lib/auth";
+import { useApiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,7 @@ export default function Dashboard() {
   const session = getLeaderSession();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const apiFetch = useApiFetch();
   const [search, setSearch] = useState("");
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
@@ -229,7 +231,7 @@ export default function Dashboard() {
     if (!deleteEventId) return;
 
     try {
-      const response = await fetch(`/api/events/${deleteEventId}`, {
+      const response = await apiFetch(`/api/events/${deleteEventId}`, {
         method: "DELETE",
       });
 
@@ -257,11 +259,8 @@ export default function Dashboard() {
 
   async function handleMakeLeader(profileId: string) {
     try {
-      const response = await fetch(`/api/profiles/${profileId}/role`, {
+      const response = await apiFetch(`/api/profiles/${profileId}/role`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ role: "leader" }),
       });
 
@@ -297,11 +296,8 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await fetch("/api/profiles/me", {
+      const response = await apiFetch("/api/profiles/me", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ pin }),
       });
 
