@@ -153,8 +153,10 @@ router.post("/profiles/register", async (req, res) => {
 router.get("/profiles", async (req, res) => {
   try {
     const auth = getAuth(req);
+    const leaderSessionHeader = req.headers["x-leader-session"];
 
-    if (!auth?.userId) {
+    // Check for Clerk auth or leader session auth
+    if (!auth?.userId && !leaderSessionHeader) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
