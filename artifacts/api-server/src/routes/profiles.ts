@@ -90,13 +90,21 @@ router.post("/profiles/register", async (req, res) => {
     const { clerk_id, ...rest } = parsed.data;
     const linkedClerkId = auth?.userId ?? clerk_id ?? null;
 
+    // Ensure all required fields are present and not null/undefined
+    const insertData = {
+      full_name: rest.full_name || "",
+      phone: rest.phone || "",
+      email: rest.email || null,
+      gender: rest.gender || "other",
+      age: rest.age || 18,
+      heard_from: rest.heard_from || "",
+      clerk_id: linkedClerkId && linkedClerkId.trim() ? linkedClerkId : null,
+      role: "visitor" as const,
+    };
+
     const [profile] = await db
       .insert(profilesTable)
-      .values({
-        ...rest,
-        clerk_id: linkedClerkId && linkedClerkId.trim() ? linkedClerkId : null,
-        role: "visitor",
-      })
+      .values(insertData)
       .returning();
 
     return res.status(201).json(profile);
