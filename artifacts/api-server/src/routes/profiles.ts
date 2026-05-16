@@ -45,7 +45,9 @@ router.get("/profiles/me", async (req, res) => {
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    return res.json(profile);
+    // Remove sensitive data from response
+    const { pin_hash, ...safeProfile } = profile;
+    return res.json(safeProfile);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });

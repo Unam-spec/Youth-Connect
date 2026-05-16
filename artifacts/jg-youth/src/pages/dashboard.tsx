@@ -129,25 +129,12 @@ export default function Dashboard() {
     },
   });
 
-  // Load current PIN on mount for super admin
+  // Reset PIN when dialog opens
   useEffect(() => {
-    async function loadPin() {
-      if (session && session.role === "super_admin") {
-        try {
-          const response = await apiFetch("/api/profiles/me");
-          if (response.ok) {
-            const data = await response.json();
-            if (data.pin_hash) {
-              setPin(data.pin_hash);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to load PIN:", error);
-        }
-      }
+    if (showPinDialog) {
+      setPin("");
     }
-    loadPin();
-  }, [session?.role, apiFetch]);
+  }, [showPinDialog]);
 
   const checkIn = useCheckIn();
   const createEvent = useCreateEvent();
@@ -366,9 +353,8 @@ export default function Dashboard() {
         return;
       }
 
-      const data = await response.json();
-      setPin(data.pin_hash || pin);
-      toast({ title: "PIN saved successfully" });
+      setPin("");
+      toast({ title: "PIN updated successfully" });
       setShowPinDialog(false);
     } catch (error) {
       toast({
@@ -1014,9 +1000,10 @@ export default function Dashboard() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <Input
-              type="text"
+              type="password"
               placeholder="Enter 4-digit PIN"
               maxLength={4}
+              pattern="[0-9]*"
               value={pin}
               onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
               className="text-center text-2xl tracking-widest"
