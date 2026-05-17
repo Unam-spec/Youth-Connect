@@ -48,6 +48,11 @@ export const checkInRequestStatusEnum = pgEnum("check_in_request_status", [
   "rejected",
 ]);
 
+export const checkInRequestTypeEnum = pgEnum("check_in_request_type", [
+  "member",
+  "visitor",
+]);
+
 export const profilesTable = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   clerk_id: text("clerk_id").unique(),
@@ -148,11 +153,35 @@ export const leaderPermissionsTable = pgTable("leader_permissions", {
     .defaultNow(),
 });
 
+// ─── Visitors table ────────────────────────────────────────────────────────────
+// Stores first-time visitors who register via the public QR code flow.
+// These visitors do NOT have a Clerk account or a profiles row.
+export const visitorsTable = pgTable("visitors", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  full_name: text("full_name").notNull(),
+  phone_number: text("phone_number").notNull(),
+  email: text("email"), // nullable
+  gender: genderEnum("gender").notNull(),
+  age: integer("age").notNull(),
+  how_did_you_hear: text("how_did_you_hear").notNull(),
+  session_date: date("session_date").notNull(),
+  status: checkInRequestStatusEnum("status").notNull().default("pending"),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ─── Check-in requests ─────────────────────────────────────────────────────────
+// Supports both profile-based (members/visitors with accounts) and
+// visitor-based (first-timers without accounts) check-in requests.
+// Exactly one of profile_id or visitor_id must be set.
 export const checkInRequestsTable = pgTable("check_in_requests", {
   id: uuid("id").primaryKey().defaultRandom(),
-  profile_id: uuid("profile_id")
-    .notNull()
-    .references(() => profilesTable.id),
+  // profile_id is nullable to allow visitor-only check-in requests
+  profile_id: uuid("profile_id").references(() => profilesTable.id),
+  // visitor_id is set for first-timer check-in requests
+  visitor_id: uuid("visitor_id").references(() => visitorsTable.id),
+  type: checkInRequestTypeEnum("type").notNull().default("member"),
   session_date: date("session_date").notNull(),
   status: checkInRequestStatusEnum("status").notNull().default("pending"),
   requested_at: timestamp("requested_at", { withTimezone: true })
@@ -191,6 +220,10 @@ export const insertLeaderPermissionsSchema = createInsertSchema(
 export const insertCheckInRequestSchema = createInsertSchema(
   checkInRequestsTable,
 ).omit({ id: true, requested_at: true });
+export const insertVisitorSchema = createInsertSchema(visitorsTable).omit({
+  id: true,
+  created_at: true,
+});
 
 export type Profile = typeof profilesTable.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -212,3 +245,5 @@ export type InsertLeaderPermissions = z.infer<
 >;
 export type CheckInRequest = typeof checkInRequestsTable.$inferSelect;
 export type InsertCheckInRequest = z.infer<typeof insertCheckInRequestSchema>;
+export type Visitor = typeof visitorsTable.$inferSelect;
+export type InsertVisitor = z.infer<typeof insertVisitorSchema>;
