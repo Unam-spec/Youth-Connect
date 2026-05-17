@@ -97,6 +97,8 @@ export const attendanceTable = pgTable("attendance", {
   check_in_method: checkInMethodEnum("check_in_method")
     .notNull()
     .default("manual"),
+  // member = registered profile, visitor = first-timer without a Clerk account
+  type: checkInRequestTypeEnum("type").notNull().default("member"),
 });
 
 export const rsvpsTable = pgTable("rsvps", {
