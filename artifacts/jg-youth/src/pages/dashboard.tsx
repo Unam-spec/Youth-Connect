@@ -1,4 +1,11 @@
-import { useMemo, useState, useEffect, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { format } from "date-fns";
 import { Redirect } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,7 +17,6 @@ import {
   getListMembershipRequestsQueryKey,
   getListProfilesQueryKey,
   useApproveMembershipRequest,
-  useCheckIn,
   useCreateEvent,
   useGetDashboardKpis,
   useGetTodayAttendance,
@@ -56,6 +62,7 @@ import {
   Calendar,
   CheckCircle,
   QrCode,
+  RefreshCw,
   ShieldAlert,
   Trash2,
   UserPlus,
@@ -63,6 +70,55 @@ import {
 } from "lucide-react";
 
 const today = new Date().toISOString().split("T")[0];
+
+// ── Leader-session-aware fetch wrapper ────────────────────────────────────────
+
+/**
+ * Returns a fetch wrapper that automatically attaches the x-leader-session
+ * header from localStorage on every request. This allows PIN-authenticated
+ * leaders to call protected API endpoints without a Clerk JWT.
+ */
+function useApiFetch() {
+  return useCallback(async (url: string, init?: RequestInit) => {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+
+    // Attach leader session if present and not expired
+    try {
+      const sessionStr = localStorage.getItem("jg_leader_session");
+      if (sessionStr) {
+        const session: { expires_at?: number } = JSON.parse(sessionStr);
+        if (
+          typeof session.expires_at === "number" &&
+          Date.now() < session.expires_at
+        ) {
+          headers["x-leader-session"] = sessionStr;
+        }
+      }
+    } catch {
+      // ignore malformed session
+    }
+
+    return fetch(url, {
+      ...init,
+      headers: { ...headers, ...(init?.headers as Record<string, string>) },
+    });
+  }, []);
+}
+
+// ── Pending check-in request type ────────────────────────────────────────────
+
+interface PendingCheckIn {
+  id: string;
+  name: string;
+  phone: string | null;
+  type: "member" | "visitor";
+  role: string;
+  requested_at: string;
+}
+
+// ── Dashboard component ───────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const session = getLeaderSession();
@@ -73,7 +129,11 @@ export default function Dashboard() {
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [showPinDialog, setShowPinDialog] = useState(false);
-  const [checkInRequests, setCheckInRequests] = useState<any[]>([]);
+  const [pendingCheckIns, setPendingCheckIns] = useState<PendingCheckIn[]>([]);
+  const [isPendingLoading, setIsPendingLoading] = useState(false);
+  const pendingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -126,7 +186,6 @@ export default function Dashboard() {
     },
   });
 
-  const checkIn = useCheckIn();
   const createEvent = useCreateEvent();
   const promoteToMember = usePromoteToMember();
   const revokeMembership = useRevokeMembership();
@@ -142,6 +201,38 @@ export default function Dashboard() {
     [profiles],
   );
 
+  // ── Pending check-in approvals ──────────────────────────────────────────────
+
+  const fetchPendingCheckIns = useCallback(async () => {
+    setIsPendingLoading(true);
+    try {
+      const response = await apiFetch("/api/checkin/requests?status=pending");
+      if (response.ok) {
+        const data = await response.json();
+        setPendingCheckIns(data);
+      }
+    } catch {
+      // silently ignore network errors on background refresh
+    } finally {
+      setIsPendingLoading(false);
+    }
+  }, [apiFetch]);
+
+  // Initial fetch + auto-refresh every 30 seconds
+  useEffect(() => {
+    fetchPendingCheckIns();
+
+    pendingIntervalRef.current = setInterval(fetchPendingCheckIns, 30_000);
+
+    return () => {
+      if (pendingIntervalRef.current) {
+        clearInterval(pendingIntervalRef.current);
+      }
+    };
+  }, [fetchPendingCheckIns]);
+
+  // ── Dashboard helpers ───────────────────────────────────────────────────────
+
   function refreshDashboard() {
     queryClient.invalidateQueries({ queryKey: getGetDashboardKpisQueryKey() });
     queryClient.invalidateQueries({
@@ -153,24 +244,6 @@ export default function Dashboard() {
       queryKey: getListMembershipRequestsQueryKey({ status: "pending" }),
     });
     queryClient.invalidateQueries({ queryKey: getListLeadersQueryKey() });
-  }
-
-  function handleManualCheckIn(profileId: string) {
-    checkIn.mutate(
-      { data: { profile_id: profileId, check_in_method: "manual" } },
-      {
-        onSuccess: () => {
-          toast({ title: "Checked in" });
-          refreshDashboard();
-        },
-        onError: (error: Error) =>
-          toast({
-            title: "Check-in failed",
-            description: error.message,
-            variant: "destructive",
-          }),
-      },
-    );
   }
 
   function handleCreateEvent() {
@@ -231,7 +304,7 @@ export default function Dashboard() {
     if (!deleteEventId) return;
 
     try {
-      const response = await fetch(`/api/events/${deleteEventId}`, {
+      const response = await apiFetch(`/api/events/${deleteEventId}`, {
         method: "DELETE",
       });
 
@@ -248,7 +321,7 @@ export default function Dashboard() {
       toast({ title: "Event deleted successfully" });
       setDeleteEventId(null);
       refreshDashboard();
-    } catch (error) {
+    } catch {
       toast({
         title: "Delete failed",
         description: "An error occurred",
@@ -259,11 +332,8 @@ export default function Dashboard() {
 
   async function handleMakeLeader(profileId: string) {
     try {
-      const response = await fetch(`/api/profiles/${profileId}/role`, {
+      const response = await apiFetch(`/api/profiles/${profileId}/role`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ role: "leader" }),
       });
 
@@ -279,7 +349,7 @@ export default function Dashboard() {
 
       toast({ title: "Promoted to leader successfully" });
       refreshDashboard();
-    } catch (error) {
+    } catch {
       toast({
         title: "Failed to promote to leader",
         description: "An error occurred",
@@ -299,11 +369,8 @@ export default function Dashboard() {
     }
 
     try {
-      const response = await fetch("/api/profiles/me", {
+      const response = await apiFetch("/api/profiles/me", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({ pin }),
       });
 
@@ -319,7 +386,7 @@ export default function Dashboard() {
 
       toast({ title: "PIN saved successfully" });
       setShowPinDialog(false);
-    } catch (error) {
+    } catch {
       toast({
         title: "Failed to save PIN",
         description: "An error occurred",
@@ -374,13 +441,13 @@ export default function Dashboard() {
     );
   }
 
+  // ── Check-in approval handlers ────────────────────────────────────────────
+
   async function handleApproveCheckIn(requestId: string) {
     try {
       const response = await apiFetch(
         `/api/checkin/requests/${requestId}/approve`,
-        {
-          method: "POST",
-        },
+        { method: "PATCH" },
       );
       if (!response.ok) {
         const error = await response.json();
@@ -392,16 +459,10 @@ export default function Dashboard() {
         return;
       }
       toast({ title: "Check-in approved" });
-      // Refresh check-in requests
-      const checkInResponse = await apiFetch(
-        "/api/checkin/requests?status=pending",
-      );
-      if (checkInResponse.ok) {
-        const data = await checkInResponse.json();
-        setCheckInRequests(data);
-      }
+      // Remove from local list immediately, then refresh
+      setPendingCheckIns((prev) => prev.filter((r) => r.id !== requestId));
       refreshDashboard();
-    } catch (error) {
+    } catch {
       toast({
         title: "Approval failed",
         description: "An error occurred",
@@ -414,9 +475,7 @@ export default function Dashboard() {
     try {
       const response = await apiFetch(
         `/api/checkin/requests/${requestId}/reject`,
-        {
-          method: "POST",
-        },
+        { method: "PATCH" },
       );
       if (!response.ok) {
         const error = await response.json();
@@ -428,16 +487,9 @@ export default function Dashboard() {
         return;
       }
       toast({ title: "Check-in rejected" });
-      // Refresh check-in requests
-      const checkInResponse = await apiFetch(
-        "/api/checkin/requests?status=pending",
-      );
-      if (checkInResponse.ok) {
-        const data = await checkInResponse.json();
-        setCheckInRequests(data);
-      }
-      refreshDashboard();
-    } catch (error) {
+      // Remove from local list immediately
+      setPendingCheckIns((prev) => prev.filter((r) => r.id !== requestId));
+    } catch {
       toast({
         title: "Rejection failed",
         description: "An error occurred",
@@ -445,6 +497,8 @@ export default function Dashboard() {
       });
     }
   }
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <Layout>
@@ -495,6 +549,14 @@ export default function Dashboard() {
         <Tabs defaultValue="attendance" className="mt-8">
           <TabsList className="grid grid-cols-2 md:grid-cols-5 h-auto md:h-10 gap-2 md:gap-0">
             <TabsTrigger value="attendance">Today</TabsTrigger>
+            <TabsTrigger value="checkin-approvals">
+              Check-ins
+              {pendingCheckIns.length > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs w-5 h-5 font-semibold">
+                  {pendingCheckIns.length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="requests">Requests</TabsTrigger>
@@ -508,6 +570,7 @@ export default function Dashboard() {
             )}
           </TabsList>
 
+          {/* ── Today's attendance ─────────────────────────────────────────── */}
           <TabsContent
             value="attendance"
             className="p-4 border rounded-xl mt-4 bg-card"
@@ -528,33 +591,84 @@ export default function Dashboard() {
             ) : (
               <EmptyLine text="No one has checked in today yet." />
             )}
+          </TabsContent>
 
-            <div className="mt-6">
-              <SectionTitle title="Manual Check-in" />
-              <div className="grid gap-2">
-                {membersForCheckIn.slice(0, 8).map((profile: any) => (
+          {/* ── Pending check-in approvals ─────────────────────────────────── */}
+          <TabsContent
+            value="checkin-approvals"
+            className="p-4 border rounded-xl mt-4 bg-card"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <SectionTitle title="Pending Check-in Approvals" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchPendingCheckIns}
+                disabled={isPendingLoading}
+                className="text-muted-foreground"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 mr-1.5 ${isPendingLoading ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground mb-4">
+              Auto-refreshes every 30 seconds. First-timers are labelled{" "}
+              <span className="font-medium text-foreground">visitor</span>.
+            </p>
+
+            {isPendingLoading && pendingCheckIns.length === 0 ? (
+              <div className="space-y-3">
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+              </div>
+            ) : pendingCheckIns.length > 0 ? (
+              <div className="space-y-2">
+                {pendingCheckIns.map((req) => (
                   <div
-                    key={profile.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
+                    key={req.id}
+                    className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
-                      <p className="font-medium">{profile.full_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{req.name}</p>
+                        {req.type === "visitor" && (
+                          <Badge variant="outline" className="text-xs">
+                            First Timer
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        {profile.phone || "No phone"} · {profile.role}
+                        {req.phone ?? "No phone"} ·{" "}
+                        {format(new Date(req.requested_at), "HH:mm")}
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleManualCheckIn(profile.id)}
-                    >
-                      Check in
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleApproveCheckIn(req.id)}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRejectCheckIn(req.id)}
+                      >
+                        Reject
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+            ) : (
+              <EmptyLine text="No pending check-in requests right now." />
+            )}
           </TabsContent>
 
+          {/* ── Members ────────────────────────────────────────────────────── */}
           <TabsContent
             value="members"
             className="p-4 border rounded-xl mt-4 bg-card"
@@ -626,6 +740,7 @@ export default function Dashboard() {
             )}
           </TabsContent>
 
+          {/* ── Events ─────────────────────────────────────────────────────── */}
           <TabsContent
             value="events"
             className="p-4 border rounded-xl mt-4 bg-card"
@@ -778,6 +893,7 @@ export default function Dashboard() {
             </div>
           </TabsContent>
 
+          {/* ── Membership requests ────────────────────────────────────────── */}
           <TabsContent
             value="requests"
             className="p-4 border rounded-xl mt-4 bg-card"
@@ -823,6 +939,7 @@ export default function Dashboard() {
             )}
           </TabsContent>
 
+          {/* ── Leaders (super admin only) ─────────────────────────────────── */}
           {session.role === "super_admin" && (
             <TabsContent
               value="leaders"
@@ -858,6 +975,7 @@ export default function Dashboard() {
             </TabsContent>
           )}
 
+          {/* ── Super admin slots ──────────────────────────────────────────── */}
           {session.role === "super_admin" && (
             <TabsContent
               value="super-admin-slots"
@@ -948,6 +1066,7 @@ export default function Dashboard() {
         </Tabs>
       </div>
 
+      {/* ── Delete event confirmation ─────────────────────────────────────── */}
       <AlertDialog
         open={!!deleteEventId}
         onOpenChange={(open) => !open && setDeleteEventId(null)}
@@ -968,6 +1087,7 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* ── PIN dialog ────────────────────────────────────────────────────── */}
       <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
         <DialogContent>
           <DialogHeader>
@@ -1003,6 +1123,8 @@ export default function Dashboard() {
     </Layout>
   );
 }
+
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 function KpiCard({
   title,
@@ -1045,7 +1167,7 @@ function SimpleTable({
   rows,
 }: {
   headers: string[];
-  rows: string[][];
+  rows: (string | ReactNode)[][];
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border">
