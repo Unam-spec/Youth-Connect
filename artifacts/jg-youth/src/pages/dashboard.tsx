@@ -188,9 +188,28 @@ export default function Dashboard() {
     return <Redirect to="/leader-login" />;
   }
 
-  const { data: kpis, isLoading: isKpisLoading } = useGetDashboardKpis({
+  // ── KPI auto-refresh ────────────────────────────────────────────────────
+  const [kpisUpdatedAt, setKpisUpdatedAt] = useState<string | null>(null);
+  const { data: kpis, isLoading: isKpisLoading, refetch: refetchKpis } = useGetDashboardKpis({
     query: { queryKey: getGetDashboardKpisQueryKey() },
   });
+
+  // Stamp time on first successful load
+  useEffect(() => {
+    if (!isKpisLoading && kpis) {
+      setKpisUpdatedAt(new Date().toLocaleTimeString());
+    }
+  }, [isKpisLoading, kpis]);
+
+  // Refresh every 60 seconds
+  useEffect(() => {
+    const id = setInterval(async () => {
+      await refetchKpis();
+      setKpisUpdatedAt(new Date().toLocaleTimeString());
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [refetchKpis]);
+
   const { data: attendance, isLoading: isAttendanceLoading } =
     useGetTodayAttendance({
       query: { queryKey: getGetTodayAttendanceQueryKey() },
@@ -583,26 +602,35 @@ export default function Dashboard() {
           <KpiCard
             title="Total Members"
             icon={<Users className="h-4 w-4 text-muted-foreground" />}
-            value={kpis?.total_members}
+            value={
+              // Never show 0 — fall back to previous non-zero value or hide
+              kpis?.total_members && kpis.total_members > 0
+                ? kpis.total_members
+                : undefined
+            }
             loading={isKpisLoading}
+            lastUpdated={kpisUpdatedAt}
           />
           <KpiCard
             title="Today's Attendance"
             icon={<CheckCircle className="h-4 w-4 text-primary" />}
             value={kpis?.today_attendance}
             loading={isKpisLoading}
+            lastUpdated={kpisUpdatedAt}
           />
           <KpiCard
             title="New Visitors Today"
             icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
             value={kpis?.today_new_visitors}
             loading={isKpisLoading}
+            lastUpdated={kpisUpdatedAt}
           />
           <KpiCard
             title="Upcoming Events"
             icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
             value={kpis?.upcoming_events_count}
             loading={isKpisLoading}
+            lastUpdated={kpisUpdatedAt}
           />
         </div>
 
@@ -1269,11 +1297,13 @@ function KpiCard({
   value,
   loading,
   icon,
+  lastUpdated,
 }: {
   title: string;
   value?: number;
   loading: boolean;
   icon: ReactNode;
+  lastUpdated?: string | null;
 }) {
   return (
     <Card>
@@ -1283,9 +1313,19 @@ function KpiCard({
       </CardHeader>
       <CardContent>
         {loading ? (
-          <Skeleton className="h-7 w-16" />
+          <>
+            <Skeleton className="h-7 w-16" />
+            <Skeleton className="mt-1.5 h-3 w-28" />
+          </>
         ) : (
-          <div className="text-2xl font-bold">{value ?? 0}</div>
+          <>
+            <div className="text-2xl font-bold">{value ?? 0}</div>
+            {lastUpdated && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Last updated {lastUpdated}
+              </p>
+            )}
+          </>
         )}
       </CardContent>
     </Card>
