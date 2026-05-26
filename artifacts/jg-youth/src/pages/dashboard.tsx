@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAuth } from "@clerk/react";
 import { format } from "date-fns";
 import { Redirect } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -79,10 +80,20 @@ const today = new Date().toISOString().split("T")[0];
  * leaders to call protected API endpoints without a Clerk JWT.
  */
 function useApiFetch() {
+  const { getToken } = useAuth();
   return useCallback(async (url: string, init?: RequestInit) => {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
+
+    try {
+      const token = await getToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    } catch {
+      // ignore
+    }
 
     // Attach leader session if present and not expired
     try {
@@ -104,7 +115,7 @@ function useApiFetch() {
       ...init,
       headers: { ...headers, ...(init?.headers as Record<string, string>) },
     });
-  }, []);
+  }, [getToken]);
 }
 
 // ── Pending check-in request type ────────────────────────────────────────────
@@ -129,6 +140,34 @@ export default function Dashboard() {
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [showPinDialog, setShowPinDialog] = useState(false);
+  const [hasPin, setHasPin] = useState(false);
+  const [roleConfirm, setRoleConfirm] = useState<{
+    profile: any;
+    targetRole: "leader" | "super_admin";
+  } | null>(null);
+
+  const fetchHasPin = useCallback(async () => {
+    try {
+      const response = await apiFetch("/api/profiles/me/pin");
+      if (response.ok) {
+        const data = await response.json();
+        setHasPin(data.hasPIN);
+      }
+    } catch {
+      // ignore
+    }
+  }, [apiFetch]);
+
+  useEffect(() => {
+    fetchHasPin();
+  }, [fetchHasPin]);
+
+  useEffect(() => {
+    if (showPinDialog) {
+      setPin("");
+    }
+  }, [showPinDialog]);
+
   const [pendingCheckIns, setPendingCheckIns] = useState<PendingCheckIn[]>([]);
   const [isPendingLoading, setIsPendingLoading] = useState(false);
   const pendingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
@@ -156,7 +195,12 @@ export default function Dashboard() {
     useGetTodayAttendance({
       query: { queryKey: getGetTodayAttendanceQueryKey() },
     });
-  const { data: profiles, isLoading: isProfilesLoading } = useListProfiles(
+  const {
+    data: profiles,
+    isLoading: isProfilesLoading,
+    isError: isProfilesError,
+    refetch: refetchProfiles,
+  } = useListProfiles(
     search ? { search } : undefined,
     {
       query: {
@@ -330,46 +374,59 @@ export default function Dashboard() {
     }
   }
 
-  async function handleMakeLeader(profileId: string) {
+  async function handleConfirmRoleChange() {
+    if (!roleConfirm) return;
+    const { profile, targetRole } = roleConfirm;
+    setRoleConfirm(null);
+
+    // Optimistically update the cache immediately!
+    queryClient.setQueryData(
+      getListProfilesQueryKey(search ? { search } : undefined),
+      (prev: any) => {
+        if (!prev) return prev;
+        return prev.map((p: any) =>
+          p.id === profile.id ? { ...p, role: targetRole } : p
+        );
+      }
+    );
+
     try {
-      const response = await apiFetch(`/api/profiles/${profileId}/role`, {
+      const response = await apiFetch(`/api/profiles/${profile.id}/role`, {
         method: "PATCH",
-        body: JSON.stringify({ role: "leader" }),
+        body: JSON.stringify({ role: targetRole }),
       });
 
       if (!response.ok) {
         const error = await response.json();
         toast({
-          title: "Failed to promote to leader",
+          title: "Failed to update role",
           description: error.error || "An error occurred",
           variant: "destructive",
         });
+        refreshDashboard();
         return;
       }
 
-      toast({ title: "Promoted to leader successfully" });
+      toast({
+        title: "Role updated successfully",
+        description: `${profile.full_name} is now a ${targetRole.replace("_", " ")}`,
+      });
       refreshDashboard();
     } catch {
       toast({
-        title: "Failed to promote to leader",
+        title: "Failed to update role",
         description: "An error occurred",
         variant: "destructive",
       });
+      refreshDashboard();
     }
   }
 
   async function handleSavePin() {
-    if (pin.length !== 4) {
-      toast({
-        title: "Invalid PIN",
-        description: "PIN must be 4 digits",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (pin.length !== 4) return;
 
     try {
-      const response = await apiFetch("/api/profiles/me", {
+      const response = await apiFetch("/api/profiles/me/pin", {
         method: "PATCH",
         body: JSON.stringify({ pin }),
       });
@@ -384,8 +441,9 @@ export default function Dashboard() {
         return;
       }
 
-      toast({ title: "PIN saved successfully" });
+      toast({ title: "PIN updated successfully" });
       setShowPinDialog(false);
+      fetchHasPin();
     } catch {
       toast({
         title: "Failed to save PIN",
@@ -499,6 +557,8 @@ export default function Dashboard() {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  const superAdminCount = profiles?.filter((p: any) => p.role === "super_admin").length ?? 0;
 
   return (
     <Layout>
@@ -673,6 +733,11 @@ export default function Dashboard() {
             value="members"
             className="p-4 border rounded-xl mt-4 bg-card"
           >
+            <div className="mb-4 bg-purple-500/10 border border-purple-500/20 text-purple-300 rounded-lg p-3 text-sm flex items-center justify-between">
+              <span className="font-medium">Super Admin Slots: {superAdminCount} / 4</span>
+              <span className="text-xs text-purple-400 font-semibold">Max 4 allowed</span>
+            </div>
+
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <SectionTitle title="Member Directory" />
               <Input
@@ -683,7 +748,23 @@ export default function Dashboard() {
               />
             </div>
             {isProfilesLoading ? (
-              <Skeleton className="h-32 w-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+              </div>
+            ) : isProfilesError ? (
+              <div
+                onClick={() => refetchProfiles()}
+                className="flex flex-col items-center justify-center p-6 border border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+              >
+                <p className="text-sm text-destructive font-medium mb-1">
+                  Could not load members, tap to retry
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Tap anywhere in this box to reload the directory
+                </p>
+              </div>
             ) : profiles && profiles.length > 0 ? (
               <div className="space-y-2">
                 {profiles.map((profile: any) => (
@@ -699,7 +780,7 @@ export default function Dashboard() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{profile.role}</Badge>
+                      <RoleBadge role={profile.role} />
                       {profile.role === "visitor" && (
                         <Button
                           size="sm"
@@ -724,9 +805,21 @@ export default function Dashboard() {
                           {session.role === "super_admin" && (
                             <Button
                               size="sm"
-                              onClick={() => handleMakeLeader(profile.id)}
+                              onClick={() => setRoleConfirm({ profile, targetRole: "leader" })}
                             >
                               Make Leader
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      {profile.role === "leader" && (
+                        <>
+                          {session.role === "super_admin" && (
+                            <Button
+                              size="sm"
+                              onClick={() => setRoleConfirm({ profile, targetRole: "super_admin" })}
+                            >
+                              Make Super Admin
                             </Button>
                           )}
                         </>
@@ -736,7 +829,7 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <EmptyLine text="No profiles found." />
+              <EmptyLine text="No members yet" />
             )}
           </TabsContent>
 
@@ -1047,13 +1140,13 @@ export default function Dashboard() {
                           {pin ? "Change PIN" : "Generate PIN"}
                         </Button>
                       </div>
-                      {pin && (
+                      {hasPin && (
                         <div className="rounded-lg bg-muted p-4">
                           <p className="text-sm text-muted-foreground mb-2">
-                            Current PIN:
+                            PIN Status:
                           </p>
-                          <p className="text-2xl font-bold tracking-widest">
-                            ••••
+                          <p className="text-2xl font-bold tracking-widest text-green-400">
+                            SECURED ••••
                           </p>
                         </div>
                       )}
@@ -1087,20 +1180,41 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* ── Role confirmation dialog ─────────────────────────────────────── */}
+      <AlertDialog
+        open={!!roleConfirm}
+        onOpenChange={(open) => !open && setRoleConfirm(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change User Role</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to promote <strong>{roleConfirm?.profile?.full_name}</strong> to <strong>{roleConfirm?.targetRole.replace("_", " ")}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRoleChange}>
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ── PIN dialog ────────────────────────────────────────────────────── */}
       <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{pin ? "Change PIN" : "Generate PIN"}</DialogTitle>
+            <DialogTitle>{hasPin ? "Change PIN" : "Generate PIN"}</DialogTitle>
             <DialogDescription>
-              {pin
-                ? "Update your 4-digit PIN for secure authentication"
-                : "Generate a new 4-digit PIN for secure authentication"}
+              {hasPin
+                ? "Update your 4-digit PIN for secure leader authentication"
+                : "Create a new 4-digit PIN for secure leader authentication"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <Input
-              type="text"
+              type="password"
               placeholder="Enter 4-digit PIN"
               maxLength={4}
               value={pin}
@@ -1114,8 +1228,8 @@ export default function Dashboard() {
             <Button variant="outline" onClick={() => setShowPinDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSavePin}>
-              {pin ? "Update PIN" : "Generate PIN"}
+            <Button onClick={handleSavePin} disabled={pin.length !== 4}>
+              {hasPin ? "Update PIN" : "Generate PIN"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1125,6 +1239,30 @@ export default function Dashboard() {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function RoleBadge({ role }: { role: string }) {
+  let classes = "border-transparent ";
+  switch (role) {
+    case "super_admin":
+      classes += "bg-purple-500/10 text-purple-400 border-purple-500/20 border";
+      break;
+    case "leader":
+      classes += "bg-blue-500/10 text-blue-400 border-blue-500/20 border";
+      break;
+    case "member":
+      classes += "bg-muted text-muted-foreground border-transparent border";
+      break;
+    default:
+      // visitor or other roles
+      classes += "bg-secondary text-secondary-foreground border-transparent border";
+  }
+
+  return (
+    <Badge className={classes} variant="outline">
+      {role.replace("_", " ")}
+    </Badge>
+  );
+}
 
 function KpiCard({
   title,
