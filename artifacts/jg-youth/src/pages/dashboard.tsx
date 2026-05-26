@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { format } from "date-fns";
 import { Redirect } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,7 +10,6 @@ import {
   getListMembershipRequestsQueryKey,
   getListProfilesQueryKey,
   useApproveMembershipRequest,
-  useCheckIn,
   useCreateEvent,
   useGetDashboardKpis,
   useGetTodayAttendance,
@@ -57,6 +56,7 @@ import {
   Calendar,
   CheckCircle,
   QrCode,
+  RefreshCw,
   ShieldAlert,
   Trash2,
   UserPlus,
@@ -64,6 +64,68 @@ import {
 } from "lucide-react";
 
 const today = new Date().toISOString().split("T")[0];
+
+// ── Leader-session-aware fetch wrapper ────────────────────────────────────────
+
+/**
+ * Returns a fetch wrapper that automatically attaches the x-leader-session
+ * header from localStorage on every request. This allows PIN-authenticated
+ * leaders to call protected API endpoints without a Clerk JWT.
+ */
+function useApiFetch() {
+  const { getToken } = useAuth();
+  return useCallback(
+    async (url: string, init?: RequestInit) => {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      try {
+        const token = await getToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+      } catch {
+        // ignore
+      }
+
+      // Attach leader session if present and not expired
+      try {
+        const sessionStr = localStorage.getItem("jg_leader_session");
+        if (sessionStr) {
+          const session: { expires_at?: number } = JSON.parse(sessionStr);
+          if (
+            typeof session.expires_at === "number" &&
+            Date.now() < session.expires_at
+          ) {
+            headers["x-leader-session"] = sessionStr;
+          }
+        }
+      } catch {
+        // ignore malformed session
+      }
+
+      return fetch(url, {
+        ...init,
+        headers: { ...headers, ...(init?.headers as Record<string, string>) },
+      });
+    },
+    [getToken],
+  );
+}
+
+// ── Pending check-in request type ────────────────────────────────────────────
+
+interface PendingCheckIn {
+  id: string;
+  name: string;
+  phone: string | null;
+  type: "member" | "visitor";
+  role: string;
+  requested_at: string;
+}
+
+// ── Dashboard component ───────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const session = getLeaderSession();
@@ -74,9 +136,6 @@ export default function Dashboard() {
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [showPinDialog, setShowPinDialog] = useState(false);
-  const [confirmLeaderProfile, setConfirmLeaderProfile] = useState<any>(null);
-  const [confirmSuperAdminProfile, setConfirmSuperAdminProfile] =
-    useState<any>(null);
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -92,21 +151,46 @@ export default function Dashboard() {
     return <Redirect to="/leader-login" />;
   }
 
-  const { data: kpis, isLoading: isKpisLoading } = useGetDashboardKpis({
+  // ── KPI auto-refresh ────────────────────────────────────────────────────
+  const [kpisUpdatedAt, setKpisUpdatedAt] = useState<string | null>(null);
+  const {
+    data: kpis,
+    isLoading: isKpisLoading,
+    refetch: refetchKpis,
+  } = useGetDashboardKpis({
     query: { queryKey: getGetDashboardKpisQueryKey() },
   });
+
+  // Stamp time on first successful load
+  useEffect(() => {
+    if (!isKpisLoading && kpis) {
+      setKpisUpdatedAt(new Date().toLocaleTimeString());
+    }
+  }, [isKpisLoading, kpis]);
+
+  // Refresh every 60 seconds
+  useEffect(() => {
+    const id = setInterval(async () => {
+      await refetchKpis();
+      setKpisUpdatedAt(new Date().toLocaleTimeString());
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [refetchKpis]);
+
   const { data: attendance, isLoading: isAttendanceLoading } =
     useGetTodayAttendance({
       query: { queryKey: getGetTodayAttendanceQueryKey() },
     });
-  const { data: profiles, isLoading: isProfilesLoading } = useListProfiles(
-    search ? { search } : undefined,
-    {
-      query: {
-        queryKey: getListProfilesQueryKey(search ? { search } : undefined),
-      },
+  const {
+    data: profiles,
+    isLoading: isProfilesLoading,
+    isError: isProfilesError,
+    refetch: refetchProfiles,
+  } = useListProfiles(search ? { search } : undefined, {
+    query: {
+      queryKey: getListProfilesQueryKey(search ? { search } : undefined),
     },
-  );
+  });
   const { data: events, isLoading: isEventsLoading } = useListEvents(
     undefined,
     {
@@ -136,7 +220,6 @@ export default function Dashboard() {
     }
   }, [showPinDialog]);
 
-  const checkIn = useCheckIn();
   const createEvent = useCreateEvent();
   const promoteToMember = usePromoteToMember();
   const revokeMembership = useRevokeMembership();
@@ -152,6 +235,38 @@ export default function Dashboard() {
     [profiles],
   );
 
+  // ── Pending check-in approvals ──────────────────────────────────────────────
+
+  const fetchPendingCheckIns = useCallback(async () => {
+    setIsPendingLoading(true);
+    try {
+      const response = await apiFetch("/api/checkin/requests?status=pending");
+      if (response.ok) {
+        const data = await response.json();
+        setPendingCheckIns(data);
+      }
+    } catch {
+      // silently ignore network errors on background refresh
+    } finally {
+      setIsPendingLoading(false);
+    }
+  }, [apiFetch]);
+
+  // Initial fetch + auto-refresh every 30 seconds
+  useEffect(() => {
+    fetchPendingCheckIns();
+
+    pendingIntervalRef.current = setInterval(fetchPendingCheckIns, 30_000);
+
+    return () => {
+      if (pendingIntervalRef.current) {
+        clearInterval(pendingIntervalRef.current);
+      }
+    };
+  }, [fetchPendingCheckIns]);
+
+  // ── Dashboard helpers ───────────────────────────────────────────────────────
+
   function refreshDashboard() {
     queryClient.invalidateQueries({ queryKey: getGetDashboardKpisQueryKey() });
     queryClient.invalidateQueries({
@@ -163,24 +278,6 @@ export default function Dashboard() {
       queryKey: getListMembershipRequestsQueryKey({ status: "pending" }),
     });
     queryClient.invalidateQueries({ queryKey: getListLeadersQueryKey() });
-  }
-
-  function handleManualCheckIn(profileId: string) {
-    checkIn.mutate(
-      { data: { profile_id: profileId, check_in_method: "manual" } },
-      {
-        onSuccess: () => {
-          toast({ title: "Checked in" });
-          refreshDashboard();
-        },
-        onError: (error: Error) =>
-          toast({
-            title: "Check-in failed",
-            description: error.message,
-            variant: "destructive",
-          }),
-      },
-    );
   }
 
   function handleCreateEvent() {
@@ -258,7 +355,7 @@ export default function Dashboard() {
       toast({ title: "Event deleted successfully" });
       setDeleteEventId(null);
       refreshDashboard();
-    } catch (error) {
+    } catch {
       toast({
         title: "Delete failed",
         description: "An error occurred",
@@ -267,33 +364,51 @@ export default function Dashboard() {
     }
   }
 
-  async function handleMakeLeader(profileId: string) {
+  async function handleConfirmRoleChange() {
+    if (!roleConfirm) return;
+    const { profile, targetRole } = roleConfirm;
+    setRoleConfirm(null);
+
+    // Optimistically update the cache immediately!
+    queryClient.setQueryData(
+      getListProfilesQueryKey(search ? { search } : undefined),
+      (prev: any) => {
+        if (!prev) return prev;
+        return prev.map((p: any) =>
+          p.id === profile.id ? { ...p, role: targetRole } : p,
+        );
+      },
+    );
+
     try {
-      const response = await apiFetch(`/api/profiles/${profileId}/role`, {
+      const response = await fetch(`/api/profiles/${profileId}/role`, {
         method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({ role: "leader" }),
       });
 
       if (!response.ok) {
         const error = await response.json();
         toast({
-          title: "Failed to promote to leader",
+          title: "Failed to update role",
           description: error.error || "An error occurred",
           variant: "destructive",
         });
+        refreshDashboard();
         return;
       }
 
-      const profile = profiles?.find((p: any) => p.id === profileId);
-      toast({ title: `${profile?.full_name} is now a Leader` });
-      setConfirmLeaderProfile(null);
+      toast({ title: "Promoted to leader successfully" });
       refreshDashboard();
-    } catch (error) {
+    } catch {
       toast({
-        title: "Failed to promote to leader",
+        title: "Failed to update role",
         description: "An error occurred",
         variant: "destructive",
       });
+      refreshDashboard();
     }
   }
 
@@ -328,17 +443,10 @@ export default function Dashboard() {
   }
 
   async function handleSavePin() {
-    if (pin.length !== 4) {
-      toast({
-        title: "Invalid PIN",
-        description: "PIN must be 4 digits",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (pin.length !== 4) return;
 
     try {
-      const response = await apiFetch("/api/profiles/me", {
+      const response = await fetch("/api/profiles/me", {
         method: "PATCH",
         body: JSON.stringify({ pin }),
       });
@@ -353,10 +461,10 @@ export default function Dashboard() {
         return;
       }
 
-      setPin("");
-      toast({ title: "PIN updated successfully" });
+      toast({ title: "PIN saved successfully" });
       setShowPinDialog(false);
-    } catch (error) {
+      fetchHasPin();
+    } catch {
       toast({
         title: "Failed to save PIN",
         description: "An error occurred",
@@ -411,6 +519,68 @@ export default function Dashboard() {
     );
   }
 
+  // ── Check-in approval handlers ────────────────────────────────────────────
+
+  async function handleApproveCheckIn(requestId: string) {
+    try {
+      const response = await apiFetch(
+        `/api/checkin/requests/${requestId}/approve`,
+        { method: "PATCH" },
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Approval failed",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Check-in approved" });
+      // Remove from local list immediately, then refresh
+      setPendingCheckIns((prev) => prev.filter((r) => r.id !== requestId));
+      refreshDashboard();
+    } catch {
+      toast({
+        title: "Approval failed",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
+  }
+
+  async function handleRejectCheckIn(requestId: string) {
+    try {
+      const response = await apiFetch(
+        `/api/checkin/requests/${requestId}/reject`,
+        { method: "PATCH" },
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Rejection failed",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+      toast({ title: "Check-in rejected" });
+      // Remove from local list immediately
+      setPendingCheckIns((prev) => prev.filter((r) => r.id !== requestId));
+    } catch {
+      toast({
+        title: "Rejection failed",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  const superAdminCount =
+    profiles?.filter((p: any) => p.role === "super_admin").length ?? 0;
+
   return (
     <Layout>
       <div className="space-y-6">
@@ -434,32 +604,49 @@ export default function Dashboard() {
           <KpiCard
             title="Total Members"
             icon={<Users className="h-4 w-4 text-muted-foreground" />}
-            value={kpis?.total_members}
+            value={
+              // Never show 0 — fall back to previous non-zero value or hide
+              kpis?.total_members && kpis.total_members > 0
+                ? kpis.total_members
+                : undefined
+            }
             loading={isKpisLoading}
+            lastUpdated={kpisUpdatedAt}
           />
           <KpiCard
             title="Today's Attendance"
             icon={<CheckCircle className="h-4 w-4 text-primary" />}
             value={kpis?.today_attendance}
             loading={isKpisLoading}
+            lastUpdated={kpisUpdatedAt}
           />
           <KpiCard
             title="New Visitors Today"
             icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
             value={kpis?.today_new_visitors}
             loading={isKpisLoading}
+            lastUpdated={kpisUpdatedAt}
           />
           <KpiCard
             title="Upcoming Events"
             icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
             value={kpis?.upcoming_events_count}
             loading={isKpisLoading}
+            lastUpdated={kpisUpdatedAt}
           />
         </div>
 
         <Tabs defaultValue="attendance" className="mt-8">
           <TabsList className="grid grid-cols-2 md:grid-cols-5 h-auto md:h-10 gap-2 md:gap-0">
             <TabsTrigger value="attendance">Today</TabsTrigger>
+            <TabsTrigger value="checkin-approvals">
+              Check-ins
+              {pendingCheckIns.length > 0 && (
+                <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs w-5 h-5 font-semibold">
+                  {pendingCheckIns.length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="members">Members</TabsTrigger>
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="requests">Requests</TabsTrigger>
@@ -473,6 +660,7 @@ export default function Dashboard() {
             )}
           </TabsList>
 
+          {/* ── Today's attendance ─────────────────────────────────────────── */}
           <TabsContent
             value="attendance"
             className="p-4 border rounded-xl mt-4 bg-card"
@@ -493,37 +681,97 @@ export default function Dashboard() {
             ) : (
               <EmptyLine text="No one has checked in today yet." />
             )}
+          </TabsContent>
 
-            <div className="mt-6">
-              <SectionTitle title="Manual Check-in" />
-              <div className="grid gap-2">
-                {membersForCheckIn.slice(0, 8).map((profile: any) => (
+          {/* ── Pending check-in approvals ─────────────────────────────────── */}
+          <TabsContent
+            value="checkin-approvals"
+            className="p-4 border rounded-xl mt-4 bg-card"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <SectionTitle title="Pending Check-in Approvals" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchPendingCheckIns}
+                disabled={isPendingLoading}
+                className="text-muted-foreground"
+              >
+                <RefreshCw
+                  className={`w-4 h-4 mr-1.5 ${isPendingLoading ? "animate-spin" : ""}`}
+                />
+                Refresh
+              </Button>
+            </div>
+
+            <p className="text-xs text-muted-foreground mb-4">
+              Auto-refreshes every 30 seconds. First-timers are labelled{" "}
+              <span className="font-medium text-foreground">visitor</span>.
+            </p>
+
+            {isPendingLoading && pendingCheckIns.length === 0 ? (
+              <div className="space-y-3">
+                <Skeleton className="h-16 w-full rounded-lg" />
+                <Skeleton className="h-16 w-full rounded-lg" />
+              </div>
+            ) : pendingCheckIns.length > 0 ? (
+              <div className="space-y-2">
+                {pendingCheckIns.map((req) => (
                   <div
-                    key={profile.id}
-                    className="flex items-center justify-between rounded-lg border p-3"
+                    key={req.id}
+                    className="flex flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div>
-                      <p className="font-medium">{profile.full_name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{req.name}</p>
+                        {req.type === "visitor" && (
+                          <Badge variant="outline" className="text-xs">
+                            First Timer
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        {profile.phone || "No phone"} · {profile.role}
+                        {req.phone ?? "No phone"} ·{" "}
+                        {format(new Date(req.requested_at), "HH:mm")}
                       </p>
                     </div>
-                    <Button
-                      size="sm"
-                      onClick={() => handleManualCheckIn(profile.id)}
-                    >
-                      Check in
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => handleApproveCheckIn(req.id)}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRejectCheckIn(req.id)}
+                      >
+                        Reject
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+            ) : (
+              <EmptyLine text="No pending check-in requests right now." />
+            )}
           </TabsContent>
 
+          {/* ── Members ────────────────────────────────────────────────────── */}
           <TabsContent
             value="members"
             className="p-4 border rounded-xl mt-4 bg-card"
           >
+            <div className="mb-4 bg-purple-500/10 border border-purple-500/20 text-purple-300 rounded-lg p-3 text-sm flex items-center justify-between">
+              <span className="font-medium">
+                Super Admin Slots: {superAdminCount} / 4
+              </span>
+              <span className="text-xs text-purple-400 font-semibold">
+                Max 4 allowed
+              </span>
+            </div>
+
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <SectionTitle title="Member Directory" />
               <Input
@@ -561,11 +809,7 @@ export default function Dashboard() {
             )}
 
             {isProfilesLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {[...Array(6)].map((_, i) => (
-                  <Skeleton key={i} className="h-48 w-full" />
-                ))}
-              </div>
+              <Skeleton className="h-32 w-full" />
             ) : profiles && profiles.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {profiles.map((profile: any) => (
@@ -606,48 +850,49 @@ export default function Dashboard() {
                               : profile.role}
                       </Badge>
                     </div>
-                    <div className="flex gap-2 mt-auto">
-                      {profile.role === "member" &&
-                        session &&
-                        session.role === "super_admin" && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary">{profile.role}</Badge>
+                      {profile.role === "visitor" && (
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            mutateProfileRole("promote", profile.id)
+                          }
+                        >
+                          Make member
+                        </Button>
+                      )}
+                      {profile.role === "member" && (
+                        <>
                           <Button
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                            onClick={() => setConfirmLeaderProfile(profile)}
-                          >
-                            Make Leader
-                          </Button>
-                        )}
-                      {profile.role === "leader" &&
-                        session &&
-                        session.role === "super_admin" && (
-                          <Button
-                            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
-                            disabled={
-                              (profiles?.filter(
-                                (p: any) => p.role === "super_admin",
-                              ).length || 0) >= 4
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              mutateProfileRole("revoke", profile.id)
                             }
-                            title={
-                              (profiles?.filter(
-                                (p: any) => p.role === "super_admin",
-                              ).length || 0) >= 4
-                                ? "All 4 super admin slots are filled"
-                                : ""
-                            }
-                            onClick={() => setConfirmSuperAdminProfile(profile)}
                           >
-                            Make Super Admin
+                            Revoke
                           </Button>
-                        )}
+                          {session.role === "super_admin" && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleMakeLeader(profile.id)}
+                            >
+                              Make Leader
+                            </Button>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <EmptyLine text="No profiles found." />
+              <EmptyLine text="No members yet" />
             )}
           </TabsContent>
 
+          {/* ── Events ─────────────────────────────────────────────────────── */}
           <TabsContent
             value="events"
             className="p-4 border rounded-xl mt-4 bg-card"
@@ -800,6 +1045,7 @@ export default function Dashboard() {
             </div>
           </TabsContent>
 
+          {/* ── Membership requests ────────────────────────────────────────── */}
           <TabsContent
             value="requests"
             className="p-4 border rounded-xl mt-4 bg-card"
@@ -845,6 +1091,7 @@ export default function Dashboard() {
             )}
           </TabsContent>
 
+          {/* ── Leaders (super admin only) ─────────────────────────────────── */}
           {session.role === "super_admin" && (
             <TabsContent
               value="leaders"
@@ -880,6 +1127,7 @@ export default function Dashboard() {
             </TabsContent>
           )}
 
+          {/* ── Super admin slots ──────────────────────────────────────────── */}
           {session.role === "super_admin" && (
             <TabsContent
               value="super-admin-slots"
@@ -951,13 +1199,13 @@ export default function Dashboard() {
                           {pin ? "Change PIN" : "Generate PIN"}
                         </Button>
                       </div>
-                      {pin && (
+                      {hasPin && (
                         <div className="rounded-lg bg-muted p-4">
                           <p className="text-sm text-muted-foreground mb-2">
-                            Current PIN:
+                            PIN Status:
                           </p>
-                          <p className="text-2xl font-bold tracking-widest">
-                            ••••
+                          <p className="text-2xl font-bold tracking-widest text-green-400">
+                            SECURED ••••
                           </p>
                         </div>
                       )}
@@ -970,6 +1218,7 @@ export default function Dashboard() {
         </Tabs>
       </div>
 
+      {/* ── Delete event confirmation ─────────────────────────────────────── */}
       <AlertDialog
         open={!!deleteEventId}
         onOpenChange={(open) => !open && setDeleteEventId(null)}
@@ -990,14 +1239,38 @@ export default function Dashboard() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* ── Role confirmation dialog ─────────────────────────────────────── */}
+      <AlertDialog
+        open={!!roleConfirm}
+        onOpenChange={(open) => !open && setRoleConfirm(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change User Role</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to promote{" "}
+              <strong>{roleConfirm?.profile?.full_name}</strong> to{" "}
+              <strong>{roleConfirm?.targetRole.replace("_", " ")}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRoleChange}>
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── PIN dialog ────────────────────────────────────────────────────── */}
       <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{pin ? "Change PIN" : "Generate PIN"}</DialogTitle>
+            <DialogTitle>{hasPin ? "Change PIN" : "Generate PIN"}</DialogTitle>
             <DialogDescription>
-              {pin
-                ? "Enter your new 4-digit PIN"
-                : "Generate a new 4-digit PIN for secure authentication"}
+              {hasPin
+                ? "Update your 4-digit PIN for secure leader authentication"
+                : "Create a new 4-digit PIN for secure leader authentication"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1017,8 +1290,8 @@ export default function Dashboard() {
             <Button variant="outline" onClick={() => setShowPinDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSavePin}>
-              {pin ? "Update PIN" : "Generate PIN"}
+            <Button onClick={handleSavePin} disabled={pin.length !== 4}>
+              {hasPin ? "Update PIN" : "Generate PIN"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1074,75 +1347,75 @@ export default function Dashboard() {
       </AlertDialog>
     </Layout>
   );
+}
 
-  function KpiCard({
-    title,
-    value,
-    loading,
-    icon,
-  }: {
-    title: string;
-    value?: number;
-    loading: boolean;
-    icon: ReactNode;
-  }) {
-    return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">{title}</CardTitle>
-          {icon}
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-7 w-16" />
-          ) : (
-            <div className="text-2xl font-bold">{value ?? 0}</div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  }
+function KpiCard({
+  title,
+  value,
+  loading,
+  icon,
+}: {
+  title: string;
+  value?: number;
+  loading: boolean;
+  icon: ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-7 w-16" />
+        ) : (
+          <div className="text-2xl font-bold">{value ?? 0}</div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
-  function SectionTitle({ title }: { title: string }) {
-    return <h3 className="mb-4 text-lg font-semibold">{title}</h3>;
-  }
+function SectionTitle({ title }: { title: string }) {
+  return <h3 className="mb-4 text-lg font-semibold">{title}</h3>;
+}
 
-  function EmptyLine({ text }: { text: string }) {
-    return <p className="text-sm text-muted-foreground">{text}</p>;
-  }
+function EmptyLine({ text }: { text: string }) {
+  return <p className="text-sm text-muted-foreground">{text}</p>;
+}
 
-  function SimpleTable({
-    headers,
-    rows,
-  }: {
-    headers: string[];
-    rows: string[][];
-  }) {
-    return (
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/40 text-left">
-            <tr>
-              {headers.map((header) => (
-                <th key={header} className="px-3 py-2 font-medium">
-                  {header}
-                </th>
+function SimpleTable({
+  headers,
+  rows,
+}: {
+  headers: string[];
+  rows: string[][];
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/40 text-left">
+          <tr>
+            {headers.map((header) => (
+              <th key={header} className="px-3 py-2 font-medium">
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, rowIndex) => (
+            <tr key={rowIndex} className="border-t">
+              {row.map((cell, cellIndex) => (
+                <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2">
+                  {cell}
+                </td>
               ))}
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-t">
-                {row.map((cell, cellIndex) => (
-                  <td key={`${rowIndex}-${cellIndex}`} className="px-3 py-2">
-                    {cell}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }

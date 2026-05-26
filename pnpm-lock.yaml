@@ -93,6 +93,9 @@ importers:
 
   artifacts/api-server:
     dependencies:
+      '@clerk/backend':
+        specifier: ^3.4.9
+        version: 3.4.9
       '@clerk/express':
         specifier: ^2.1.14
         version: 2.1.14(express@5.2.1)
@@ -117,6 +120,9 @@ importers:
       cors:
         specifier: ^2
         version: 2.8.6
+      date-fns-tz:
+        specifier: ^3.2.0
+        version: 3.2.0(date-fns@4.1.0)
       dotenv:
         specifier: ^17.4.2
         version: 17.4.2
@@ -697,6 +703,10 @@ packages:
     resolution: {integrity: sha512-OYRYr8hM/ewWQHFKISrIq/au/9/GsyppqRXmivshWnwMegd9cc2UVirFBouoH5Vv1R92ErqrgF/jYS+FkFEJZw==}
     engines: {node: '>=20.9.0'}
 
+  '@clerk/backend@3.4.9':
+    resolution: {integrity: sha512-2sbnGrHga3t/IFAkyvWO6H9QG1bnj7KUA13hpRB9utOYGCRdCn6oLxtiSdH6uGUzjX/km1dtw0uwZIxYgHbuVA==}
+    engines: {node: '>=20.9.0'}
+
   '@clerk/express@2.1.14':
     resolution: {integrity: sha512-S/LfjTezITz+x1NrmoGctEUnmrghtD+cE/eTR8KPRBPi6BtVcAHOkjBJsp3kkDQIYRg7Xib/u2y0WTuH1IDjmA==}
     engines: {node: '>=20.9.0'}
@@ -736,6 +746,18 @@ packages:
 
   '@clerk/shared@4.10.2':
     resolution: {integrity: sha512-2RXGaCV94U2wYWaMQZA/AhVkqjcSx8f+oVjh6wgr4yXDmZ24BQRjPJ+K4L6IHiB/agoaXtKWJ0GI8InRZjo9/g==}
+    engines: {node: '>=20.9.0'}
+    peerDependencies:
+      react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
+      react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
+
+  '@clerk/shared@4.12.0':
+    resolution: {integrity: sha512-LEe3lpi1r2DhFH9FuqzVrDQ2UkQJ3TA6XkkqnfHHRBfAJdh+jnYXYiivQpj3znMCihm3FVLOMXcpSqBz80XoQg==}
     engines: {node: '>=20.9.0'}
     peerDependencies:
       react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
@@ -2330,6 +2352,11 @@ packages:
 
   date-fns-jalali@4.1.0-0:
     resolution: {integrity: sha512-hTIP/z+t+qKwBDcmmsnmjWTduxCg+5KfdqWQvb2X/8C9+knYY6epN/pfxdDuyVlSVeFz0sM5eEfwIUQ70U4ckg==}
+
+  date-fns-tz@3.2.0:
+    resolution: {integrity: sha512-sg8HqoTEulcbbbVXeg84u5UnlsQa8GS5QXMqjjYIhS4abEVVKIUwe0/l/UhrZdKaL/W5eWZNlbTeEIiOXTcsBQ==}
+    peerDependencies:
+      date-fns: ^3.0.0 || ^4.0.0
 
   date-fns@3.6.0:
     resolution: {integrity: sha512-fRHTG8g/Gif+kSh50gaGEdToemgfj74aRX3swtiouboip5JDLAyDE9F11nHMIcvOaXeOC6D7SpNhi7uFyB7Uww==}
@@ -3935,6 +3962,15 @@ snapshots:
       - react
       - react-dom
 
+  '@clerk/backend@3.4.9':
+    dependencies:
+      '@clerk/shared': 4.12.0
+      standardwebhooks: 1.0.0
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - react
+      - react-dom
+
   '@clerk/express@2.1.14(express@5.2.1)':
     dependencies:
       '@clerk/backend': 3.4.6
@@ -3982,6 +4018,14 @@ snapshots:
     optionalDependencies:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
+
+  '@clerk/shared@4.12.0':
+    dependencies:
+      '@tanstack/query-core': 5.100.9
+      dequal: 2.0.3
+      glob-to-regexp: 0.4.1
+      js-cookie: 3.0.5
+      std-env: 3.10.0
 
   '@clerk/themes@2.4.57(react-dom@19.1.0(react@19.1.0))(react@19.1.0)':
     dependencies:
@@ -5548,6 +5592,10 @@ snapshots:
   d3-timer@3.0.1: {}
 
   date-fns-jalali@4.1.0-0: {}
+
+  date-fns-tz@3.2.0(date-fns@4.1.0):
+    dependencies:
+      date-fns: 4.1.0
 
   date-fns@3.6.0: {}
 

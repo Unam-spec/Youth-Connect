@@ -9,7 +9,6 @@ import {
   time,
   jsonb,
   pgEnum,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -49,21 +48,20 @@ export const checkInRequestStatusEnum = pgEnum("check_in_request_status", [
   "rejected",
 ]);
 
-export const messageStatusEnum = pgEnum("message_status", [
-  "sent",
-  "read",
-  "archived",
+export const checkInRequestTypeEnum = pgEnum("check_in_request_type", [
+  "member",
+  "visitor",
 ]);
 
 export const profilesTable = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   clerk_id: text("clerk_id").unique(),
   full_name: text("full_name").notNull(),
-  phone: text("phone").notNull(),
+  phone: text("phone"),
   email: text("email"),
-  gender: genderEnum("gender").notNull(),
-  age: integer("age").notNull(),
-  heard_from: text("heard_from").notNull(),
+  gender: genderEnum("gender"),
+  age: integer("age"),
+  heard_from: text("heard_from"),
   role: roleEnum("role").notNull().default("visitor"),
   pin_hash: text("pin_hash"),
   created_at: timestamp("created_at", { withTimezone: true })
@@ -78,9 +76,7 @@ export const eventsTable = pgTable("events", {
   date: date("date").notNull(),
   time: time("time").notNull(),
   location: text("location").notNull(),
-  created_by: uuid("created_by").references(() => profilesTable.id, {
-    onDelete: "set null",
-  }),
+  created_by: uuid("created_by").references(() => profilesTable.id),
   age_min: integer("age_min"),
   age_max: integer("age_max"),
   custom_requirements: jsonb("custom_requirements"),
@@ -90,40 +86,29 @@ export const eventsTable = pgTable("events", {
     .defaultNow(),
 });
 
-export const attendanceTable = pgTable(
-  "attendance",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    profile_id: uuid("profile_id").references(() => profilesTable.id, {
-      onDelete: "cascade",
-    }),
-    event_id: uuid("event_id").references(() => eventsTable.id, {
-      onDelete: "cascade",
-    }),
-    checked_in_at: timestamp("checked_in_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    session_date: date("session_date").notNull(),
-    check_in_method: checkInMethodEnum("check_in_method")
-      .notNull()
-      .default("manual"),
-  },
-  (table) => ({
-    uniqueProfileSession: uniqueIndex("attendance_profile_session_unique").on(
-      table.profile_id,
-      table.session_date,
-    ),
-  }),
-);
+export const attendanceTable = pgTable("attendance", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  profile_id: uuid("profile_id").references(() => profilesTable.id),
+  event_id: uuid("event_id").references(() => eventsTable.id),
+  checked_in_at: timestamp("checked_in_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  session_date: date("session_date").notNull(),
+  check_in_method: checkInMethodEnum("check_in_method")
+    .notNull()
+    .default("manual"),
+  // member = registered profile, visitor = first-timer without a Clerk account
+  type: checkInRequestTypeEnum("type").notNull().default("member"),
+});
 
 export const rsvpsTable = pgTable("rsvps", {
   id: uuid("id").primaryKey().defaultRandom(),
   event_id: uuid("event_id")
     .notNull()
-    .references(() => eventsTable.id, { onDelete: "cascade" }),
+    .references(() => eventsTable.id),
   profile_id: uuid("profile_id")
     .notNull()
-    .references(() => profilesTable.id, { onDelete: "cascade" }),
+    .references(() => profilesTable.id),
   status: rsvpStatusEnum("status").notNull().default("going"),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -134,12 +119,10 @@ export const membershipRequestsTable = pgTable("membership_requests", {
   id: uuid("id").primaryKey().defaultRandom(),
   profile_id: uuid("profile_id")
     .notNull()
-    .references(() => profilesTable.id, { onDelete: "cascade" }),
+    .references(() => profilesTable.id),
   reason: text("reason").notNull(),
   status: membershipStatusEnum("status").notNull().default("pending"),
-  reviewed_by: uuid("reviewed_by").references(() => profilesTable.id, {
-    onDelete: "set null",
-  }),
+  reviewed_by: uuid("reviewed_by").references(() => profilesTable.id),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -160,7 +143,7 @@ export const leaderPermissionsTable = pgTable("leader_permissions", {
   profile_id: uuid("profile_id")
     .notNull()
     .unique()
-    .references(() => profilesTable.id, { onDelete: "cascade" }),
+    .references(() => profilesTable.id),
   can_create_events: boolean("can_create_events").notNull().default(true),
   can_manage_members: boolean("can_manage_members").notNull().default(false),
   can_view_kpis: boolean("can_view_kpis").notNull().default(true),
@@ -172,67 +155,42 @@ export const leaderPermissionsTable = pgTable("leader_permissions", {
     .defaultNow(),
 });
 
-export const checkInRequestsTable = pgTable(
-  "check_in_requests",
-  {
-    id: uuid("id").primaryKey().defaultRandom(),
-    profile_id: uuid("profile_id")
-      .notNull()
-      .references(() => profilesTable.id, { onDelete: "cascade" }),
-    session_date: date("session_date").notNull(),
-    status: checkInRequestStatusEnum("status").notNull().default("pending"),
-    requested_at: timestamp("requested_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    reviewed_by: uuid("reviewed_by").references(() => profilesTable.id, {
-      onDelete: "set null",
-    }),
-    reviewed_at: timestamp("reviewed_at", { withTimezone: true }),
-  },
-  (table) => ({
-    uniqueProfileSession: uniqueIndex(
-      "check_in_requests_profile_session_unique",
-    ).on(table.profile_id, table.session_date),
-  }),
-);
-
-export const messagesTable = pgTable("messages", {
+// ─── Visitors table ────────────────────────────────────────────────────────────
+// Stores first-time visitors who register via the public QR code flow.
+// These visitors do NOT have a Clerk account or a profiles row.
+export const visitorsTable = pgTable("visitors", {
   id: uuid("id").primaryKey().defaultRandom(),
-  sender_id: uuid("sender_id")
-    .notNull()
-    .references(() => profilesTable.id, { onDelete: "cascade" }),
-  recipient_id: uuid("recipient_id")
-    .notNull()
-    .references(() => profilesTable.id, { onDelete: "cascade" }),
-  content: text("content").notNull(),
-  status: messageStatusEnum("status").notNull().default("sent"),
+  full_name: text("full_name").notNull(),
+  phone_number: text("phone_number").notNull(),
+  email: text("email"), // nullable
+  gender: genderEnum("gender").notNull(),
+  age: integer("age").notNull(),
+  how_did_you_hear: text("how_did_you_hear").notNull(),
+  session_date: date("session_date").notNull(),
+  status: checkInRequestStatusEnum("status").notNull().default("pending"),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
 
-export const leaderSlotsTable = pgTable("leader_slots", {
+// ─── Check-in requests ─────────────────────────────────────────────────────────
+// Supports both profile-based (members/visitors with accounts) and
+// visitor-based (first-timers without accounts) check-in requests.
+// Exactly one of profile_id or visitor_id must be set.
+export const checkInRequestsTable = pgTable("check_in_requests", {
   id: uuid("id").primaryKey().defaultRandom(),
-  profile_id: uuid("profile_id")
-    .notNull()
-    .unique()
-    .references(() => profilesTable.id, { onDelete: "cascade" }),
-  slot_number: integer("slot_number").notNull(),
-  assigned_at: timestamp("assigned_at", { withTimezone: true })
+  // profile_id is nullable to allow visitor-only check-in requests
+  profile_id: uuid("profile_id").references(() => profilesTable.id),
+  // visitor_id is set for first-timer check-in requests
+  visitor_id: uuid("visitor_id").references(() => visitorsTable.id),
+  type: checkInRequestTypeEnum("type").notNull().default("member"),
+  session_date: date("session_date").notNull(),
+  status: checkInRequestStatusEnum("status").notNull().default("pending"),
+  requested_at: timestamp("requested_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
-});
-
-export const superAdminSlotsTable = pgTable("super_admin_slots", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  profile_id: uuid("profile_id")
-    .notNull()
-    .unique()
-    .references(() => profilesTable.id, { onDelete: "cascade" }),
-  slot_number: integer("slot_number").notNull(),
-  assigned_at: timestamp("assigned_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  reviewed_by: uuid("reviewed_by").references(() => profilesTable.id),
+  reviewed_at: timestamp("reviewed_at", { withTimezone: true }),
 });
 
 export const insertProfileSchema = createInsertSchema(profilesTable).omit({
@@ -264,19 +222,10 @@ export const insertLeaderPermissionsSchema = createInsertSchema(
 export const insertCheckInRequestSchema = createInsertSchema(
   checkInRequestsTable,
 ).omit({ id: true, requested_at: true });
-export const insertMessageSchema = createInsertSchema(messagesTable).omit({
+export const insertVisitorSchema = createInsertSchema(visitorsTable).omit({
   id: true,
   created_at: true,
 });
-export const insertLeaderSlotSchema = createInsertSchema(leaderSlotsTable).omit(
-  {
-    id: true,
-    assigned_at: true,
-  },
-);
-export const insertSuperAdminSlotSchema = createInsertSchema(
-  superAdminSlotsTable,
-).omit({ id: true, assigned_at: true });
 
 export type Profile = typeof profilesTable.$inferSelect;
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -298,9 +247,5 @@ export type InsertLeaderPermissions = z.infer<
 >;
 export type CheckInRequest = typeof checkInRequestsTable.$inferSelect;
 export type InsertCheckInRequest = z.infer<typeof insertCheckInRequestSchema>;
-export type Message = typeof messagesTable.$inferSelect;
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
-export type LeaderSlot = typeof leaderSlotsTable.$inferSelect;
-export type InsertLeaderSlot = z.infer<typeof insertLeaderSlotSchema>;
-export type SuperAdminSlot = typeof superAdminSlotsTable.$inferSelect;
-export type InsertSuperAdminSlot = z.infer<typeof insertSuperAdminSlotSchema>;
+export type Visitor = typeof visitorsTable.$inferSelect;
+export type InsertVisitor = z.infer<typeof insertVisitorSchema>;

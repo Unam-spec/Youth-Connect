@@ -1,19 +1,8 @@
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Layout } from "@/components/layout";
-import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
@@ -22,6 +11,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -29,104 +19,128 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRegisterVisitor } from "@workspace/api-client-react";
-import { Link, useLocation } from "wouter";
-import { CheckCircle2, ChevronLeft } from "lucide-react";
+import { Link } from "wouter";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { AlertCircle, CheckCircle2, ChevronLeft } from "lucide-react";
+import { useState } from "react";
 
+// ─── Client-side validation schema ────────────────────────────────────────────
+// Field names match the public POST /api/register endpoint exactly.
 const registerSchema = z.object({
-  full_name: z.string().min(2, "Full name is required"),
-  phone: z.string().min(10, "Valid phone number is required").max(15),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
-  gender: z.enum(["male", "female", "other"]),
-  age: z.coerce.number().min(10).max(100),
-  heard_from: z.string().min(2, "Please tell us how you heard about us"),
+  full_name: z.string().min(2, "Full name must be at least 2 characters"),
+  phone_number: z
+    .string()
+    .min(10, "Valid phone number is required")
+    .max(15, "Phone number is too long"),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  gender: z.enum(["male", "female", "other"], {
+    required_error: "Please select a gender",
+  }),
+  age: z.coerce
+    .number({ invalid_type_error: "Age must be a number" })
+    .int("Age must be a whole number")
+    .min(10, "Age must be at least 10")
+    .max(100, "Age must be at most 100"),
+  how_did_you_hear: z.string().min(2, "Please tell us how you heard about us"),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
 export default function Register() {
-  const { toast } = useToast();
-  const [, setLocation] = useLocation();
   const [isSuccess, setIsSuccess] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       full_name: "",
-      phone: "",
+      phone_number: "",
       email: "",
       gender: "male",
       age: 18,
-      heard_from: "",
+      how_did_you_hear: "",
     },
   });
 
+  // ── Submit handler ───────────────────────────────────────────────────────────
+  // Calls the fully-public POST /api/register endpoint.
+  // No Authorization header — this is intentionally unauthenticated.
   async function onSubmit(data: RegisterFormValues) {
-    setIsSubmitting(true);
+    setIsPending(true);
+    setServerError(null);
+
     try {
-      const response = await fetch("/api/profiles/register", {
+      const response = await fetch("/api/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          // No Authorization header — public endpoint
         },
         body: JSON.stringify({
-          ...data,
-          email: data.email || null,
+          full_name: data.full_name,
+          phone_number: data.phone_number,
+          // Convert empty string to null before sending
+          email: data.email === "" ? null : (data.email ?? null),
+          gender: data.gender,
+          // Ensure age is sent as an integer
+          age: parseInt(String(data.age), 10),
+          how_did_you_hear: data.how_did_you_hear,
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || error.error || "Registration failed");
+      if (response.status === 201) {
+        setIsSuccess(true);
+        return;
       }
 
-      const result = await response.json();
-      setIsSuccess(true);
-      toast({ title: "Registration successful" });
-    } catch (error) {
-      toast({
-        title: "Registration Failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "An error occurred during registration",
-        variant: "destructive",
-      });
+      // Surface the exact server error message so developers can debug
+      const errorData = await response.json().catch(() => ({}));
+      setServerError(
+        errorData.error ||
+          `Registration failed with status ${response.status}. Please try again.`,
+      );
+    } catch (networkErr: any) {
+      setServerError(
+        networkErr?.message
+          ? `Network error: ${networkErr.message}`
+          : "Network error — please check your connection and try again.",
+      );
     } finally {
-      setIsSubmitting(false);
+      setIsPending(false);
     }
   }
 
+  // ── Success state ────────────────────────────────────────────────────────────
   if (isSuccess) {
     return (
       <Layout>
         <div className="max-w-md mx-auto pt-10">
           <Card className="border-primary/20 shadow-xl overflow-hidden relative">
-            <div className="absolute top-0 left-0 w-full h-2 bg-primary"></div>
+            <div className="absolute top-0 left-0 w-full h-2 bg-primary" />
             <CardHeader className="text-center pb-2 pt-8">
               <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl">Welcome to JG Youth!</CardTitle>
+              <CardTitle className="text-2xl">You're registered!</CardTitle>
               <CardDescription className="text-base mt-2">
-                You've successfully registered as a first-timer. We're so glad
-                you're here.
+                Registered! A leader will approve your check-in.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6 pb-8 space-y-4">
-              <div className="bg-muted p-4 rounded-lg text-sm text-center">
-                Your profile has been created as a Visitor. To get full access
-                to RSVP to events and more, you can become a Member.
+              <div className="bg-muted p-4 rounded-lg text-sm text-center text-muted-foreground">
+                Please wait while a leader reviews and approves your check-in
+                request. You'll be called up once approved.
               </div>
               <div className="flex flex-col gap-3 pt-2">
-                <Link href="/become-member">
-                  <Button className="w-full" size="lg">
-                    Become a Member
-                  </Button>
-                </Link>
                 <Link href="/">
-                  <Button variant="outline" className="w-full">
+                  <Button className="w-full" size="lg">
                     Return Home
                   </Button>
                 </Link>
@@ -138,6 +152,7 @@ export default function Register() {
     );
   }
 
+  // ── Registration form ────────────────────────────────────────────────────────
   return (
     <Layout>
       <div className="max-w-xl mx-auto py-8">
@@ -163,12 +178,21 @@ export default function Register() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Server-side error banner */}
+            {serverError && (
+              <div className="mb-5 flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{serverError}</span>
+              </div>
+            )}
+
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-6"
               >
                 <div className="space-y-4">
+                  {/* Full Name */}
                   <FormField
                     control={form.control}
                     name="full_name"
@@ -183,10 +207,11 @@ export default function Register() {
                     )}
                   />
 
+                  {/* Phone + Email */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="phone"
+                      name="phone_number"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Phone Number *</FormLabel>
@@ -221,6 +246,7 @@ export default function Register() {
                     />
                   </div>
 
+                  {/* Gender + Age */}
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -255,7 +281,12 @@ export default function Register() {
                         <FormItem>
                           <FormLabel>Age *</FormLabel>
                           <FormControl>
-                            <Input type="number" {...field} />
+                            <Input
+                              type="number"
+                              min={10}
+                              max={100}
+                              {...field}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -263,9 +294,10 @@ export default function Register() {
                     />
                   </div>
 
+                  {/* How did you hear */}
                   <FormField
                     control={form.control}
-                    name="heard_from"
+                    name="how_did_you_hear"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>How did you hear about us? *</FormLabel>
@@ -284,9 +316,9 @@ export default function Register() {
                 <Button
                   type="submit"
                   className="w-full text-base h-12"
-                  disabled={isSubmitting}
+                  disabled={isPending}
                 >
-                  {isSubmitting ? "Registering..." : "Register"}
+                  {isPending ? "Registering..." : "Register"}
                 </Button>
               </form>
             </Form>

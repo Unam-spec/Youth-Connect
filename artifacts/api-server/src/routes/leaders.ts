@@ -39,7 +39,10 @@ router.get("/leaders", async (req, res) => {
         },
       })
       .from(leaderPermissionsTable)
-      .leftJoin(profilesTable, eq(leaderPermissionsTable.profile_id, profilesTable.id));
+      .leftJoin(
+        profilesTable,
+        eq(leaderPermissionsTable.profile_id, profilesTable.id),
+      );
     return res.json(leaders);
   } catch (err) {
     req.log.error(err);
@@ -149,11 +152,31 @@ router.post("/leaders/verify-pin", async (req, res) => {
     if (profile.role !== "leader" && profile.role !== "super_admin") {
       return res.status(401).json({ error: "Not a leader" });
     }
-    const valid = await bcrypt.compare(pin, profile.pin_hash);
+    let valid = false;
+    // Check if stored pin_hash looks like plain text (less than 20 characters)
+    if (profile.pin_hash.length < 20) {
+      // Direct string comparison for plain text PINs
+      if (pin === profile.pin_hash) {
+        valid = true;
+        // Automatically rehash and save as bcrypt
+        const newHash = await bcrypt.hash(pin, 10);
+        await db
+          .update(profilesTable)
+          .set({ pin_hash: newHash })
+          .where(eq(profilesTable.id, profile.id));
+      }
+    } else {
+      // bcrypt comparison for hashed PINs
+      valid = await bcrypt.compare(pin, profile.pin_hash);
+    }
     if (!valid) {
       return res.status(401).json({ error: "Invalid PIN" });
     }
-    return res.json({ success: true, role: profile.role, profile_id: profile.id });
+    return res.json({
+      success: true,
+      role: profile.role,
+      profile_id: profile.id,
+    });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -176,7 +199,10 @@ router.post("/leaders/update-pin", async (req, res) => {
     if (!profile || !profile.pin_hash) {
       return res.status(401).json({ error: "No PIN set" });
     }
-    const valid = await bcrypt.compare(parsed.data.current_pin, profile.pin_hash);
+    const valid = await bcrypt.compare(
+      parsed.data.current_pin,
+      profile.pin_hash,
+    );
     if (!valid) {
       return res.status(401).json({ error: "Current PIN is incorrect" });
     }

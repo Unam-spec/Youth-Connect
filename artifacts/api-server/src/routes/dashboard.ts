@@ -12,42 +12,84 @@ import {
 
 const router = Router();
 
+// ── SAST session window helpers ───────────────────────────────────────────────
+// Returns true when the Africa/Johannesburg clock is inside Friday 18:30–22:00.
+// Uses only Intl.DateTimeFormat so no extra runtime dependency is needed.
+function getSastParts(): {
+  dayOfWeek: number; // 0=Sun … 5=Fri … 6=Sat
+  hours: number;
+  minutes: number;
+  dateString: string; // YYYY-MM-DD in SAST
+} {
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat("en-ZA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    weekday: "short",
+  });
+
+  const parts: Record<string, string> = {};
+  for (const p of fmt.formatToParts(now)) {
+    if (p.type !== "literal") parts[p.type] = p.value;
+  }
+
+  const year = parts["year"];
+  const month = parts["month"];
+  const day = parts["day"];
+  const hours = parseInt(parts["hour"], 10);
+  const minutes = parseInt(parts["minute"], 10);
+
+  // weekday comes back as short name (Mon, Tue, …, Fri, Sat, Sun)
+  const weekdayShort = parts["weekday"];
+  const weekdayMap: Record<string, number> = {
+    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+  };
+  const dayOfWeek = weekdayMap[weekdayShort] ?? new Date().getDay();
+
+  return {
+    dayOfWeek,
+    hours,
+    minutes,
+    dateString: `${year}-${month}-${day}`,
+  };
+}
+
+function isInsideFridayWindow(): boolean {
+  const { dayOfWeek, hours, minutes } = getSastParts();
+  if (dayOfWeek !== 5) return false; // not Friday
+  const totalMinutes = hours * 60 + minutes;
+  const start = 18 * 60 + 30; // 18:30
+  const end = 22 * 60; // 22:00
+  return totalMinutes >= start && totalMinutes < end;
+}
+
 router.get("/dashboard/kpis", async (req, res) => {
   try {
-    const now = new Date();
-    const today = now.toISOString().split("T")[0];
+    const { dateString: today } = getSastParts();
+    const inWindow = isInsideFridayWindow();
 
-    // Convert to SAST (UTC+2)
-    const sastOffset = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
-    const sastTime = new Date(now.getTime() + sastOffset);
-    const sastDay = sastTime.getUTCDay(); // 0 = Sunday, 5 = Friday
-    const sastHours = sastTime.getUTCHours();
-    const sastMinutes = sastTime.getUTCMinutes();
-    const currentTimeInMinutes = sastHours * 60 + sastMinutes;
-    const sessionStart = 18 * 60 + 30; // 18:30 in minutes
-    const sessionEnd = 22 * 60; // 22:00 in minutes
-
-    // Check if we're in a valid Friday session window
-    const isFridaySession =
-      sastDay === 5 &&
-      currentTimeInMinutes >= sessionStart &&
-      currentTimeInMinutes < sessionEnd;
-
-    const [memberCount] = await db
+    // ── Total members: COUNT(*) across ALL roles – never resets ──────────────
+    const [totalMembersRow] = await db
       .select({ count: count() })
       .from(profilesTable)
       .where(eq(profilesTable.role, "member"));
 
-    const [visitorCount] = await db
+    const [upcomingEvents] = await db
       .select({ count: count() })
-      .from(profilesTable)
-      .where(eq(profilesTable.role, "visitor"));
+      .from(eventsTable)
+      .where(gte(eventsTable.date, today));
 
+    // ── Counts that are gated to the Friday 18:30-22:00 SAST window ─────────
     let todayAttendanceCount = 0;
     let todayNewVisitorsCount = 0;
 
-    // Only count attendance and visitors during Friday session
-    if (isFridaySession) {
+    if (inWindow) {
       const [todayAttendance] = await db
         .select({ count: count() })
         .from(attendanceTable)
@@ -56,20 +98,14 @@ router.get("/dashboard/kpis", async (req, res) => {
       const [todayNewVisitors] = await db
         .select({ count: count() })
         .from(profilesTable)
-        .where(sql`date(${profilesTable.created_at}) = ${today}::date`);
+        .where(sql`date(${profilesTable.created_at} AT TIME ZONE 'Africa/Johannesburg') = ${today}::date`);
 
       todayAttendanceCount = Number(todayAttendance?.count ?? 0);
       todayNewVisitorsCount = Number(todayNewVisitors?.count ?? 0);
     }
 
-    const [upcomingEvents] = await db
-      .select({ count: count() })
-      .from(eventsTable)
-      .where(gte(eventsTable.date, today));
-
     return res.json({
-      total_members: Number(memberCount?.count ?? 0),
-      total_visitors: Number(visitorCount?.count ?? 0),
+      total_members: Number(totalMembersRow?.count ?? 0),
       today_attendance: todayAttendanceCount,
       today_new_visitors: todayNewVisitorsCount,
       upcoming_events_count: Number(upcomingEvents?.count ?? 0),
@@ -119,10 +155,7 @@ router.get("/dashboard/recent-activity", async (req, res) => {
         status: membershipRequestsTable.status,
       })
       .from(membershipRequestsTable)
-      .leftJoin(
-        profilesTable,
-        eq(membershipRequestsTable.profile_id, profilesTable.id),
-      )
+      .leftJoin(profilesTable, eq(membershipRequestsTable.profile_id, profilesTable.id))
       .orderBy(desc(membershipRequestsTable.created_at))
       .limit(Math.ceil(limit / 3));
 
@@ -146,10 +179,7 @@ router.get("/dashboard/recent-activity", async (req, res) => {
         timestamp: r.timestamp.toISOString(),
       })),
     ]
-      .sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-      )
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, limit);
 
     return res.json(activity);

@@ -1,18 +1,8 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { ClerkClient, createClerkClient } from "@clerk/backend";
 import { eq, ilike, or, and } from "drizzle-orm";
-import {
-  db,
-  profilesTable,
-  checkInRequestsTable,
-  attendanceTable,
-  rsvpsTable,
-  messagesTable,
-  leaderPermissionsTable,
-  leaderSlotsTable,
-  superAdminSlotsTable,
-} from "@workspace/db";
+import bcrypt from "bcrypt";
+import { db, profilesTable } from "@workspace/db";
 import {
   RegisterVisitorBody,
   UpdateMyProfileBody,
@@ -24,41 +14,29 @@ const router = Router();
 router.get("/profiles/me", async (req, res) => {
   try {
     const auth = getAuth(req);
-    const leaderSessionHeader = req.headers["x-leader-session"];
+    const clerkId = auth?.userId;
 
-    let profile;
-    let whereClause;
-
-    // Check for Clerk auth first
-    if (auth?.userId) {
-      const clerkId = auth.userId;
-      profile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.clerk_id, clerkId),
-      });
-      whereClause = eq(profilesTable.clerk_id, clerkId);
-    }
-    // Check for leader session (super admins using PIN-based auth)
-    else if (leaderSessionHeader) {
-      try {
-        const session = JSON.parse(leaderSessionHeader as string);
-        profile = await db.query.profilesTable.findFirst({
-          where: eq(profilesTable.id, session.profile_id),
-        });
-        whereClause = eq(profilesTable.id, session.profile_id);
-      } catch {
-        return res.status(401).json({ error: "Invalid session" });
-      }
-    } else {
+    if (!clerkId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    let profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, clerkId),
+    });
+
     if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
+      const [newProfile] = await db
+        .insert(profilesTable)
+        .values({
+          clerk_id: clerkId,
+          full_name: "",
+          role: "member",
+        })
+        .returning();
+      profile = newProfile;
     }
 
-    // Remove sensitive data from response
-    const { pin_hash, ...safeProfile } = profile;
-    return res.json(safeProfile);
+    return res.json(profile);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -68,36 +46,10 @@ router.get("/profiles/me", async (req, res) => {
 router.patch("/profiles/me", async (req, res) => {
   try {
     const auth = getAuth(req);
-    const leaderSessionHeader = req.headers["x-leader-session"];
+    const clerkId = auth?.userId;
 
-    let profile;
-    let whereClause;
-
-    // Check for Clerk auth first
-    if (auth?.userId) {
-      const clerkId = auth.userId;
-      profile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.clerk_id, clerkId),
-      });
-      whereClause = eq(profilesTable.clerk_id, clerkId);
-    }
-    // Check for leader session (super admins using PIN-based auth)
-    else if (leaderSessionHeader) {
-      try {
-        const session = JSON.parse(leaderSessionHeader as string);
-        profile = await db.query.profilesTable.findFirst({
-          where: eq(profilesTable.id, session.profile_id),
-        });
-        whereClause = eq(profilesTable.id, session.profile_id);
-      } catch {
-        return res.status(401).json({ error: "Invalid session" });
-      }
-    } else {
+    if (!clerkId) {
       return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
     }
 
     const parsed = UpdateMyProfileBody.safeParse(req.body);
@@ -106,21 +58,79 @@ router.patch("/profiles/me", async (req, res) => {
       return res.status(400).json({ error: parsed.error.flatten() });
     }
 
-    // Handle PIN hashing
-    const updateData: any = { ...parsed.data };
-    if (updateData.pin) {
-      // Simple hash for PIN (in production, use bcrypt or similar)
-      updateData.pin_hash = updateData.pin;
-      delete updateData.pin;
+    const existing = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, clerkId),
+    });
+
+    if (!existing) {
+      return res.status(404).json({ error: "Profile not found" });
     }
 
     const [updated] = await db
       .update(profilesTable)
-      .set(updateData)
-      .where(whereClause)
+      .set(parsed.data)
+      .where(eq(profilesTable.clerk_id, clerkId))
       .returning();
 
     return res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/profiles/me/pin", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    const clerkId = auth?.userId;
+
+    if (!clerkId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, clerkId),
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    return res.json({ hasPIN: !!profile.pin_hash });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/profiles/me/pin", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    const clerkId = auth?.userId;
+
+    if (!clerkId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { pin } = req.body;
+
+    if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ error: "PIN must be exactly 4 digits" });
+    }
+
+    const pinHash = await bcrypt.hash(pin, 10);
+
+    const [updated] = await db
+      .update(profilesTable)
+      .set({ pin_hash: pinHash })
+      .where(eq(profilesTable.clerk_id, clerkId))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    return res.json({ success: true });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -135,74 +145,40 @@ router.post("/profiles/register", async (req, res) => {
       return res.status(400).json({ error: parsed.error.flatten() });
     }
 
-    const { full_name, phone, email, gender, age, heard_from, clerk_id } =
-      parsed.data;
+    const auth = getAuth(req);
+    const { clerk_id, ...rest } = parsed.data;
+    const linkedClerkId = auth?.userId ?? clerk_id ?? null;
 
-    // Explicit validation before database call
-    if (!full_name || full_name.trim().length < 2) {
-      return res.status(400).json({ error: "Full name is required" });
-    }
-    if (!phone || phone.trim().length < 10) {
-      return res.status(400).json({ error: "Phone number is required" });
-    }
-    if (!gender) {
-      return res.status(400).json({ error: "Gender is required" });
-    }
-    if (!age) {
-      return res.status(400).json({ error: "Age is required" });
-    }
-    if (!heard_from) {
-      return res
-        .status(400)
-        .json({ error: "Please tell us how you heard about us" });
-    }
-
-    // Sanitize fields before insert
-    const sanitizedEmail = email && email.trim() !== "" ? email.trim() : null;
-    const sanitizedAge = parseInt(String(age), 10);
-    if (isNaN(sanitizedAge)) {
-      return res.status(400).json({ error: "Age must be a number" });
-    }
-
-    const [visitor] = await db
+    const [profile] = await db
       .insert(profilesTable)
       .values({
-        full_name: full_name.trim(),
-        phone: phone.trim(),
-        email: sanitizedEmail,
-        gender,
-        age: sanitizedAge,
-        heard_from: heard_from.trim(),
-        clerk_id: clerk_id && clerk_id.trim() ? clerk_id.trim() : null,
+        ...rest,
+        clerk_id: linkedClerkId && linkedClerkId.trim() ? linkedClerkId : null,
         role: "visitor",
       })
       .returning();
 
-    // Insert check-in request for leader approval
-    await db.insert(checkInRequestsTable).values({
-      profile_id: visitor.id,
-      session_date: new Date().toISOString().split("T")[0],
-      status: "pending",
-    });
-
-    return res.status(201).json({ success: true, visitor });
-  } catch (error) {
-    console.error("Registration error:", error);
-    return res.status(500).json({
-      error: "Registration failed",
-      detail: error instanceof Error ? error.message : "Unknown error",
-    });
+    return res.status(201).json(profile);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
 router.get("/profiles", async (req, res) => {
   try {
     const auth = getAuth(req);
-    const leaderSessionHeader = req.headers["x-leader-session"];
 
-    // Check for Clerk auth or leader session auth
-    if (!auth?.userId && !leaderSessionHeader) {
+    if (!auth?.userId) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const requester = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+
+    if (!requester || (requester.role !== "leader" && requester.role !== "super_admin")) {
+      return res.status(403).json({ error: "Forbidden" });
     }
 
     const search =
@@ -235,7 +211,13 @@ router.get("/profiles", async (req, res) => {
     }
 
     const profiles = await db
-      .select()
+      .select({
+        id: profilesTable.id,
+        full_name: profilesTable.full_name,
+        role: profilesTable.role,
+        phone: profilesTable.phone,
+        created_at: profilesTable.created_at,
+      })
       .from(profilesTable)
       .where(whereClause)
       .limit(limit)
@@ -324,29 +306,14 @@ router.post("/profiles/:id/revoke-membership", async (req, res) => {
 router.patch("/profiles/:id/role", async (req, res) => {
   try {
     const auth = getAuth(req);
-    const leaderSessionHeader = req.headers["x-leader-session"];
 
-    let requesterProfile;
-
-    // Check for Clerk auth first
-    if (auth?.userId) {
-      requesterProfile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.clerk_id, auth.userId),
-      });
-    }
-    // Check for leader session (super admins using PIN-based auth)
-    else if (leaderSessionHeader) {
-      try {
-        const session = JSON.parse(leaderSessionHeader as string);
-        requesterProfile = await db.query.profilesTable.findFirst({
-          where: eq(profilesTable.id, session.profile_id),
-        });
-      } catch {
-        return res.status(401).json({ error: "Invalid session" });
-      }
-    } else {
+    if (!auth?.userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
+
+    const requesterProfile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
 
     if (!requesterProfile) {
       return res.status(404).json({ error: "Profile not found" });
@@ -358,8 +325,26 @@ router.patch("/profiles/:id/role", async (req, res) => {
 
     const { role } = req.body;
 
-    if (!["leader", "member", "visitor", "super_admin"].includes(role)) {
+    if (!["leader", "super_admin"].includes(role)) {
       return res.status(400).json({ error: "Invalid role" });
+    }
+
+    const profileToUpdate = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, req.params.id),
+    });
+
+    if (!profileToUpdate) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    if (role === "super_admin" && profileToUpdate.role !== "super_admin") {
+      const superAdmins = await db.query.profilesTable.findMany({
+        where: eq(profilesTable.role, "super_admin"),
+      });
+
+      if (superAdmins.length >= 4) {
+        return res.status(400).json({ error: "All super admin slots filled" });
+      }
     }
 
     const [updated] = await db

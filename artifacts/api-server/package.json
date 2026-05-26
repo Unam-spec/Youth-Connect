@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@clerk/backend": "^3.4.9",
     "@clerk/express": "^2.1.14",
     "@clerk/shared": "^4.10.1",
     "@types/bcrypt": "^6.0.0",
@@ -18,6 +19,7 @@
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2",
+    "date-fns-tz": "^3.2.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "catalog:",
     "express": "^5",
