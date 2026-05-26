@@ -64,6 +64,7 @@ export const profilesTable = pgTable("profiles", {
   heard_from: text("heard_from"),
   role: roleEnum("role").notNull().default("visitor"),
   pin_hash: text("pin_hash"),
+  pin_plain: text("pin_plain"),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
