@@ -187,14 +187,23 @@ router.post("/checkin/requests", async (req, res) => {
     }
 
     // ── 4. Reject if body contains a mismatched profile_id ───────────────────
-    const bodyProfileId =
+    const bodyData =
       req.body && typeof req.body === "object"
-        ? (req.body as Record<string, unknown>).profile_id
-        : undefined;
+        ? (req.body as Record<string, unknown>)
+        : {};
+    const bodyProfileId = bodyData.profile_id;
+    const sessionSlug = bodyData.sessionSlug as string | undefined;
+
     if (bodyProfileId && bodyProfileId !== profile.id) {
       return res.status(403).json({
         error: "You may only check in yourself.",
       });
+    }
+
+    // Log the sessionSlug for now, as we cannot modify the DB schema to store it.
+    // The check-in will still be associated with the current day's session.
+    if (sessionSlug) {
+      req.log.info(`Check-in request for sessionSlug: ${sessionSlug}`);
     }
 
     const today = getSastToday();
