@@ -12,8 +12,9 @@
   "dependencies": {
     "@clerk/react": "^6.6.1",
     "@clerk/themes": "^2.4.57",
-    "qrcode": "^1.5.4",
-    "@workspace/api-client-react": "workspace:*"
+    "@workspace/api-client-react": "workspace:*",
+    "html5-qrcode": "^2.3.8",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

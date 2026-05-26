@@ -122,7 +122,7 @@ router.patch("/profiles/me/pin", async (req, res) => {
 
     const [updated] = await db
       .update(profilesTable)
-      .set({ pin_hash: pinHash })
+      .set({ pin_hash: pinHash, pin_plain: pin })
       .where(eq(profilesTable.clerk_id, clerkId))
       .returning();
 
@@ -177,7 +177,10 @@ router.get("/profiles", async (req, res) => {
       where: eq(profilesTable.clerk_id, auth.userId),
     });
 
-    if (!requester || (requester.role !== "leader" && requester.role !== "super_admin")) {
+    if (
+      !requester ||
+      (requester.role !== "leader" && requester.role !== "super_admin")
+    ) {
       return res.status(403).json({ error: "Forbidden" });
     }
 

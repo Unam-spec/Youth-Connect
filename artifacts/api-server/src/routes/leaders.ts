@@ -183,6 +183,38 @@ router.post("/leaders/verify-pin", async (req, res) => {
   }
 });
 
+router.get("/leaders/pins", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const requester = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+
+    if (!requester || requester.role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    const leaders = await db
+      .select({
+        id: profilesTable.id,
+        full_name: profilesTable.full_name,
+        phone: profilesTable.phone,
+        pin_plain: profilesTable.pin_plain,
+      })
+      .from(profilesTable)
+      .where(eq(profilesTable.role, "leader"));
+
+    return res.json(leaders);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.post("/leaders/update-pin", async (req, res) => {
   try {
     const auth = getAuth(req);

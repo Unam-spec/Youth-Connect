@@ -36,11 +36,7 @@ export const checkInMethodEnum = pgEnum("check_in_method", [
 
 export const qrCodeTypeEnum = pgEnum("qr_code_type", ["public", "leader"]);
 
-export const rsvpStatusEnum = pgEnum("rsvp_status", [
-  "going",
-  "not_going",
-  "maybe",
-]);
+export const rsvpStatusEnum = pgEnum("rsvp", ["going", "not_going", "maybe"]);
 
 export const checkInRequestStatusEnum = pgEnum("check_in_request_status", [
   "pending",
@@ -64,6 +60,7 @@ export const profilesTable = pgTable("profiles", {
   heard_from: text("heard_from"),
   role: roleEnum("role").notNull().default("visitor"),
   pin_hash: text("pin_hash"),
+  pin_plain: text("pin_plain"),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
