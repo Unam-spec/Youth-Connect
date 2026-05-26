@@ -153,6 +153,9 @@ export default function Dashboard() {
   const apiFetch = useApiFetch();
   const [search, setSearch] = useState("");
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
+  const [eventToDeleteName, setEventToDeleteName] = useState<string | null>(
+    null,
+  );
   const [pin, setPin] = useState("");
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [hasPin, setHasPin] = useState(false);
@@ -279,29 +282,34 @@ export default function Dashboard() {
   const pendingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
-  const [eventForm, setEventForm] = useState({
-    title: "",
-    description: "",
-    date: today,
-    time: "18:00",
-    location: "",
-    age_min: "",
-    age_max: "",
-    is_public: true,
-  });
-
-  if (!session) {
-    return <Redirect to="/leader-login" />;
-  }
-
-  // ── KPI auto-refresh ────────────────────────────────────────────────────
-  const [kpisUpdatedAt, setKpisUpdatedAt] = useState<string | null>(null);
+  const { data: attendance, isLoading: isAttendanceLoading } =
+    useGetTodayAttendance({
+      query: { queryKey: getGetTodayAttendanceQueryKey() },
+    });
   const {
-    data: kpis,
-    isLoading: isKpisLoading,
-    refetch: refetchKpis,
-  } = useGetDashboardKpis({
-    query: { queryKey: getGetDashboardKpisQueryKey() },
+    data: profiles,
+    isLoading: isProfilesLoading,
+    isError: isProfilesError,
+    refetch: refetchProfiles,
+  } = useListProfiles(search ? { search } : undefined, {
+    query: {
+      queryKey: getListProfilesQueryKey(search ? { search } : undefined),
+    },
+  });
+  const { data: requests, isLoading: isRequestsLoading } =
+    useListMembershipRequests(
+      { status: "pending" },
+      {
+        query: {
+          queryKey: getListMembershipRequestsQueryKey({ status: "pending" }),
+        },
+      },
+    );
+  const { data: leaders, isLoading: isLeadersLoading } = useListLeaders({
+    query: {
+      enabled: session.role === "super_admin",
+      queryKey: getListLeadersQueryKey(),
+    },
   });
 
   // Stamp time on first successful load
@@ -1450,7 +1458,10 @@ export default function Dashboard() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDeleteEventId(event.id)}
+                        onClick={() => {
+                          setDeleteEventId(event.id);
+                          setEventToDeleteName(event.title);
+                        }}
                         className="text-destructive hover:text-destructive"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1765,7 +1776,8 @@ export default function Dashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Event</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this event? This cannot be undone.
+              Delete {eventToDeleteName}? This removes all RSVPs. Cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
