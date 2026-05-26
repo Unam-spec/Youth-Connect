@@ -16,8 +16,8 @@ import {
   Select,
   SelectContent,
   SelectItem,
-  SelectTrigger,
   SelectValue,
+  SelectTrigger,
 } from "@/components/ui/select";
 import { Link } from "wouter";
 import {
