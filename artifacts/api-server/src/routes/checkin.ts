@@ -84,23 +84,13 @@ async function resolveLeaderOrAdmin(req: Request): Promise<Profile | null> {
 // ── Time-window helpers ───────────────────────────────────────────────────────
 
 /**
- * Returns an error message if the check-in window is closed, or null if open.
+ * Returns true only on Fridays between 18:30 and 22:00 Africa/Johannesburg.
  */
-function getCheckinWindowError(): string | null {
+function isCheckinWindowOpen(): boolean {
   const sast = toZonedTime(new Date(), "Africa/Johannesburg");
   const day = sast.getDay(); // 0 = Sunday, 5 = Friday
   const totalMinutes = sast.getHours() * 60 + sast.getMinutes();
-
-  if (day !== 5) {
-    return "Check-in is only available on Fridays between 18:30 and 22:00 SAST.";
-  }
-  if (totalMinutes < 18 * 60 + 30) {
-    return "Check-in opens at 18:30 SAST on Fridays.";
-  }
-  if (totalMinutes >= 22 * 60) {
-    return "Check-in has closed for tonight (closes at 22:00 SAST).";
-  }
-  return null;
+  return day === 5 && totalMinutes >= 18 * 60 + 30 && totalMinutes < 22 * 60;
 }
 
 /**
@@ -168,9 +158,24 @@ router.post("/checkin/requests", async (req, res) => {
     }
 
     // ── 2. Server-side time-window check (Africa/Johannesburg) ────────────────
-    const checkinError = getCheckinWindowError();
-    if (checkinError) {
-      return res.status(403).json({ error: checkinError });
+    if (!isCheckinWindowOpen()) {
+      const sast = toZonedTime(new Date(), "Africa/Johannesburg");
+      const day = sast.getDay();
+      if (day !== 5) {
+        return res.status(403).json({
+          error:
+            "Check-in is only available on Fridays between 18:30 and 22:00 SAST.",
+        });
+      }
+      const totalMinutes = sast.getHours() * 60 + sast.getMinutes();
+      if (totalMinutes < 18 * 60 + 30) {
+        return res.status(403).json({
+          error: "Check-in opens at 18:30 SAST on Fridays.",
+        });
+      }
+      return res.status(403).json({
+        error: "Check-in has closed for tonight (closes at 22:00 SAST).",
+      });
     }
 
     // ── 3. Resolve profile from Clerk token (never from request body) ─────────
