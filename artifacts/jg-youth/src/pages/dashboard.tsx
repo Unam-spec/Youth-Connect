@@ -30,7 +30,7 @@ import {
   useRevokeMembership,
 } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
-import { getLeaderSession } from "@/lib/auth";
+import { getLeaderSession, setLeaderSession, LeaderSession } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -159,6 +159,7 @@ export default function Dashboard() {
     profile: any;
     targetRole: "leader" | "super_admin";
   } | null>(null);
+  const [isUpdatingPermissions, setIsUpdatingPermissions] = useState(false);
 
   // ── Leader PINs state (super_admin only) ───────────────────────────────────
   const [leaderPins, setLeaderPins] = useState<LeaderPin[]>([]);
@@ -513,6 +514,53 @@ export default function Dashboard() {
     }
   }
 
+  async function handlePermissionChange(
+    profileId: string,
+    permissionKey: keyof LeaderSession, // Use keyof LeaderSession for permissionKey
+    newValue: boolean,
+  ) {
+    setIsUpdatingPermissions(true);
+    try {
+      const response = await apiFetch(
+        `/api/profiles/${profileId}/permissions`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ [permissionKey]: newValue }),
+        },
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Failed to update permissions",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "Permissions updated" });
+      // Optimistically update the local session if the current user's permissions are changed
+      if (session!.profile_id === profileId) {
+        // Use non-null assertion for session
+        const updatedSession: Omit<LeaderSession, "expires_at"> = {
+          ...session!, // Use non-null assertion for session
+          [permissionKey]: newValue,
+        };
+        setLeaderSession(updatedSession); // Update local storage
+      }
+      refreshDashboard(); // Refresh to get updated data
+    } catch (err) {
+      toast({
+        title: "Failed to update permissions",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingPermissions(false);
+    }
+  }
+
   function mutateProfileRole(action: "promote" | "revoke", profileId: string) {
     const mutation = action === "promote" ? promoteToMember : revokeMembership;
     mutation.mutate(
@@ -640,45 +688,49 @@ export default function Dashboard() {
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard
-            title="Total Members"
-            icon={<Users className="h-4 w-4 text-muted-foreground" />}
-            value={
-              // Never show 0 — fall back to previous non-zero value or hide
-              kpis?.total_members && kpis.total_members > 0
-                ? kpis.total_members
-                : undefined
-            }
-            loading={isKpisLoading}
-            lastUpdated={kpisUpdatedAt}
-          />
-          <KpiCard
-            title="Today's Attendance"
-            icon={<CheckCircle className="h-4 w-4 text-primary" />}
-            value={kpis?.today_attendance}
-            loading={isKpisLoading}
-            lastUpdated={kpisUpdatedAt}
-          />
-          <KpiCard
-            title="New Visitors Today"
-            icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
-            value={kpis?.today_new_visitors}
-            loading={isKpisLoading}
-            lastUpdated={kpisUpdatedAt}
-          />
-          <KpiCard
-            title="Upcoming Events"
-            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-            value={kpis?.upcoming_events_count}
-            loading={isKpisLoading}
-            lastUpdated={kpisUpdatedAt}
-          />
-        </div>
+        {session.can_view_kpis && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard
+              title="Total Members"
+              icon={<Users className="h-4 w-4 text-muted-foreground" />}
+              value={
+                // Never show 0 — fall back to previous non-zero value or hide
+                kpis?.total_members && kpis.total_members > 0
+                  ? kpis.total_members
+                  : undefined
+              }
+              loading={isKpisLoading}
+              lastUpdated={kpisUpdatedAt}
+            />
+            <KpiCard
+              title="Today's Attendance"
+              icon={<CheckCircle className="h-4 w-4 text-primary" />}
+              value={kpis?.today_attendance}
+              loading={isKpisLoading}
+              lastUpdated={kpisUpdatedAt}
+            />
+            <KpiCard
+              title="New Visitors Today"
+              icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
+              value={kpis?.today_new_visitors}
+              loading={isKpisLoading}
+              lastUpdated={kpisUpdatedAt}
+            />
+            <KpiCard
+              title="Upcoming Events"
+              icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+              value={kpis?.upcoming_events_count}
+              loading={isKpisLoading}
+              lastUpdated={kpisUpdatedAt}
+            />
+          </div>
+        )}
 
         <Tabs defaultValue="attendance" className="mt-8">
           <TabsList className="grid grid-cols-2 md:grid-cols-5 h-auto md:h-10 gap-2 md:gap-0">
-            <TabsTrigger value="attendance">Today</TabsTrigger>
+            {session.can_view_attendance && (
+              <TabsTrigger value="attendance">Today</TabsTrigger>
+            )}
             <TabsTrigger value="checkin-approvals">
               Check-ins
               {pendingCheckIns.length > 0 && (
@@ -687,7 +739,9 @@ export default function Dashboard() {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="members">Members</TabsTrigger>
+            {session.can_view_members && (
+              <TabsTrigger value="members">Members</TabsTrigger>
+            )}
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="requests">Requests</TabsTrigger>
             {session.role === "super_admin" && (
@@ -897,17 +951,89 @@ export default function Dashboard() {
                       {profile.role === "leader" && (
                         <>
                           {session.role === "super_admin" && (
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                setRoleConfirm({
-                                  profile,
-                                  targetRole: "super_admin",
-                                })
-                              }
-                            >
-                              Make Super Admin
-                            </Button>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id={`create-events-${profile.id}`}
+                                  checked={profile.can_create_events}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(
+                                      profile.id,
+                                      "can_create_events",
+                                      checked,
+                                    )
+                                  }
+                                  disabled={isUpdatingPermissions}
+                                />
+                                <Label htmlFor={`create-events-${profile.id}`}>
+                                  Create Events
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id={`view-kpis-${profile.id}`}
+                                  checked={profile.can_view_kpis}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(
+                                      profile.id,
+                                      "can_view_kpis",
+                                      checked,
+                                    )
+                                  }
+                                  disabled={isUpdatingPermissions}
+                                />
+                                <Label htmlFor={`view-kpis-${profile.id}`}>
+                                  View KPIs
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id={`view-members-${profile.id}`}
+                                  checked={profile.can_view_members}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(
+                                      profile.id,
+                                      "can_view_members",
+                                      checked,
+                                    )
+                                  }
+                                  disabled={isUpdatingPermissions}
+                                />
+                                <Label htmlFor={`view-members-${profile.id}`}>
+                                  View Members
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id={`view-attendance-${profile.id}`}
+                                  checked={profile.can_view_attendance}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(
+                                      profile.id,
+                                      "can_view_attendance",
+                                      checked,
+                                    )
+                                  }
+                                  disabled={isUpdatingPermissions}
+                                />
+                                <Label
+                                  htmlFor={`view-attendance-${profile.id}`}
+                                >
+                                  View Attendance
+                                </Label>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  setRoleConfirm({
+                                    profile,
+                                    targetRole: "super_admin",
+                                  })
+                                }
+                              >
+                                Make Super Admin
+                              </Button>
+                            </div>
                           )}
                         </>
                       )}
@@ -925,100 +1051,104 @@ export default function Dashboard() {
             value="events"
             className="p-4 border rounded-xl mt-4 bg-card"
           >
-            <SectionTitle title="Create Event" />
-            <div className="grid gap-3 md:grid-cols-2">
-              <Input
-                value={eventForm.title}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    title: event.target.value,
-                  }))
-                }
-                placeholder="Event title"
-              />
-              <Input
-                value={eventForm.location}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    location: event.target.value,
-                  }))
-                }
-                placeholder="Location"
-              />
-              <Input
-                type="date"
-                value={eventForm.date}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    date: event.target.value,
-                  }))
-                }
-              />
-              <Input
-                type="time"
-                value={eventForm.time}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    time: event.target.value,
-                  }))
-                }
-              />
-              <Input
-                type="number"
-                value={eventForm.age_min}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    age_min: event.target.value,
-                  }))
-                }
-                placeholder="Min age"
-              />
-              <Input
-                type="number"
-                value={eventForm.age_max}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    age_max: event.target.value,
-                  }))
-                }
-                placeholder="Max age"
-              />
-              <Textarea
-                value={eventForm.description}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="Description"
-                className="md:col-span-2"
-              />
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={eventForm.is_public}
-                  onCheckedChange={(checked) =>
-                    setEventForm((current) => ({
-                      ...current,
-                      is_public: checked,
-                    }))
-                  }
-                />
-                <Label>Show on landing page and member dashboards</Label>
-              </div>
-              <Button
-                onClick={handleCreateEvent}
-                disabled={createEvent.isPending}
-              >
-                {createEvent.isPending ? "Creating..." : "Create event"}
-              </Button>
-            </div>
+            {session.can_create_events && (
+              <>
+                <SectionTitle title="Create Event" />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input
+                    value={eventForm.title}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                    placeholder="Event title"
+                  />
+                  <Input
+                    value={eventForm.location}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        location: event.target.value,
+                      }))
+                    }
+                    placeholder="Location"
+                  />
+                  <Input
+                    type="date"
+                    value={eventForm.date}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        date: event.target.value,
+                      }))
+                    }
+                  />
+                  <Input
+                    type="time"
+                    value={eventForm.time}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        time: event.target.value,
+                      }))
+                    }
+                  />
+                  <Input
+                    type="number"
+                    value={eventForm.age_min}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        age_min: event.target.value,
+                      }))
+                    }
+                    placeholder="Min age"
+                  />
+                  <Input
+                    type="number"
+                    value={eventForm.age_max}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        age_max: event.target.value,
+                      }))
+                    }
+                    placeholder="Max age"
+                  />
+                  <Textarea
+                    value={eventForm.description}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    placeholder="Description"
+                    className="md:col-span-2"
+                  />
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={eventForm.is_public}
+                      onCheckedChange={(checked) =>
+                        setEventForm((current) => ({
+                          ...current,
+                          is_public: checked,
+                        }))
+                      }
+                    />
+                    <Label>Show on landing page and member dashboards</Label>
+                  </div>
+                  <Button
+                    onClick={handleCreateEvent}
+                    disabled={createEvent.isPending}
+                  >
+                    {createEvent.isPending ? "Creating..." : "Create event"}
+                  </Button>
+                </div>
+              </>
+            )}
 
             <div className="mt-8">
               <div className="flex items-center justify-between mb-4">
