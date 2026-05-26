@@ -60,6 +60,8 @@ export default function LeaderLogin() {
   // Resolve Clerk session on mount
   useEffect(() => {
     if (!isLoaded) return;
+    // If we are already redirecting, do nothing further in this effect
+    if (mode === "redirecting") return;
 
     if (!isSignedIn) {
       setMode("full");
@@ -86,7 +88,7 @@ export default function LeaderLogin() {
 
         if (profile.role === "super_admin") {
           // Super admin: set session and skip PIN screen entirely
-          setLeaderSession({ role: "super_admin", profile_id: profile.id });
+          setLeaderSession(profile); // Pass the entire profile object
           setMode("redirecting");
           setLocation("/dashboard");
           return;
@@ -104,7 +106,7 @@ export default function LeaderLogin() {
         setMode("full");
       }
     })();
-  }, [isLoaded, isSignedIn, getToken, setLocation]);
+  }, [isLoaded, isSignedIn, getToken, setLocation, mode]);
 
   // PIN-only form (for Clerk-authenticated leaders)
   const pinOnlyForm = useForm<PinOnlyFormValues>({
