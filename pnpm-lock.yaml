@@ -141,6 +141,9 @@ importers:
       pino-http:
         specifier: ^10
         version: 10.5.0
+      zod:
+        specifier: 'catalog:'
+        version: 3.25.76
     devDependencies:
       '@types/cookie-parser':
         specifier: ^1.4.10
@@ -157,6 +160,9 @@ importers:
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
+      drizzle-kit:
+        specifier: ^0.31.9
+        version: 0.31.9
       esbuild:
         specifier: 0.27.3
         version: 0.27.3
