@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { eq, ilike, or, and } from "drizzle-orm";
+import bcrypt from "bcrypt";
 import { db, profilesTable } from "@workspace/db";
 import {
   RegisterVisitorBody,
@@ -78,6 +79,64 @@ router.patch("/profiles/me", async (req, res) => {
   }
 });
 
+router.get("/profiles/me/pin", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    const clerkId = auth?.userId;
+
+    if (!clerkId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, clerkId),
+    });
+
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    return res.json({ hasPIN: !!profile.pin_hash });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/profiles/me/pin", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    const clerkId = auth?.userId;
+
+    if (!clerkId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { pin } = req.body;
+
+    if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ error: "PIN must be exactly 4 digits" });
+    }
+
+    const pinHash = await bcrypt.hash(pin, 10);
+
+    const [updated] = await db
+      .update(profilesTable)
+      .set({ pin_hash: pinHash })
+      .where(eq(profilesTable.clerk_id, clerkId))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.post("/profiles/register", async (req, res) => {
   try {
     const parsed = RegisterVisitorBody.safeParse(req.body);
@@ -114,6 +173,14 @@ router.get("/profiles", async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    const requester = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+
+    if (!requester || (requester.role !== "leader" && requester.role !== "super_admin")) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
     const search =
       typeof req.query.search === "string" ? req.query.search : undefined;
     const role =
@@ -144,7 +211,13 @@ router.get("/profiles", async (req, res) => {
     }
 
     const profiles = await db
-      .select()
+      .select({
+        id: profilesTable.id,
+        full_name: profilesTable.full_name,
+        role: profilesTable.role,
+        phone: profilesTable.phone,
+        created_at: profilesTable.created_at,
+      })
       .from(profilesTable)
       .where(whereClause)
       .limit(limit)
@@ -252,8 +325,26 @@ router.patch("/profiles/:id/role", async (req, res) => {
 
     const { role } = req.body;
 
-    if (!["leader", "member", "visitor", "super_admin"].includes(role)) {
+    if (!["leader", "super_admin"].includes(role)) {
       return res.status(400).json({ error: "Invalid role" });
+    }
+
+    const profileToUpdate = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, req.params.id),
+    });
+
+    if (!profileToUpdate) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    if (role === "super_admin" && profileToUpdate.role !== "super_admin") {
+      const superAdmins = await db.query.profilesTable.findMany({
+        where: eq(profilesTable.role, "super_admin"),
+      });
+
+      if (superAdmins.length >= 4) {
+        return res.status(400).json({ error: "All super admin slots filled" });
+      }
     }
 
     const [updated] = await db
