@@ -62,6 +62,8 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Calendar,
   CheckCircle,
+  Eye,
+  EyeOff,
   QrCode,
   RefreshCw,
   ShieldAlert,
@@ -81,41 +83,44 @@ const today = new Date().toISOString().split("T")[0];
  */
 function useApiFetch() {
   const { getToken } = useAuth();
-  return useCallback(async (url: string, init?: RequestInit) => {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+  return useCallback(
+    async (url: string, init?: RequestInit) => {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
 
-    try {
-      const token = await getToken();
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-    } catch {
-      // ignore
-    }
-
-    // Attach leader session if present and not expired
-    try {
-      const sessionStr = localStorage.getItem("jg_leader_session");
-      if (sessionStr) {
-        const session: { expires_at?: number } = JSON.parse(sessionStr);
-        if (
-          typeof session.expires_at === "number" &&
-          Date.now() < session.expires_at
-        ) {
-          headers["x-leader-session"] = sessionStr;
+      try {
+        const token = await getToken();
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
         }
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore malformed session
-    }
 
-    return fetch(url, {
-      ...init,
-      headers: { ...headers, ...(init?.headers as Record<string, string>) },
-    });
-  }, [getToken]);
+      // Attach leader session if present and not expired
+      try {
+        const sessionStr = localStorage.getItem("jg_leader_session");
+        if (sessionStr) {
+          const session: { expires_at?: number } = JSON.parse(sessionStr);
+          if (
+            typeof session.expires_at === "number" &&
+            Date.now() < session.expires_at
+          ) {
+            headers["x-leader-session"] = sessionStr;
+          }
+        }
+      } catch {
+        // ignore malformed session
+      }
+
+      return fetch(url, {
+        ...init,
+        headers: { ...headers, ...(init?.headers as Record<string, string>) },
+      });
+    },
+    [getToken],
+  );
 }
 
 // ── Pending check-in request type ────────────────────────────────────────────
@@ -127,6 +132,15 @@ interface PendingCheckIn {
   type: "member" | "visitor";
   role: string;
   requested_at: string;
+}
+
+// ── Leader PIN type ───────────────────────────────────────────────────────────
+
+interface LeaderPin {
+  id: string;
+  full_name: string;
+  phone: string | null;
+  pin_plain: string | null;
 }
 
 // ── Dashboard component ───────────────────────────────────────────────────────
@@ -145,6 +159,11 @@ export default function Dashboard() {
     profile: any;
     targetRole: "leader" | "super_admin";
   } | null>(null);
+
+  // ── Leader PINs state (super_admin only) ───────────────────────────────────
+  const [leaderPins, setLeaderPins] = useState<LeaderPin[]>([]);
+  const [isLeaderPinsLoading, setIsLeaderPinsLoading] = useState(false);
+  const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
 
   const fetchHasPin = useCallback(async () => {
     try {
@@ -190,7 +209,11 @@ export default function Dashboard() {
 
   // ── KPI auto-refresh ────────────────────────────────────────────────────
   const [kpisUpdatedAt, setKpisUpdatedAt] = useState<string | null>(null);
-  const { data: kpis, isLoading: isKpisLoading, refetch: refetchKpis } = useGetDashboardKpis({
+  const {
+    data: kpis,
+    isLoading: isKpisLoading,
+    refetch: refetchKpis,
+  } = useGetDashboardKpis({
     query: { queryKey: getGetDashboardKpisQueryKey() },
   });
 
@@ -219,14 +242,11 @@ export default function Dashboard() {
     isLoading: isProfilesLoading,
     isError: isProfilesError,
     refetch: refetchProfiles,
-  } = useListProfiles(
-    search ? { search } : undefined,
-    {
-      query: {
-        queryKey: getListProfilesQueryKey(search ? { search } : undefined),
-      },
+  } = useListProfiles(search ? { search } : undefined, {
+    query: {
+      queryKey: getListProfilesQueryKey(search ? { search } : undefined),
     },
-  );
+  });
   const { data: events, isLoading: isEventsLoading } = useListEvents(
     undefined,
     {
@@ -293,6 +313,27 @@ export default function Dashboard() {
       }
     };
   }, [fetchPendingCheckIns]);
+
+  // ── Leader PINs fetch (super_admin only) ───────────────────────────────────
+
+  const fetchLeaderPins = useCallback(async () => {
+    setIsLeaderPinsLoading(true);
+    try {
+      const response = await apiFetch("/api/leaders/pins");
+      if (response.ok) {
+        const data = await response.json();
+        setLeaderPins(data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsLeaderPinsLoading(false);
+    }
+  }, [apiFetch]);
+
+  function togglePinReveal(id: string) {
+    setRevealedPins((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
 
   // ── Dashboard helpers ───────────────────────────────────────────────────────
 
@@ -404,9 +445,9 @@ export default function Dashboard() {
       (prev: any) => {
         if (!prev) return prev;
         return prev.map((p: any) =>
-          p.id === profile.id ? { ...p, role: targetRole } : p
+          p.id === profile.id ? { ...p, role: targetRole } : p,
         );
-      }
+      },
     );
 
     try {
@@ -577,7 +618,8 @@ export default function Dashboard() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  const superAdminCount = profiles?.filter((p: any) => p.role === "super_admin").length ?? 0;
+  const superAdminCount =
+    profiles?.filter((p: any) => p.role === "super_admin").length ?? 0;
 
   return (
     <Layout>
@@ -650,6 +692,9 @@ export default function Dashboard() {
             <TabsTrigger value="requests">Requests</TabsTrigger>
             {session.role === "super_admin" && (
               <TabsTrigger value="leaders">Leaders</TabsTrigger>
+            )}
+            {session.role === "super_admin" && (
+              <TabsTrigger value="leader-pins">Leader PINs</TabsTrigger>
             )}
             {session.role === "super_admin" && (
               <TabsTrigger value="super-admin-slots">
@@ -762,8 +807,12 @@ export default function Dashboard() {
             className="p-4 border rounded-xl mt-4 bg-card"
           >
             <div className="mb-4 bg-purple-500/10 border border-purple-500/20 text-purple-300 rounded-lg p-3 text-sm flex items-center justify-between">
-              <span className="font-medium">Super Admin Slots: {superAdminCount} / 4</span>
-              <span className="text-xs text-purple-400 font-semibold">Max 4 allowed</span>
+              <span className="font-medium">
+                Super Admin Slots: {superAdminCount} / 4
+              </span>
+              <span className="text-xs text-purple-400 font-semibold">
+                Max 4 allowed
+              </span>
             </div>
 
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -833,7 +882,12 @@ export default function Dashboard() {
                           {session.role === "super_admin" && (
                             <Button
                               size="sm"
-                              onClick={() => setRoleConfirm({ profile, targetRole: "leader" })}
+                              onClick={() =>
+                                setRoleConfirm({
+                                  profile,
+                                  targetRole: "leader",
+                                })
+                              }
                             >
                               Make Leader
                             </Button>
@@ -845,7 +899,12 @@ export default function Dashboard() {
                           {session.role === "super_admin" && (
                             <Button
                               size="sm"
-                              onClick={() => setRoleConfirm({ profile, targetRole: "super_admin" })}
+                              onClick={() =>
+                                setRoleConfirm({
+                                  profile,
+                                  targetRole: "super_admin",
+                                })
+                              }
                             >
                               Make Super Admin
                             </Button>
@@ -1096,6 +1155,92 @@ export default function Dashboard() {
             </TabsContent>
           )}
 
+          {/* ── Leader PINs (super admin only) ────────────────────────────── */}
+          {session.role === "super_admin" && (
+            <TabsContent
+              value="leader-pins"
+              className="p-4 border rounded-xl mt-4 bg-card"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <SectionTitle title="Leader PINs" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchLeaderPins}
+                  disabled={isLeaderPinsLoading}
+                  className="text-muted-foreground"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 mr-1.5 ${isLeaderPinsLoading ? "animate-spin" : ""}`}
+                  />
+                  Refresh
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">
+                Visible to super admins only. Click the eye icon to reveal a
+                leader's PIN.
+              </p>
+              {isLeaderPinsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                </div>
+              ) : leaderPins.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40 text-left">
+                      <tr>
+                        <th className="px-3 py-2 font-medium">Leader Name</th>
+                        <th className="px-3 py-2 font-medium">Phone</th>
+                        <th className="px-3 py-2 font-medium">PIN</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaderPins.map((leader) => (
+                        <tr key={leader.id} className="border-t">
+                          <td className="px-3 py-2">{leader.full_name}</td>
+                          <td className="px-3 py-2">{leader.phone ?? "—"}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono">
+                                {revealedPins[leader.id]
+                                  ? (leader.pin_plain ?? "—")
+                                  : "••••"}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                onClick={() => togglePinReveal(leader.id)}
+                                aria-label={
+                                  revealedPins[leader.id]
+                                    ? "Hide PIN"
+                                    : "Reveal PIN"
+                                }
+                              >
+                                {revealedPins[leader.id] ? (
+                                  <EyeOff className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                  <ShieldAlert className="mb-2 h-5 w-5" />
+                  No leaders found, or PINs have not been set yet. Click Refresh
+                  to load.
+                </div>
+              )}
+            </TabsContent>
+          )}
+
           {/* ── Super admin slots ──────────────────────────────────────────── */}
           {session.role === "super_admin" && (
             <TabsContent
@@ -1217,7 +1362,9 @@ export default function Dashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Change User Role</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to promote <strong>{roleConfirm?.profile?.full_name}</strong> to <strong>{roleConfirm?.targetRole.replace("_", " ")}</strong>?
+              Are you sure you want to promote{" "}
+              <strong>{roleConfirm?.profile?.full_name}</strong> to{" "}
+              <strong>{roleConfirm?.targetRole.replace("_", " ")}</strong>?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1282,7 +1429,8 @@ function RoleBadge({ role }: { role: string }) {
       break;
     default:
       // visitor or other roles
-      classes += "bg-secondary text-secondary-foreground border-transparent border";
+      classes +=
+        "bg-secondary text-secondary-foreground border-transparent border";
   }
 
   return (
