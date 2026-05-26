@@ -12,40 +12,102 @@ import {
 
 const router = Router();
 
+// ── SAST session window helpers ───────────────────────────────────────────────
+// Returns true when the Africa/Johannesburg clock is inside Friday 18:30–22:00.
+// Uses only Intl.DateTimeFormat so no extra runtime dependency is needed.
+function getSastParts(): {
+  dayOfWeek: number; // 0=Sun … 5=Fri … 6=Sat
+  hours: number;
+  minutes: number;
+  dateString: string; // YYYY-MM-DD in SAST
+} {
+  const now = new Date();
+  const fmt = new Intl.DateTimeFormat("en-ZA", {
+    timeZone: "Africa/Johannesburg",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+    weekday: "short",
+  });
+
+  const parts: Record<string, string> = {};
+  for (const p of fmt.formatToParts(now)) {
+    if (p.type !== "literal") parts[p.type] = p.value;
+  }
+
+  const year = parts["year"];
+  const month = parts["month"];
+  const day = parts["day"];
+  const hours = parseInt(parts["hour"], 10);
+  const minutes = parseInt(parts["minute"], 10);
+
+  // weekday comes back as short name (Mon, Tue, …, Fri, Sat, Sun)
+  const weekdayShort = parts["weekday"];
+  const weekdayMap: Record<string, number> = {
+    Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+  };
+  const dayOfWeek = weekdayMap[weekdayShort] ?? new Date().getDay();
+
+  return {
+    dayOfWeek,
+    hours,
+    minutes,
+    dateString: `${year}-${month}-${day}`,
+  };
+}
+
+function isInsideFridayWindow(): boolean {
+  const { dayOfWeek, hours, minutes } = getSastParts();
+  if (dayOfWeek !== 5) return false; // not Friday
+  const totalMinutes = hours * 60 + minutes;
+  const start = 18 * 60 + 30; // 18:30
+  const end = 22 * 60; // 22:00
+  return totalMinutes >= start && totalMinutes < end;
+}
+
 router.get("/dashboard/kpis", async (req, res) => {
   try {
-    const today = new Date().toISOString().split("T")[0];
+    const { dateString: today } = getSastParts();
+    const inWindow = isInsideFridayWindow();
 
-    const [memberCount] = await db
+    // ── Total members: COUNT(*) across ALL roles – never resets ──────────────
+    const [totalMembersRow] = await db
       .select({ count: count() })
       .from(profilesTable)
       .where(eq(profilesTable.role, "member"));
-
-    const [visitorCount] = await db
-      .select({ count: count() })
-      .from(profilesTable)
-      .where(eq(profilesTable.role, "visitor"));
-
-    const [todayAttendance] = await db
-      .select({ count: count() })
-      .from(attendanceTable)
-      .where(eq(attendanceTable.session_date, today));
-
-    const [todayNewVisitors] = await db
-      .select({ count: count() })
-      .from(profilesTable)
-      .where(sql`date(${profilesTable.created_at}) = ${today}::date`);
 
     const [upcomingEvents] = await db
       .select({ count: count() })
       .from(eventsTable)
       .where(gte(eventsTable.date, today));
 
+    // ── Counts that are gated to the Friday 18:30-22:00 SAST window ─────────
+    let todayAttendanceCount = 0;
+    let todayNewVisitorsCount = 0;
+
+    if (inWindow) {
+      const [todayAttendance] = await db
+        .select({ count: count() })
+        .from(attendanceTable)
+        .where(eq(attendanceTable.session_date, today));
+
+      const [todayNewVisitors] = await db
+        .select({ count: count() })
+        .from(profilesTable)
+        .where(sql`date(${profilesTable.created_at} AT TIME ZONE 'Africa/Johannesburg') = ${today}::date`);
+
+      todayAttendanceCount = Number(todayAttendance?.count ?? 0);
+      todayNewVisitorsCount = Number(todayNewVisitors?.count ?? 0);
+    }
+
     return res.json({
-      total_members: Number(memberCount?.count ?? 0),
-      total_visitors: Number(visitorCount?.count ?? 0),
-      today_attendance: Number(todayAttendance?.count ?? 0),
-      today_new_visitors: Number(todayNewVisitors?.count ?? 0),
+      total_members: Number(totalMembersRow?.count ?? 0),
+      today_attendance: todayAttendanceCount,
+      today_new_visitors: todayNewVisitorsCount,
       upcoming_events_count: Number(upcomingEvents?.count ?? 0),
     });
   } catch (err) {
