@@ -147,9 +147,13 @@ export default function LeaderLogin() {
         {
           onSuccess: (result) => {
             if (result.success && result.profile_id) {
+              // Assuming result contains the full profile or enough data to construct it
+              // For now, we'll pass what's available from result, but ideally, the backend
+              // should return the full profile on successful PIN verification.
               setLeaderSession({
                 role: result.role,
                 profile_id: result.profile_id,
+                // Add other profile fields if available in result
               });
               toast({ title: "Welcome back, leader." });
               setLocation("/dashboard");
