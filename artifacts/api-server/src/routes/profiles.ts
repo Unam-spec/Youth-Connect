@@ -8,6 +8,7 @@ import {
   UpdateMyProfileBody,
   ListProfilesQueryParams,
 } from "@workspace/api-zod";
+import { z } from "zod"; // Import z for schema definition
 
 const router = Router();
 
@@ -346,6 +347,67 @@ router.patch("/profiles/:id/role", async (req, res) => {
       .update(profilesTable)
       .set({ role })
       .where(eq(profilesTable.id, req.params.id))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    return res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.patch("/profiles/:id/permissions", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Check if requester is super_admin
+    const requesterProfile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+
+    if (!requesterProfile || requesterProfile.role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+
+    // Zod schema for permission update
+    const PermissionUpdateBody = z.object({
+      can_create_events: z.boolean().optional(),
+      can_view_kpis: z.boolean().optional(),
+      can_view_members: z.boolean().optional(),
+      can_view_attendance: z.boolean().optional(),
+    });
+
+    const parsed = PermissionUpdateBody.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.flatten() });
+    }
+
+    const { id } = req.params;
+    const {
+      can_create_events,
+      can_view_kpis,
+      can_view_members,
+      can_view_attendance,
+    } = parsed.data;
+
+    const [updated] = await db
+      .update(profilesTable)
+      .set({
+        ...(can_create_events !== undefined && { can_create_events }),
+        ...(can_view_kpis !== undefined && { can_view_kpis }),
+        ...(can_view_members !== undefined && { can_view_members }),
+        ...(can_view_attendance !== undefined && { can_view_attendance }),
+      })
+      .where(eq(profilesTable.id, id))
       .returning();
 
     if (!updated) {
