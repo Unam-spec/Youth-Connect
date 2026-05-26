@@ -1,6 +1,10 @@
 export interface LeaderSession {
   role: "super_admin" | "leader";
   profile_id?: string;
+  can_create_events?: boolean;
+  can_view_kpis?: boolean;
+  can_view_members?: boolean;
+  can_view_attendance?: boolean;
   expires_at: number;
 }
 
@@ -8,7 +12,7 @@ export function setLeaderSession(session: Omit<LeaderSession, "expires_at">) {
   const expires_at = Date.now() + 8 * 60 * 60 * 1000; // 8 hours
   localStorage.setItem(
     "jg_leader_session",
-    JSON.stringify({ ...session, expires_at })
+    JSON.stringify({ ...session, expires_at }),
   );
 }
 
