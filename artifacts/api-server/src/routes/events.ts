@@ -69,12 +69,16 @@ router.post("/events", async (req, res) => {
     const creatorProfile = await db.query.profilesTable.findFirst({
       where: eq(profilesTable.clerk_id, auth.userId),
     });
+    const eventDate = parsed.data.date instanceof Date
+      ? parsed.data.date.toISOString().split("T")[0]
+      : parsed.data.date;
+
     const [event] = await db
       .insert(eventsTable)
       .values({
         title: parsed.data.title,
         description: parsed.data.description,
-        date: parsed.data.date,
+        date: eventDate,
         time: parsed.data.time,
         location: parsed.data.location,
         age_min: parsed.data.age_min ?? null,
@@ -131,6 +135,9 @@ router.patch("/events/:id", async (req, res) => {
       return res.status(400).json({ error: parsed.error.flatten() });
     }
     const updateData: Record<string, unknown> = { ...parsed.data };
+    if (parsed.data.date instanceof Date) {
+      updateData.date = parsed.data.date.toISOString().split("T")[0];
+    }
     if (parsed.data.custom_requirements !== undefined) {
       updateData.custom_requirements = parsed.data.custom_requirements;
     }
