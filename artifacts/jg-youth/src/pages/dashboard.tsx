@@ -71,6 +71,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -160,6 +161,9 @@ export default function Dashboard() {
     targetRole: "leader" | "super_admin";
   } | null>(null);
   const [isUpdatingPermissions, setIsUpdatingPermissions] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [showSessionQrCodeDialog, setShowSessionQrCodeDialog] = useState(false);
+  const [isGeneratingQr, setIsGeneratingQr] = useState(false); // To disable button during generation
 
   // ── Leader PINs state (super_admin only) ───────────────────────────────────
   const [leaderPins, setLeaderPins] = useState<LeaderPin[]>([]);
@@ -187,6 +191,40 @@ export default function Dashboard() {
       setPin("");
     }
   }, [showPinDialog]);
+
+  // Function to generate the session QR code
+  const handleGenerateSessionQrCode = useCallback(async () => {
+    setIsGeneratingQr(true);
+    try {
+      const response = await apiFetch("/api/qrcodes/session", {
+        method: "POST",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Assuming the API returns { slug: "...", type: "session", ... }
+        // Construct the full URL for the QR code
+        const baseUrl = window.location.origin; // Or your app's base URL
+        setQrCodeUrl(`${baseUrl}/checkin?session_id=${data.slug}`);
+        setShowSessionQrCodeDialog(true);
+        toast({ title: "Session QR code generated" });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Failed to generate QR code",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to generate QR code",
+        description: "Network error or server unreachable",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingQr(false);
+    }
+  }, [apiFetch, toast]);
 
   const [pendingCheckIns, setPendingCheckIns] = useState<PendingCheckIn[]>([]);
   const [isPendingLoading, setIsPendingLoading] = useState(false);
@@ -681,11 +719,25 @@ export default function Dashboard() {
               Live attendance, members, events, and requests.
             </p>
           </div>
-          <Badge
-            variant={session.role === "super_admin" ? "default" : "secondary"}
-          >
-            {session.role.replace("_", " ")}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {" "}
+            {/* Added this div for grouping */}
+            {(session.role === "leader" || session.role === "super_admin") && (
+              <Button
+                onClick={handleGenerateSessionQrCode}
+                disabled={isGeneratingQr}
+                className="flex items-center"
+              >
+                <QrCode className="h-4 w-4 mr-2" />
+                Generate Session QR
+              </Button>
+            )}
+            <Badge
+              variant={session.role === "super_admin" ? "default" : "secondary"}
+            >
+              {session.role.replace("_", " ")}
+            </Badge>
+          </div>
         </div>
 
         {session.can_view_kpis && (
@@ -854,6 +906,33 @@ export default function Dashboard() {
               <EmptyLine text="No pending check-in requests right now." />
             )}
           </TabsContent>
+
+          {/* Session QR Code Dialog */}
+          <Dialog
+            open={showSessionQrCodeDialog}
+            onOpenChange={setShowSessionQrCodeDialog}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Session QR Code</DialogTitle>
+                <DialogDescription>
+                  Scan this QR code for check-in.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-center p-4">
+                {qrCodeUrl ? (
+                  <QRCodeSVG value={qrCodeUrl} size={256} level="H" />
+                ) : (
+                  <p>Generating QR code...</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setShowSessionQrCodeDialog(false)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* ── Members ────────────────────────────────────────────────────── */}
           <TabsContent
@@ -1461,6 +1540,39 @@ export default function Dashboard() {
           )}
         </Tabs>
       </div>
+
+      {/* Session QR Code Dialog */}
+      <Dialog
+        open={showSessionQrCodeDialog}
+        onOpenChange={setShowSessionQrCodeDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Scan for Session Check-in</DialogTitle>
+            <DialogDescription>
+              Members and visitors can scan this QR code to check in for the
+              current session.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center p-4">
+            {qrCodeUrl ? (
+              <QRCodeSVG
+                value={qrCodeUrl}
+                size={256}
+                level="H"
+                includeMargin={true}
+              />
+            ) : (
+              <p>Generating QR code...</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowSessionQrCodeDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Delete event confirmation ─────────────────────────────────────── */}
       <AlertDialog
