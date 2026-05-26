@@ -165,6 +165,54 @@ export default function Dashboard() {
   const [showSessionQrCodeDialog, setShowSessionQrCodeDialog] = useState(false);
   const [isGeneratingQr, setIsGeneratingQr] = useState(false); // To disable button during generation
 
+  // ── RSVPs state ────────────────────────────────────────────────────────────
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [rsvps, setRsvps] = useState<any[]>([]);
+  const [isRsvpsLoading, setIsRsvpsLoading] = useState(false);
+
+  const fetchRsvps = useCallback(async () => {
+    if (!selectedEventId) {
+      setRsvps([]);
+      return;
+    }
+    setIsRsvpsLoading(true);
+    try {
+      const response = await apiFetch(`/api/rsvps?event_id=${selectedEventId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setRsvps(data);
+      } else {
+        toast({
+          title: "Failed to fetch RSVPs",
+          description: "An error occurred while fetching RSVPs.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to fetch RSVPs",
+        description: "Network error or server unreachable.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRsvpsLoading(false);
+    }
+  }, [apiFetch, selectedEventId, toast]);
+
+  useEffect(() => {
+    fetchRsvps();
+  }, [fetchRsvps]);
+
+  useEffect(() => {
+    if (events && events.length > 0 && !selectedEventId) {
+      // Sort events by date to get the most recent one
+      const sortedEvents = [...events].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
+      setSelectedEventId(sortedEvents[0].id);
+    }
+  }, [events, selectedEventId]);
+
   // ── Leader PINs state (super_admin only) ───────────────────────────────────
   const [leaderPins, setLeaderPins] = useState<LeaderPin[]>([]);
   const [isLeaderPinsLoading, setIsLeaderPinsLoading] = useState(false);
@@ -272,6 +320,12 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, [refetchKpis]);
 
+  const { data: events, isLoading: isEventsLoading } = useListEvents(
+    undefined,
+    {
+      query: { queryKey: getListEventsQueryKey() },
+    },
+  );
   const { data: attendance, isLoading: isAttendanceLoading } =
     useGetTodayAttendance({
       query: { queryKey: getGetTodayAttendanceQueryKey() },
@@ -286,12 +340,6 @@ export default function Dashboard() {
       queryKey: getListProfilesQueryKey(search ? { search } : undefined),
     },
   });
-  const { data: events, isLoading: isEventsLoading } = useListEvents(
-    undefined,
-    {
-      query: { queryKey: getListEventsQueryKey() },
-    },
-  );
   const { data: requests, isLoading: isRequestsLoading } =
     useListMembershipRequests(
       { status: "pending" },
@@ -383,6 +431,7 @@ export default function Dashboard() {
     });
     queryClient.invalidateQueries({ queryKey: getListProfilesQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: ["rsvps"] }); // Invalidate RSVPs query
     queryClient.invalidateQueries({
       queryKey: getListMembershipRequestsQueryKey({ status: "pending" }),
     });
@@ -796,6 +845,9 @@ export default function Dashboard() {
             )}
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="requests">Requests</TabsTrigger>
+            {(session.role === "leader" || session.role === "super_admin") && (
+              <TabsTrigger value="rsvps">RSVPs</TabsTrigger>
+            )}
             {session.role === "super_admin" && (
               <TabsTrigger value="leaders">Leaders</TabsTrigger>
             )}
@@ -808,6 +860,136 @@ export default function Dashboard() {
               </TabsTrigger>
             )}
           </TabsList>
+
+          {/* ── RSVPs ──────────────────────────────────────────────────────── */}
+          {(session.role === "leader" || session.role === "super_admin") && (
+            <TabsContent
+              value="rsvps"
+              className="p-4 border rounded-xl mt-4 bg-card"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <SectionTitle title="Event RSVPs" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchRsvps}
+                  disabled={isRsvpsLoading}
+                  className="text-muted-foreground"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 mr-1.5 ${isRsvpsLoading ? "animate-spin" : ""}`}
+                  />
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="mb-4">
+                <Label htmlFor="event-select">Select Event</Label>
+                <select
+                  id="event-select"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                  value={selectedEventId || ""}
+                  onChange={(e) => setSelectedEventId(e.target.value)}
+                >
+                  <option value="">Select an event</option>
+                  {events?.map((event: any) => (
+                    <option key={event.id} value={event.id}>
+                      {event.title} -{" "}
+                      {format(new Date(event.date), "MMM d, yyyy")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedEventId && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader className="bg-green-500/20 text-green-700 dark:text-green-300 rounded-t-lg">
+                      <CardTitle className="flex items-center justify-between text-lg">
+                        Going <CheckCircle className="h-5 w-5" />
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-600 text-white"
+                        >
+                          {
+                            rsvps.filter((r: any) => r.status === "going")
+                              .length
+                          }
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      {isRsvpsLoading ? (
+                        <Skeleton className="h-24 w-full" />
+                      ) : rsvps.filter((r: any) => r.status === "going")
+                          .length > 0 ? (
+                        <SimpleTable
+                          headers={["Name", "Role", "RSVP Date"]}
+                          rows={rsvps
+                            .filter((r: any) => r.status === "going")
+                            .map((rsvp: any) => [
+                              rsvp.member_name,
+                              <RoleBadge
+                                key={rsvp.member_role}
+                                role={rsvp.member_role}
+                              />,
+                              format(
+                                new Date(rsvp.created_at),
+                                "MMM d, yyyy HH:mm",
+                              ),
+                            ])}
+                        />
+                      ) : (
+                        <EmptyLine text="No responses yet." />
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="bg-red-500/20 text-red-700 dark:text-red-300 rounded-t-lg">
+                      <CardTitle className="flex items-center justify-between text-lg">
+                        Not Going <Trash2 className="h-5 w-5" />
+                        <Badge
+                          variant="secondary"
+                          className="bg-red-600 text-white"
+                        >
+                          {
+                            rsvps.filter((r: any) => r.status === "not_going")
+                              .length
+                          }
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      {isRsvpsLoading ? (
+                        <Skeleton className="h-24 w-full" />
+                      ) : rsvps.filter((r: any) => r.status === "not_going")
+                          .length > 0 ? (
+                        <SimpleTable
+                          headers={["Name", "Role", "RSVP Date"]}
+                          rows={rsvps
+                            .filter((r: any) => r.status === "not_going")
+                            .map((rsvp: any) => [
+                              rsvp.member_name,
+                              <RoleBadge
+                                key={rsvp.member_role}
+                                role={rsvp.member_role}
+                              />,
+                              format(
+                                new Date(rsvp.created_at),
+                                "MMM d, yyyy HH:mm",
+                              ),
+                            ])}
+                        />
+                      ) : (
+                        <EmptyLine text="No responses yet." />
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </TabsContent>
+          )}
 
           {/* ── Today's attendance ─────────────────────────────────────────── */}
           <TabsContent
