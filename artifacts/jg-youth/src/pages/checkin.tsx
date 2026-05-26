@@ -67,6 +67,39 @@ export default function CheckIn() {
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
   const [showMemberDialog, setShowMemberDialog] = useState(false);
   const [scannedData, setScannedData] = useState<string>("");
+  const [sessionSlug, setSessionSlug] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (scannedData) {
+      try {
+        const url = new URL(scannedData);
+        const sessionId = url.searchParams.get("session_id");
+        if (sessionId) {
+          setSessionSlug(sessionId);
+          // Here, instead of directly showing the dialog, we should ideally
+          // make an API call to determine if the user is a member or first-timer
+          // based on the sessionSlug and their authenticated status.
+          // For now, we'll keep showing the dialog, but this is where the logic
+          // for automatic determination would go.
+        } else {
+          toast({
+            title: "Invalid QR Code",
+            description:
+              "The scanned QR code does not contain a valid session ID.",
+            variant: "destructive",
+          });
+          setShowMemberDialog(false); // Close dialog if invalid
+        }
+      } catch (error) {
+        toast({
+          title: "Invalid QR Code",
+          description: "The scanned QR code is not a valid URL.",
+          variant: "destructive",
+        });
+        setShowMemberDialog(false); // Close dialog if invalid
+      }
+    }
+  }, [scannedData, toast]);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
@@ -152,7 +185,7 @@ export default function CheckIn() {
     } catch (err: any) {
       setIsScanning(false);
       setScannerError(
-        err?.message || "Failed to start camera. Please check permissions.",
+        "Camera access required. Please allow camera access and try again.",
       );
       toast({
         title: "Camera Error",
@@ -184,6 +217,12 @@ export default function CheckIn() {
       return;
     }
 
+    if (!sessionSlug) {
+      setErrorMessage("No session QR code scanned.");
+      setCheckInStatus("error");
+      return;
+    }
+
     setShowMemberDialog(false);
     setCheckInStatus("loading");
     setErrorMessage("");
@@ -196,7 +235,7 @@ export default function CheckIn() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ sessionSlug }),
       });
 
       const data = await response.json();
@@ -228,7 +267,7 @@ export default function CheckIn() {
 
   function handleFirstTimer() {
     setShowMemberDialog(false);
-    window.location.href = "/register";
+    window.location.href = `/register?session_id=${sessionSlug}`;
   }
 
   // ── Search Functions ──────────────────────────────────────────────────────────

@@ -69,9 +69,10 @@ router.post("/events", async (req, res) => {
     const creatorProfile = await db.query.profilesTable.findFirst({
       where: eq(profilesTable.clerk_id, auth.userId),
     });
-    const eventDate = parsed.data.date instanceof Date
-      ? parsed.data.date.toISOString().split("T")[0]
-      : parsed.data.date;
+    const eventDate =
+      parsed.data.date instanceof Date
+        ? parsed.data.date.toISOString().split("T")[0]
+        : parsed.data.date;
 
     const [event] = await db
       .insert(eventsTable)
@@ -175,13 +176,16 @@ router.delete("/events/:id", async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    // Delete RSVPs first
-    await db.delete(rsvpsTable).where(eq(rsvpsTable.event_id, req.params.id));
+    const eventId = req.params.id;
 
-    // Delete the event
-    await db.delete(eventsTable).where(eq(eventsTable.id, req.params.id));
+    await db.transaction(async (tx) => {
+      // Delete associated RSVPs
+      await tx.delete(rsvpsTable).where(eq(rsvpsTable.event_id, eventId));
+      // Delete the event
+      await tx.delete(eventsTable).where(eq(eventsTable.id, eventId));
+    });
 
-    return res.json({ message: "Event deleted successfully" });
+    return res.status(200).json({ success: true, deletedId: eventId });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });

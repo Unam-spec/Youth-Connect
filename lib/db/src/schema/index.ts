@@ -61,6 +61,10 @@ export const profilesTable = pgTable("profiles", {
   role: roleEnum("role").notNull().default("visitor"),
   pin_hash: text("pin_hash"),
   pin_plain: text("pin_plain"),
+  can_create_events: boolean("can_create_events").notNull().default(true),
+  can_view_kpis: boolean("can_view_kpis").notNull().default(true),
+  can_view_members: boolean("can_view_members").notNull().default(true),
+  can_view_attendance: boolean("can_view_attendance").notNull().default(true),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

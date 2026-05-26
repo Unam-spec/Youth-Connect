@@ -30,7 +30,7 @@ import {
   useRevokeMembership,
 } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
-import { getLeaderSession } from "@/lib/auth";
+import { getLeaderSession, setLeaderSession, LeaderSession } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,7 @@ import {
   UserPlus,
   Users,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -152,6 +153,9 @@ export default function Dashboard() {
   const apiFetch = useApiFetch();
   const [search, setSearch] = useState("");
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
+  const [eventToDeleteName, setEventToDeleteName] = useState<string | null>(
+    null,
+  );
   const [pin, setPin] = useState("");
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [hasPin, setHasPin] = useState(false);
@@ -159,6 +163,58 @@ export default function Dashboard() {
     profile: any;
     targetRole: "leader" | "super_admin";
   } | null>(null);
+  const [isUpdatingPermissions, setIsUpdatingPermissions] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+  const [showSessionQrCodeDialog, setShowSessionQrCodeDialog] = useState(false);
+  const [isGeneratingQr, setIsGeneratingQr] = useState(false); // To disable button during generation
+
+  // ── RSVPs state ────────────────────────────────────────────────────────────
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [rsvps, setRsvps] = useState<any[]>([]);
+  const [isRsvpsLoading, setIsRsvpsLoading] = useState(false);
+
+  const fetchRsvps = useCallback(async () => {
+    if (!selectedEventId) {
+      setRsvps([]);
+      return;
+    }
+    setIsRsvpsLoading(true);
+    try {
+      const response = await apiFetch(`/api/rsvps?event_id=${selectedEventId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setRsvps(data);
+      } else {
+        toast({
+          title: "Failed to fetch RSVPs",
+          description: "An error occurred while fetching RSVPs.",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to fetch RSVPs",
+        description: "Network error or server unreachable.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRsvpsLoading(false);
+    }
+  }, [apiFetch, selectedEventId, toast]);
+
+  useEffect(() => {
+    fetchRsvps();
+  }, [fetchRsvps]);
+
+  useEffect(() => {
+    if (events && events.length > 0 && !selectedEventId) {
+      // Sort events by date to get the most recent one
+      const sortedEvents = [...events].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
+      setSelectedEventId(sortedEvents[0].id);
+    }
+  }, [events, selectedEventId]);
 
   // ── Leader PINs state (super_admin only) ───────────────────────────────────
   const [leaderPins, setLeaderPins] = useState<LeaderPin[]>([]);
@@ -187,34 +243,73 @@ export default function Dashboard() {
     }
   }, [showPinDialog]);
 
+  // Function to generate the session QR code
+  const handleGenerateSessionQrCode = useCallback(async () => {
+    setIsGeneratingQr(true);
+    try {
+      const response = await apiFetch("/api/qrcodes/session", {
+        method: "POST",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Assuming the API returns { slug: "...", type: "session", ... }
+        // Construct the full URL for the QR code
+        const baseUrl = window.location.origin; // Or your app's base URL
+        setQrCodeUrl(`${baseUrl}/checkin?session_id=${data.slug}`);
+        setShowSessionQrCodeDialog(true);
+        toast({ title: "Session QR code generated" });
+      } else {
+        const error = await response.json();
+        toast({
+          title: "Failed to generate QR code",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Failed to generate QR code",
+        description: "Network error or server unreachable",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingQr(false);
+    }
+  }, [apiFetch, toast]);
+
   const [pendingCheckIns, setPendingCheckIns] = useState<PendingCheckIn[]>([]);
   const [isPendingLoading, setIsPendingLoading] = useState(false);
   const pendingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
-  const [eventForm, setEventForm] = useState({
-    title: "",
-    description: "",
-    date: today,
-    time: "18:00",
-    location: "",
-    age_min: "",
-    age_max: "",
-    is_public: true,
-  });
-
-  if (!session) {
-    return <Redirect to="/leader-login" />;
-  }
-
-  // ── KPI auto-refresh ────────────────────────────────────────────────────
-  const [kpisUpdatedAt, setKpisUpdatedAt] = useState<string | null>(null);
+  const { data: attendance, isLoading: isAttendanceLoading } =
+    useGetTodayAttendance({
+      query: { queryKey: getGetTodayAttendanceQueryKey() },
+    });
   const {
-    data: kpis,
-    isLoading: isKpisLoading,
-    refetch: refetchKpis,
-  } = useGetDashboardKpis({
-    query: { queryKey: getGetDashboardKpisQueryKey() },
+    data: profiles,
+    isLoading: isProfilesLoading,
+    isError: isProfilesError,
+    refetch: refetchProfiles,
+  } = useListProfiles(search ? { search } : undefined, {
+    query: {
+      queryKey: getListProfilesQueryKey(search ? { search } : undefined),
+    },
+  });
+  const { data: requests, isLoading: isRequestsLoading } =
+    useListMembershipRequests(
+      { status: "pending" },
+      {
+        query: {
+          queryKey: getListMembershipRequestsQueryKey({ status: "pending" }),
+        },
+      },
+    );
+  const { data: leaders, isLoading: isLeadersLoading } = useListLeaders({
+    query: {
+      enabled: session.role === "super_admin",
+      queryKey: getListLeadersQueryKey(),
+    },
   });
 
   // Stamp time on first successful load
@@ -233,6 +328,12 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, [refetchKpis]);
 
+  const { data: events, isLoading: isEventsLoading } = useListEvents(
+    undefined,
+    {
+      query: { queryKey: getListEventsQueryKey() },
+    },
+  );
   const { data: attendance, isLoading: isAttendanceLoading } =
     useGetTodayAttendance({
       query: { queryKey: getGetTodayAttendanceQueryKey() },
@@ -247,12 +348,6 @@ export default function Dashboard() {
       queryKey: getListProfilesQueryKey(search ? { search } : undefined),
     },
   });
-  const { data: events, isLoading: isEventsLoading } = useListEvents(
-    undefined,
-    {
-      query: { queryKey: getListEventsQueryKey() },
-    },
-  );
   const { data: requests, isLoading: isRequestsLoading } =
     useListMembershipRequests(
       { status: "pending" },
@@ -344,6 +439,7 @@ export default function Dashboard() {
     });
     queryClient.invalidateQueries({ queryKey: getListProfilesQueryKey() });
     queryClient.invalidateQueries({ queryKey: getListEventsQueryKey() });
+    queryClient.invalidateQueries({ queryKey: ["rsvps"] }); // Invalidate RSVPs query
     queryClient.invalidateQueries({
       queryKey: getListMembershipRequestsQueryKey({ status: "pending" }),
     });
@@ -513,6 +609,53 @@ export default function Dashboard() {
     }
   }
 
+  async function handlePermissionChange(
+    profileId: string,
+    permissionKey: keyof LeaderSession, // Use keyof LeaderSession for permissionKey
+    newValue: boolean,
+  ) {
+    setIsUpdatingPermissions(true);
+    try {
+      const response = await apiFetch(
+        `/api/profiles/${profileId}/permissions`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({ [permissionKey]: newValue }),
+        },
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        toast({
+          title: "Failed to update permissions",
+          description: error.error || "An error occurred",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      toast({ title: "Permissions updated" });
+      // Optimistically update the local session if the current user's permissions are changed
+      if (session!.profile_id === profileId) {
+        // Use non-null assertion for session
+        const updatedSession: Omit<LeaderSession, "expires_at"> = {
+          ...session!, // Use non-null assertion for session
+          [permissionKey]: newValue,
+        };
+        setLeaderSession(updatedSession); // Update local storage
+      }
+      refreshDashboard(); // Refresh to get updated data
+    } catch (err) {
+      toast({
+        title: "Failed to update permissions",
+        description: "An error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingPermissions(false);
+    }
+  }
+
   function mutateProfileRole(action: "promote" | "revoke", profileId: string) {
     const mutation = action === "promote" ? promoteToMember : revokeMembership;
     mutation.mutate(
@@ -633,52 +776,70 @@ export default function Dashboard() {
               Live attendance, members, events, and requests.
             </p>
           </div>
-          <Badge
-            variant={session.role === "super_admin" ? "default" : "secondary"}
-          >
-            {session.role.replace("_", " ")}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {" "}
+            {/* Added this div for grouping */}
+            {(session.role === "leader" || session.role === "super_admin") && (
+              <Button
+                onClick={handleGenerateSessionQrCode}
+                disabled={isGeneratingQr}
+                className="flex items-center"
+              >
+                <QrCode className="h-4 w-4 mr-2" />
+                Generate Session QR
+              </Button>
+            )}
+            <Badge
+              variant={session.role === "super_admin" ? "default" : "secondary"}
+            >
+              {session.role.replace("_", " ")}
+            </Badge>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard
-            title="Total Members"
-            icon={<Users className="h-4 w-4 text-muted-foreground" />}
-            value={
-              // Never show 0 — fall back to previous non-zero value or hide
-              kpis?.total_members && kpis.total_members > 0
-                ? kpis.total_members
-                : undefined
-            }
-            loading={isKpisLoading}
-            lastUpdated={kpisUpdatedAt}
-          />
-          <KpiCard
-            title="Today's Attendance"
-            icon={<CheckCircle className="h-4 w-4 text-primary" />}
-            value={kpis?.today_attendance}
-            loading={isKpisLoading}
-            lastUpdated={kpisUpdatedAt}
-          />
-          <KpiCard
-            title="New Visitors Today"
-            icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
-            value={kpis?.today_new_visitors}
-            loading={isKpisLoading}
-            lastUpdated={kpisUpdatedAt}
-          />
-          <KpiCard
-            title="Upcoming Events"
-            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
-            value={kpis?.upcoming_events_count}
-            loading={isKpisLoading}
-            lastUpdated={kpisUpdatedAt}
-          />
-        </div>
+        {session.can_view_kpis && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard
+              title="Total Members"
+              icon={<Users className="h-4 w-4 text-muted-foreground" />}
+              value={
+                // Never show 0 — fall back to previous non-zero value or hide
+                kpis?.total_members && kpis.total_members > 0
+                  ? kpis.total_members
+                  : undefined
+              }
+              loading={isKpisLoading}
+              lastUpdated={kpisUpdatedAt}
+            />
+            <KpiCard
+              title="Today's Attendance"
+              icon={<CheckCircle className="h-4 w-4 text-primary" />}
+              value={kpis?.today_attendance}
+              loading={isKpisLoading}
+              lastUpdated={kpisUpdatedAt}
+            />
+            <KpiCard
+              title="New Visitors Today"
+              icon={<UserPlus className="h-4 w-4 text-muted-foreground" />}
+              value={kpis?.today_new_visitors}
+              loading={isKpisLoading}
+              lastUpdated={kpisUpdatedAt}
+            />
+            <KpiCard
+              title="Upcoming Events"
+              icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+              value={kpis?.upcoming_events_count}
+              loading={isKpisLoading}
+              lastUpdated={kpisUpdatedAt}
+            />
+          </div>
+        )}
 
         <Tabs defaultValue="attendance" className="mt-8">
           <TabsList className="grid grid-cols-2 md:grid-cols-5 h-auto md:h-10 gap-2 md:gap-0">
-            <TabsTrigger value="attendance">Today</TabsTrigger>
+            {session.can_view_attendance && (
+              <TabsTrigger value="attendance">Today</TabsTrigger>
+            )}
             <TabsTrigger value="checkin-approvals">
               Check-ins
               {pendingCheckIns.length > 0 && (
@@ -687,9 +848,14 @@ export default function Dashboard() {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="members">Members</TabsTrigger>
+            {session.can_view_members && (
+              <TabsTrigger value="members">Members</TabsTrigger>
+            )}
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="requests">Requests</TabsTrigger>
+            {(session.role === "leader" || session.role === "super_admin") && (
+              <TabsTrigger value="rsvps">RSVPs</TabsTrigger>
+            )}
             {session.role === "super_admin" && (
               <TabsTrigger value="leaders">Leaders</TabsTrigger>
             )}
@@ -702,6 +868,136 @@ export default function Dashboard() {
               </TabsTrigger>
             )}
           </TabsList>
+
+          {/* ── RSVPs ──────────────────────────────────────────────────────── */}
+          {(session.role === "leader" || session.role === "super_admin") && (
+            <TabsContent
+              value="rsvps"
+              className="p-4 border rounded-xl mt-4 bg-card"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <SectionTitle title="Event RSVPs" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={fetchRsvps}
+                  disabled={isRsvpsLoading}
+                  className="text-muted-foreground"
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 mr-1.5 ${isRsvpsLoading ? "animate-spin" : ""}`}
+                  />
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="mb-4">
+                <Label htmlFor="event-select">Select Event</Label>
+                <select
+                  id="event-select"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                  value={selectedEventId || ""}
+                  onChange={(e) => setSelectedEventId(e.target.value)}
+                >
+                  <option value="">Select an event</option>
+                  {events?.map((event: any) => (
+                    <option key={event.id} value={event.id}>
+                      {event.title} -{" "}
+                      {format(new Date(event.date), "MMM d, yyyy")}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedEventId && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader className="bg-green-500/20 text-green-700 dark:text-green-300 rounded-t-lg">
+                      <CardTitle className="flex items-center justify-between text-lg">
+                        Going <CheckCircle className="h-5 w-5" />
+                        <Badge
+                          variant="secondary"
+                          className="bg-green-600 text-white"
+                        >
+                          {
+                            rsvps.filter((r: any) => r.status === "going")
+                              .length
+                          }
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      {isRsvpsLoading ? (
+                        <Skeleton className="h-24 w-full" />
+                      ) : rsvps.filter((r: any) => r.status === "going")
+                          .length > 0 ? (
+                        <SimpleTable
+                          headers={["Name", "Role", "RSVP Date"]}
+                          rows={rsvps
+                            .filter((r: any) => r.status === "going")
+                            .map((rsvp: any) => [
+                              rsvp.member_name,
+                              <RoleBadge
+                                key={rsvp.member_role}
+                                role={rsvp.member_role}
+                              />,
+                              format(
+                                new Date(rsvp.created_at),
+                                "MMM d, yyyy HH:mm",
+                              ),
+                            ])}
+                        />
+                      ) : (
+                        <EmptyLine text="No responses yet." />
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="bg-red-500/20 text-red-700 dark:text-red-300 rounded-t-lg">
+                      <CardTitle className="flex items-center justify-between text-lg">
+                        Not Going <Trash2 className="h-5 w-5" />
+                        <Badge
+                          variant="secondary"
+                          className="bg-red-600 text-white"
+                        >
+                          {
+                            rsvps.filter((r: any) => r.status === "not_going")
+                              .length
+                          }
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4">
+                      {isRsvpsLoading ? (
+                        <Skeleton className="h-24 w-full" />
+                      ) : rsvps.filter((r: any) => r.status === "not_going")
+                          .length > 0 ? (
+                        <SimpleTable
+                          headers={["Name", "Role", "RSVP Date"]}
+                          rows={rsvps
+                            .filter((r: any) => r.status === "not_going")
+                            .map((rsvp: any) => [
+                              rsvp.member_name,
+                              <RoleBadge
+                                key={rsvp.member_role}
+                                role={rsvp.member_role}
+                              />,
+                              format(
+                                new Date(rsvp.created_at),
+                                "MMM d, yyyy HH:mm",
+                              ),
+                            ])}
+                        />
+                      ) : (
+                        <EmptyLine text="No responses yet." />
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </TabsContent>
+          )}
 
           {/* ── Today's attendance ─────────────────────────────────────────── */}
           <TabsContent
@@ -801,6 +1097,33 @@ export default function Dashboard() {
             )}
           </TabsContent>
 
+          {/* Session QR Code Dialog */}
+          <Dialog
+            open={showSessionQrCodeDialog}
+            onOpenChange={setShowSessionQrCodeDialog}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Session QR Code</DialogTitle>
+                <DialogDescription>
+                  Scan this QR code for check-in.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-center p-4">
+                {qrCodeUrl ? (
+                  <QRCodeSVG value={qrCodeUrl} size={256} level="H" />
+                ) : (
+                  <p>Generating QR code...</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button onClick={() => setShowSessionQrCodeDialog(false)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           {/* ── Members ────────────────────────────────────────────────────── */}
           <TabsContent
             value="members"
@@ -897,17 +1220,89 @@ export default function Dashboard() {
                       {profile.role === "leader" && (
                         <>
                           {session.role === "super_admin" && (
-                            <Button
-                              size="sm"
-                              onClick={() =>
-                                setRoleConfirm({
-                                  profile,
-                                  targetRole: "super_admin",
-                                })
-                              }
-                            >
-                              Make Super Admin
-                            </Button>
+                            <div className="flex flex-col gap-2">
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id={`create-events-${profile.id}`}
+                                  checked={profile.can_create_events}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(
+                                      profile.id,
+                                      "can_create_events",
+                                      checked,
+                                    )
+                                  }
+                                  disabled={isUpdatingPermissions}
+                                />
+                                <Label htmlFor={`create-events-${profile.id}`}>
+                                  Create Events
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id={`view-kpis-${profile.id}`}
+                                  checked={profile.can_view_kpis}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(
+                                      profile.id,
+                                      "can_view_kpis",
+                                      checked,
+                                    )
+                                  }
+                                  disabled={isUpdatingPermissions}
+                                />
+                                <Label htmlFor={`view-kpis-${profile.id}`}>
+                                  View KPIs
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id={`view-members-${profile.id}`}
+                                  checked={profile.can_view_members}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(
+                                      profile.id,
+                                      "can_view_members",
+                                      checked,
+                                    )
+                                  }
+                                  disabled={isUpdatingPermissions}
+                                />
+                                <Label htmlFor={`view-members-${profile.id}`}>
+                                  View Members
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Switch
+                                  id={`view-attendance-${profile.id}`}
+                                  checked={profile.can_view_attendance}
+                                  onCheckedChange={(checked) =>
+                                    handlePermissionChange(
+                                      profile.id,
+                                      "can_view_attendance",
+                                      checked,
+                                    )
+                                  }
+                                  disabled={isUpdatingPermissions}
+                                />
+                                <Label
+                                  htmlFor={`view-attendance-${profile.id}`}
+                                >
+                                  View Attendance
+                                </Label>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() =>
+                                  setRoleConfirm({
+                                    profile,
+                                    targetRole: "super_admin",
+                                  })
+                                }
+                              >
+                                Make Super Admin
+                              </Button>
+                            </div>
                           )}
                         </>
                       )}
@@ -925,100 +1320,104 @@ export default function Dashboard() {
             value="events"
             className="p-4 border rounded-xl mt-4 bg-card"
           >
-            <SectionTitle title="Create Event" />
-            <div className="grid gap-3 md:grid-cols-2">
-              <Input
-                value={eventForm.title}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    title: event.target.value,
-                  }))
-                }
-                placeholder="Event title"
-              />
-              <Input
-                value={eventForm.location}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    location: event.target.value,
-                  }))
-                }
-                placeholder="Location"
-              />
-              <Input
-                type="date"
-                value={eventForm.date}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    date: event.target.value,
-                  }))
-                }
-              />
-              <Input
-                type="time"
-                value={eventForm.time}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    time: event.target.value,
-                  }))
-                }
-              />
-              <Input
-                type="number"
-                value={eventForm.age_min}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    age_min: event.target.value,
-                  }))
-                }
-                placeholder="Min age"
-              />
-              <Input
-                type="number"
-                value={eventForm.age_max}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    age_max: event.target.value,
-                  }))
-                }
-                placeholder="Max age"
-              />
-              <Textarea
-                value={eventForm.description}
-                onChange={(event) =>
-                  setEventForm((current) => ({
-                    ...current,
-                    description: event.target.value,
-                  }))
-                }
-                placeholder="Description"
-                className="md:col-span-2"
-              />
-              <div className="flex items-center gap-3">
-                <Switch
-                  checked={eventForm.is_public}
-                  onCheckedChange={(checked) =>
-                    setEventForm((current) => ({
-                      ...current,
-                      is_public: checked,
-                    }))
-                  }
-                />
-                <Label>Show on landing page and member dashboards</Label>
-              </div>
-              <Button
-                onClick={handleCreateEvent}
-                disabled={createEvent.isPending}
-              >
-                {createEvent.isPending ? "Creating..." : "Create event"}
-              </Button>
-            </div>
+            {session.can_create_events && (
+              <>
+                <SectionTitle title="Create Event" />
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Input
+                    value={eventForm.title}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                    placeholder="Event title"
+                  />
+                  <Input
+                    value={eventForm.location}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        location: event.target.value,
+                      }))
+                    }
+                    placeholder="Location"
+                  />
+                  <Input
+                    type="date"
+                    value={eventForm.date}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        date: event.target.value,
+                      }))
+                    }
+                  />
+                  <Input
+                    type="time"
+                    value={eventForm.time}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        time: event.target.value,
+                      }))
+                    }
+                  />
+                  <Input
+                    type="number"
+                    value={eventForm.age_min}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        age_min: event.target.value,
+                      }))
+                    }
+                    placeholder="Min age"
+                  />
+                  <Input
+                    type="number"
+                    value={eventForm.age_max}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        age_max: event.target.value,
+                      }))
+                    }
+                    placeholder="Max age"
+                  />
+                  <Textarea
+                    value={eventForm.description}
+                    onChange={(event) =>
+                      setEventForm((current) => ({
+                        ...current,
+                        description: event.target.value,
+                      }))
+                    }
+                    placeholder="Description"
+                    className="md:col-span-2"
+                  />
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      checked={eventForm.is_public}
+                      onCheckedChange={(checked) =>
+                        setEventForm((current) => ({
+                          ...current,
+                          is_public: checked,
+                        }))
+                      }
+                    />
+                    <Label>Show on landing page and member dashboards</Label>
+                  </div>
+                  <Button
+                    onClick={handleCreateEvent}
+                    disabled={createEvent.isPending}
+                  >
+                    {createEvent.isPending ? "Creating..." : "Create event"}
+                  </Button>
+                </div>
+              </>
+            )}
 
             <div className="mt-8">
               <div className="flex items-center justify-between mb-4">
@@ -1059,7 +1458,10 @@ export default function Dashboard() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDeleteEventId(event.id)}
+                        onClick={() => {
+                          setDeleteEventId(event.id);
+                          setEventToDeleteName(event.title);
+                        }}
                         className="text-destructive hover:text-destructive"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -1332,6 +1734,39 @@ export default function Dashboard() {
         </Tabs>
       </div>
 
+      {/* Session QR Code Dialog */}
+      <Dialog
+        open={showSessionQrCodeDialog}
+        onOpenChange={setShowSessionQrCodeDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Scan for Session Check-in</DialogTitle>
+            <DialogDescription>
+              Members and visitors can scan this QR code to check in for the
+              current session.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center p-4">
+            {qrCodeUrl ? (
+              <QRCodeSVG
+                value={qrCodeUrl}
+                size={256}
+                level="H"
+                includeMargin={true}
+              />
+            ) : (
+              <p>Generating QR code...</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setShowSessionQrCodeDialog(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Delete event confirmation ─────────────────────────────────────── */}
       <AlertDialog
         open={!!deleteEventId}
@@ -1341,7 +1776,8 @@ export default function Dashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Event</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this event? This cannot be undone.
+              Delete {eventToDeleteName}? This removes all RSVPs. Cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -10,6 +10,7 @@ import checkinRouter from "./checkin";
 import qrcodesRouter from "./qrcodes";
 import dashboardRouter from "./dashboard";
 import registerRouter from "./register";
+import messagesRouter from "./messages";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(leadersRouter);
 router.use(checkinRouter);
 router.use(qrcodesRouter);
 router.use(dashboardRouter);
+router.use(messagesRouter);
 
 export default router;
