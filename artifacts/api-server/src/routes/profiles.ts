@@ -20,20 +20,12 @@ router.get("/profiles/me", async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    let profile = await db.query.profilesTable.findFirst({
+    const profile = await db.query.profilesTable.findFirst({
       where: eq(profilesTable.clerk_id, clerkId),
     });
 
     if (!profile) {
-      const [newProfile] = await db
-        .insert(profilesTable)
-        .values({
-          clerk_id: clerkId,
-          full_name: "",
-          role: "member",
-        })
-        .returning();
-      profile = newProfile;
+      return res.status(404).json({ error: "Profile not found" });
     }
 
     return res.json(profile);
