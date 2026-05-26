@@ -88,7 +88,10 @@ export default function LeaderLogin() {
 
         if (profile.role === "super_admin") {
           // Super admin: set session and skip PIN screen entirely
-          setLeaderSession(profile); // Pass the entire profile object
+          setLeaderSession({
+            role: profile.role,
+            profile_id: profile.profile_id,
+          });
           setMode("redirecting");
           setLocation("/dashboard");
           return;
