@@ -1,17 +1,27 @@
-import { Show, useUser } from "@clerk/react";
+import { useState } from "react";
+import { useUser } from "@clerk/react";
 import { Link, useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Clock, ArrowRight, UserPlus, LogIn, ClipboardCheck } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Clock, ArrowRight, UserPlus, LogIn, ClipboardCheck, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
 
 function PublicHome() {
   const { data: kpis, isLoading: isKpisLoading } = useGetDashboardKpis({ query: { enabled: true, queryKey: getGetDashboardKpisQueryKey() } });
   const { data: events, isLoading: isEventsLoading } = useListEvents({ public_only: true, upcoming: true }, { query: { enabled: true, queryKey: getListEventsQueryKey({ public_only: true, upcoming: true }) } });
+  const [showLoginDialog, setShowLoginDialog] = useState(false);
+  const [, setLocation] = useLocation();
 
   return (
     <Layout>
@@ -39,121 +49,129 @@ function PublicHome() {
                 Self Check-In
               </Button>
             </Link>
-            <Link href="/sign-in">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto h-12 px-8 text-base">
-                <LogIn className="mr-2 h-5 w-5" />
-                Login
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full sm:w-auto h-12 px-8 text-base"
+              onClick={() => setShowLoginDialog(true)}
+            >
+              <LogIn className="mr-2 h-5 w-5" />
+              Login
+            </Button>
           </div>
         </section>
 
+        {/* Stats */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-card/50 backdrop-blur">
             <CardHeader className="pb-2">
-              <CardDescription>Total Members</CardDescription>
+              <CardDescription>Community Members</CardDescription>
+              <CardTitle className="text-4xl">
+                {isKpisLoading ? <Skeleton className="h-9 w-16" /> : (kpis?.total_members ?? 0)}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {isKpisLoading ? <Skeleton className="h-10 w-24" /> : <div className="text-4xl font-bold">{kpis?.total_members || 0}</div>}
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 backdrop-blur border-primary/20">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-primary font-medium">Today's Visitors</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isKpisLoading ? <Skeleton className="h-10 w-24" /> : <div className="text-4xl font-bold text-primary">{kpis?.today_new_visitors || 0}</div>}
+              <p className="text-xs text-muted-foreground">Growing every Friday</p>
             </CardContent>
           </Card>
           <Card className="bg-card/50 backdrop-blur">
             <CardHeader className="pb-2">
-              <CardDescription>Today's Attendance</CardDescription>
+              <CardDescription>Upcoming Events</CardDescription>
+              <CardTitle className="text-4xl">
+                {isKpisLoading ? <Skeleton className="h-9 w-16" /> : (kpis?.upcoming_events_count ?? 0)}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {isKpisLoading ? <Skeleton className="h-10 w-24" /> : <div className="text-4xl font-bold">{kpis?.today_attendance || 0}</div>}
+              <p className="text-xs text-muted-foreground">Don't miss out</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-card/50 backdrop-blur">
+            <CardHeader className="pb-2">
+              <CardDescription>This Week's Attendance</CardDescription>
+              <CardTitle className="text-4xl">
+                {isKpisLoading ? <Skeleton className="h-9 w-16" /> : (kpis?.today_attendance ?? 0)}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Checked in this session</p>
             </CardContent>
           </Card>
         </section>
 
-        <section>
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold tracking-tight">Upcoming Public Events</h2>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {isEventsLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <Card key={i} className="overflow-hidden">
+        {/* Upcoming Events */}
+        {!isEventsLoading && events && events.length > 0 && (
+          <section>
+            <h2 className="text-2xl font-bold tracking-tight mb-6">Upcoming Events</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {events.slice(0, 3).map((event) => (
+                <Card key={event.id} className="flex flex-col bg-card/50 backdrop-blur">
                   <CardHeader>
-                    <Skeleton className="h-6 w-2/3 mb-2" />
-                    <Skeleton className="h-4 w-1/3" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-4/5" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : events && events.length > 0 ? (
-              events.map((event) => (
-                <Card key={event.id} className="flex flex-col">
-                  <CardHeader>
-                    <CardTitle className="line-clamp-1 text-xl">{event.title}</CardTitle>
-                    <CardDescription className="flex items-center gap-1.5 mt-2 text-foreground/80">
+                    <CardTitle className="line-clamp-1">{event.title}</CardTitle>
+                    <CardDescription className="flex items-center gap-1.5 mt-1">
                       <CalendarIcon className="h-4 w-4" />
-                      {format(new Date(event.date), "EEEE, MMMM d, yyyy")}
+                      {format(new Date(event.date), "EEEE, MMM d")}
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="flex-1">
-                    <div className="space-y-3 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 shrink-0" />
-                        <span>{event.time}</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
-                        <span className="line-clamp-2">{event.location}</span>
-                      </div>
-                      {event.description && (
-                        <p className="line-clamp-3 mt-4 text-foreground/70">{event.description}</p>
-                      )}
+                  <CardContent className="flex-1 space-y-2 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      <span>{event.time}</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 mt-0.5" />
+                      <span className="line-clamp-1">{event.location}</span>
                     </div>
                   </CardContent>
                 </Card>
-              ))
-            ) : (
-              <div className="col-span-full py-12 text-center border rounded-xl border-dashed">
-                <CalendarIcon className="h-10 w-10 mx-auto text-muted-foreground mb-4 opacity-50" />
-                <h3 className="text-lg font-medium text-foreground mb-1">No upcoming events</h3>
-                <p className="text-muted-foreground">Check back later for new events.</p>
-              </div>
-            )}
-          </div>
-        </section>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
+
+      {/* Member / First-Timer login dialog */}
+      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Welcome back!</DialogTitle>
+            <DialogDescription>
+              Are you an existing member or a first-timer?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 mt-2">
+            <Button
+              size="lg"
+              className="w-full h-14 text-base"
+              onClick={() => {
+                setShowLoginDialog(false);
+                setLocation("/sign-in");
+              }}
+            >
+              <Users className="mr-2 h-5 w-5" />
+              I'm a Member
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full h-14 text-base"
+              onClick={() => {
+                setShowLoginDialog(false);
+                setLocation("/register");
+              }}
+            >
+              <UserPlus className="mr-2 h-5 w-5" />
+              I'm a First-Timer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
 
 export default function Home() {
-  const { user, isLoaded } = useUser();
-  const [location, setLocation] = useLocation();
-
-  if (!isLoaded) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-[50vh]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (user) {
-    return <Redirect to="/my" />;
-  }
-
+  const { isLoaded, isSignedIn } = useUser();
+  if (!isLoaded) return null;
+  if (isSignedIn) return <Redirect to="/my" />;
   return <PublicHome />;
 }
