@@ -90,7 +90,7 @@ export default function LeaderLogin() {
           // Super admin: set session and skip PIN screen entirely
           setLeaderSession({
             role: profile.role,
-            profile_id: profile.profile_id,
+            profile_id: profile.id, // fix: was profile.profile_id, correct field is id
           });
           setMode("redirecting");
           setLocation("/dashboard");
@@ -150,13 +150,9 @@ export default function LeaderLogin() {
         {
           onSuccess: (result) => {
             if (result.success && result.profile_id) {
-              // Assuming result contains the full profile or enough data to construct it
-              // For now, we'll pass what's available from result, but ideally, the backend
-              // should return the full profile on successful PIN verification.
               setLeaderSession({
                 role: result.role,
                 profile_id: result.profile_id,
-                // Add other profile fields if available in result
               });
               toast({ title: "Welcome back, leader." });
               setLocation("/dashboard");
