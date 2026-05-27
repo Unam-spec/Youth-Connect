@@ -29,6 +29,7 @@ import {
   useRejectMembershipRequest,
   useRevokeMembership,
 } from "@workspace/api-client-react";
+import { ComingSoon } from "@/components/coming-soon";
 import { Layout } from "@/components/layout";
 import { getLeaderSession, setLeaderSession, LeaderSession } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -136,15 +137,6 @@ interface LeaderPin {
   pin_plain: string | null;
 }
 
-interface Message {
-  id: string;
-  sender_id: string;
-  sender_name: string;
-  sender_role: string;
-  content: string;
-  created_at: string;
-}
-
 // ── Dashboard component ───────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -225,13 +217,6 @@ export default function Dashboard() {
       query: { queryKey: getListEventsQueryKey() },
     },
   );
-
-  // ── Channel state ──────────────────────────────────────────────────────────
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessageContent, setNewMessageContent] = useState("");
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
-  const [isMessagesLoading, setIsMessagesLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ── RSVPs state ────────────────────────────────────────────────────────────
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -352,47 +337,6 @@ export default function Dashboard() {
     }
   }, [apiFetch, toast]);
 
-  // ── Channel fetch ──────────────────────────────────────────────────────────
-  const fetchMessages = useCallback(async () => {
-    setIsMessagesLoading(true);
-    try {
-      const response = await apiFetch("/api/messages");
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data);
-      } else {
-        toast({
-          title: "Failed to fetch messages",
-          description: "An error occurred while fetching messages.",
-          variant: "destructive",
-        });
-      }
-    } catch {
-      toast({
-        title: "Failed to fetch messages",
-        description: "Network error or server unreachable.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsMessagesLoading(false);
-    }
-  }, [apiFetch, toast]);
-
-  useEffect(() => {
-    if (session?.role === "leader" || session?.role === "super_admin") {
-      fetchMessages();
-      const intervalId = setInterval(fetchMessages, 10_000);
-      return () => clearInterval(intervalId);
-    }
-    return undefined;
-  }, [fetchMessages, session?.role]);
-
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
-
   const [pendingCheckIns, setPendingCheckIns] = useState<PendingCheckIn[]>([]);
   const [isPendingLoading, setIsPendingLoading] = useState(false);
   const pendingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
@@ -490,67 +434,6 @@ export default function Dashboard() {
       queryKey: getListMembershipRequestsQueryKey({ status: "pending" }),
     });
     queryClient.invalidateQueries({ queryKey: getListLeadersQueryKey() });
-    fetchMessages();
-  }
-
-  async function handleSendMessage() {
-    if (newMessageContent.trim() === "") return;
-    setIsSendingMessage(true);
-    try {
-      const response = await apiFetch("/api/messages", {
-        method: "POST",
-        body: JSON.stringify({
-          content: newMessageContent,
-          sender_name:
-            (session as any)?.full_name ?? (session as any)?.name ?? "Unknown",
-          sender_role: session?.role || "visitor",
-        }),
-      });
-      if (response.ok) {
-        setNewMessageContent("");
-        fetchMessages();
-      } else {
-        const error = await response.json();
-        toast({
-          title: "Failed to send message",
-          description: error.message || "An error occurred",
-          variant: "destructive",
-        });
-      }
-    } catch {
-      toast({
-        title: "Failed to send message",
-        description: "Network error or server unreachable.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSendingMessage(false);
-    }
-  }
-
-  async function handleDeleteMessage(messageId: string) {
-    try {
-      const response = await apiFetch(`/api/messages/${messageId}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        toast({ title: "Message deleted" });
-        fetchMessages();
-      } else {
-        const error = await response.json();
-        toast({
-          title: "Failed to delete message",
-          description: error.message || "An error occurred",
-          variant: "destructive",
-        });
-      }
-    } catch {
-      toast({
-        title: "Failed to delete message",
-        description: "Network error or server unreachable.",
-        variant: "destructive",
-      });
-    }
   }
 
   function handleCreateEvent() {
@@ -1748,79 +1631,17 @@ export default function Dashboard() {
             </TabsContent>
           )}
 
-          {/* ── Channel ────────────────────────────────────────────────────── */}
+          {/* ── Channel (coming soon) ───────────────────────────────────────── */}
           {(session.role === "leader" || session.role === "super_admin") && (
             <TabsContent
               value="channel"
-              className="p-4 border rounded-xl mt-4 bg-card flex flex-col h-[600px]"
+              className="p-4 border rounded-xl mt-4 bg-card"
             >
               <SectionTitle title="Channel" />
-              <div className="flex-1 overflow-y-auto space-y-4 p-4 border rounded-lg bg-muted/20 mb-4">
-                {isMessagesLoading ? (
-                  <p className="text-muted-foreground text-center">
-                    Loading messages...
-                  </p>
-                ) : messages.length === 0 ? (
-                  <p className="text-muted-foreground text-center">
-                    No messages yet. Start the conversation.
-                  </p>
-                ) : (
-                  messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className="flex items-start space-x-3"
-                    >
-                      <RoleBadge role={message.sender_role} />
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold">
-                            {message.sender_name}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {format(
-                              new Date(message.created_at),
-                              "MMM d, yyyy HH:mm",
-                            )}
-                          </span>
-                        </div>
-                        <p className="text-sm text-foreground">
-                          {message.content}
-                        </p>
-                      </div>
-                      {session.role === "super_admin" && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteMessage(message.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Type your message..."
-                  className="flex-1"
-                  value={newMessageContent}
-                  onChange={(e) => setNewMessageContent(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === "Enter" && newMessageContent.trim() !== "") {
-                      handleSendMessage();
-                    }
-                  }}
-                />
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={isSendingMessage || newMessageContent.trim() === ""}
-                >
-                  {isSendingMessage ? "Sending..." : "Send"}
-                </Button>
-              </div>
+              <ComingSoon
+                title="Leader channel coming soon"
+                description="A private space for leaders and super admins to coordinate is on the way. Everything else in the dashboard works as usual."
+              />
             </TabsContent>
           )}
         </Tabs>
