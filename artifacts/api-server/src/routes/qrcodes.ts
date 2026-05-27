@@ -107,4 +107,36 @@ router.get("/qrcodes/:slug", async (req, res) => {
   }
 });
 
+
+router.post("/qrcodes/session", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    const leaderSession = req.headers["x-leader-session"];
+
+    if (!auth?.userId && !leaderSession) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Deactivate existing session QR codes
+    await db
+      .update(qrCodesTable)
+      .set({ active: false })
+      .where(and(eq(qrCodesTable.type, "session"), eq(qrCodesTable.active, true)));
+
+    const [newQr] = await db
+      .insert(qrCodesTable)
+      .values({
+        slug: randomBytes(8).toString("hex"),
+        type: "session",
+        active: true,
+      })
+      .returning();
+
+    return res.json({ slug: newQr.slug, type: newQr.type });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
