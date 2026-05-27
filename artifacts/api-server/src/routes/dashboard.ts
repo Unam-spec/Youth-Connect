@@ -78,7 +78,7 @@ router.get("/dashboard/kpis", async (req, res) => {
     const [totalMembersRow] = await db
       .select({ count: count() })
       .from(profilesTable)
-      .where(eq(profilesTable.role, "member"));
+      .where(sql);
 
     const [upcomingEvents] = await db
       .select({ count: count() })
