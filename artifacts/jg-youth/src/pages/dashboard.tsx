@@ -150,6 +150,8 @@ export default function Dashboard() {
   const [leaderPins, setLeaderPins] = useState<LeaderPin[]>([]);
   const [isLeaderPinsLoading, setIsLeaderPinsLoading] = useState(false);
   const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
+  const [settingPinFor, setSettingPinFor] = useState<LeaderPin | null>(null);
+  const [leaderPinInput, setLeaderPinInput] = useState("");
   const [pendingCheckIns, setPendingCheckIns] = useState<PendingCheckIn[]>([]);
   const [isPendingLoading, setIsPendingLoading] = useState(false);
   const pendingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -410,6 +412,27 @@ export default function Dashboard() {
       fetchHasPin();
     } catch {
       toast({ title: "Failed to save PIN", variant: "destructive" });
+    }
+  }
+
+  async function handleSetLeaderPin() {
+    if (!settingPinFor || leaderPinInput.length !== 4) return;
+    try {
+      const res = await apiFetch(`/api/leaders/${settingPinFor.id}/set-pin`, {
+        method: "POST",
+        body: JSON.stringify({ pin: leaderPinInput }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Failed to set PIN", description: err.error, variant: "destructive" });
+        return;
+      }
+      toast({ title: `PIN set for ${settingPinFor.full_name}` });
+      setSettingPinFor(null);
+      setLeaderPinInput("");
+      fetchLeaderPins();
+    } catch {
+      toast({ title: "Failed to set PIN", variant: "destructive" });
     }
   }
 
@@ -1007,9 +1030,9 @@ export default function Dashboard() {
                             <p className="text-xs text-muted-foreground">{leader.phone ?? "No phone"}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-mono text-sm tracking-widest tabular-nums">
-                            {revealedPins[leader.id] ? (leader.pin_plain ?? "—") : "••••"}
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-sm tracking-widest tabular-nums min-w-[3rem] text-right">
+                            {revealedPins[leader.id] ? (leader.pin_plain ?? "—") : (leader.pin_plain ? "••••" : "not set")}
                           </span>
                           <Button
                             id={`btn-reveal-pin-${leader.id}`}
@@ -1017,8 +1040,18 @@ export default function Dashboard() {
                             size="sm"
                             className="h-8 w-8 p-0 hover:text-teal-400"
                             onClick={() => togglePinReveal(leader.id)}
+                            disabled={!leader.pin_plain}
                           >
                             {revealedPins[leader.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </Button>
+                          <Button
+                            id={`btn-set-leader-pin-${leader.id}`}
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs px-2.5 border-teal-500/30 hover:border-teal-500 hover:text-teal-300"
+                            onClick={() => { setSettingPinFor(leader); setLeaderPinInput(""); }}
+                          >
+                            {leader.pin_plain ? "Change" : "Set PIN"}
                           </Button>
                         </div>
                       </div>
@@ -1140,6 +1173,38 @@ export default function Dashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* ── Set PIN for a specific leader (super admin only) ── */}
+      <Dialog open={!!settingPinFor} onOpenChange={open => { if (!open) { setSettingPinFor(null); setLeaderPinInput(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set PIN for {settingPinFor?.full_name}</DialogTitle>
+            <DialogDescription>Enter a 4-digit PIN. This will be used when this leader logs in.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Input
+              id="leader-pin-input"
+              type="password"
+              placeholder="Enter 4-digit PIN"
+              maxLength={4}
+              value={leaderPinInput}
+              onChange={e => setLeaderPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="text-center text-2xl tracking-widest"
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSettingPinFor(null); setLeaderPinInput(""); }}>Cancel</Button>
+            <Button
+              onClick={handleSetLeaderPin}
+              disabled={leaderPinInput.length !== 4}
+              className="bg-teal-500 hover:bg-teal-400 text-white border-0"
+            >
+              Set PIN
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
         <DialogContent>
