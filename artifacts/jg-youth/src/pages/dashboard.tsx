@@ -258,11 +258,17 @@ export default function Dashboard() {
   useEffect(() => { fetchHasPin(); }, [fetchHasPin]);
   useEffect(() => { fetchRsvps(); }, [fetchRsvps]);
 
+  // Use a ref to hold the latest fetchPendingCheckIns so the interval never restarts
+  const fetchPendingRef = useRef(fetchPendingCheckIns);
+  useEffect(() => { fetchPendingRef.current = fetchPendingCheckIns; }, [fetchPendingCheckIns]);
+
   useEffect(() => {
-    fetchPendingCheckIns();
-    pendingIntervalRef.current = setInterval(fetchPendingCheckIns, 30_000);
+    // Initial fetch
+    fetchPendingRef.current();
+    // Poll every 30s without restarting the interval on re-renders
+    pendingIntervalRef.current = setInterval(() => fetchPendingRef.current(), 30_000);
     return () => { if (pendingIntervalRef.current) clearInterval(pendingIntervalRef.current); };
-  }, [fetchPendingCheckIns]);
+  }, []); // empty deps — interval starts once, uses ref for latest function
 
   // Auto-load leader pins on mount for super admins
   useEffect(() => {
@@ -437,7 +443,11 @@ export default function Dashboard() {
   function mutateRequest(action: "approve" | "reject", requestId: string) {
     const mutation = action === "approve" ? approveRequest : rejectRequest;
     mutation.mutate({ id: requestId }, {
-      onSuccess: () => { toast({ title: action === "approve" ? "Request approved" : "Request rejected" }); refreshDashboard(); },
+      onSuccess: () => {
+        toast({ title: action === "approve" ? "Request approved" : "Request rejected" });
+        // Invalidate only after a short delay to avoid flash of empty list
+        setTimeout(() => refreshDashboard(), 400);
+      },
       onError: (error: Error) => toast({ title: "Request update failed", description: error.message, variant: "destructive" }),
     });
   }
