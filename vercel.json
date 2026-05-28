@@ -1,11 +1,17 @@
 {
   "version": 2,
-  "buildCommand": "cd artifacts/jg-youth && pnpm install --no-frozen-lockfile --shamefully-hoist && pnpm exec vite build --config vite.config.ts",
+  "buildCommand": "cd artifacts/jg-youth && npm install --legacy-peer-deps && npm run build",
   "outputDirectory": "artifacts/jg-youth/dist/public",
-  "installCommand": "rm -f pnpm-lock.yaml && pnpm install --no-frozen-lockfile --shamefully-hoist",
+  "installCommand": "npm install --legacy-peer-deps",
   "framework": null,
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://youth-connect-production.up.railway.app/api/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "https://youth-connect-production.up.railway.app/api/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ]
 }
