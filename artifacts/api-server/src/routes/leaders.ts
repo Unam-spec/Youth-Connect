@@ -28,11 +28,11 @@ router.get("/leaders", async (req, res) => {
     if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
     const leaders = await db
       .select({
-        profile_id: leaderPermissionsTable.profile_id,
-        can_create_events: leaderPermissionsTable.can_create_events,
-        can_manage_members: leaderPermissionsTable.can_manage_members,
-        can_view_kpis: leaderPermissionsTable.can_view_kpis,
-        can_approve_membership: leaderPermissionsTable.can_approve_membership,
+        profile_id: profilesTable.id,
+        can_create_events: profilesTable.can_create_events,
+        can_view_kpis: profilesTable.can_view_kpis,
+        can_view_members: profilesTable.can_view_members,
+        can_view_attendance: profilesTable.can_view_attendance,
         profile: {
           id: profilesTable.id,
           full_name: profilesTable.full_name,
@@ -46,8 +46,8 @@ router.get("/leaders", async (req, res) => {
           created_at: profilesTable.created_at,
         },
       })
-      .from(leaderPermissionsTable)
-      .leftJoin(profilesTable, eq(leaderPermissionsTable.profile_id, profilesTable.id));
+      .from(profilesTable)
+      .where(eq(profilesTable.role, "leader"));
     return res.json(leaders);
   } catch (err) {
     req.log.error(err);

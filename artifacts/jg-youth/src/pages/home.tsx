@@ -38,10 +38,10 @@ function PublicHome() {
             Jeremiah Generation AFM
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-4">
-            Register. Show up. <span className="text-primary">Be counted.</span>
+            Don’t be the one we ask <span className="text-primary">‘where were you?’</span>
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl">
-            Welcome to the JG Youth portal. Connect with the community, keep track of events, and manage your membership.
+            Register, show up, be part of it.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
             <Link href="/register">
