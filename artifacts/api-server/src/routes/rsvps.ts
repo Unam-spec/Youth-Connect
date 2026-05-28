@@ -107,38 +107,54 @@ router.post("/rsvps/:eventId", async (req, res) => {
     if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
     }
-    // Fetch event for email confirmation
+
+    // Fetch event once — reused for both update and insert paths
     const event = await db.query.eventsTable.findFirst({
       where: eq(eventsTable.id, req.params.eventId),
     });
+
     const existing = await db.query.rsvpsTable.findFirst({
       where: and(
         eq(rsvpsTable.event_id, req.params.eventId),
         eq(rsvpsTable.profile_id, profile.id),
       ),
     });
+
+    let rsvp: typeof rsvpsTable.;
+
     if (existing) {
       const [updated] = await db
         .update(rsvpsTable)
         .set({ status: parsed.data.status })
         .where(eq(rsvpsTable.id, existing.id))
         .returning();
-      const event = await db.query.eventsTable.findFirst({
-        where: eq(eventsTable.id, req.params.eventId),
-      });
-      return res.json({ ...updated, event: event ?? null });
+      rsvp = updated;
+    } else {
+      const [inserted] = await db
+        .insert(rsvpsTable)
+        .values({
+          event_id: req.params.eventId,
+          profile_id: profile.id,
+          status: parsed.data.status,
+        })
+        .returning();
+      rsvp = inserted;
     }
-    const [rsvp] = await db
-      .insert(rsvpsTable)
-      .values({
-        event_id: req.params.eventId,
-        profile_id: profile.id,
-        status: parsed.data.status,
-      })
-      .returning();
-    const event = await db.query.eventsTable.findFirst({
-      where: eq(eventsTable.id, req.params.eventId),
-    });
+
+    // Send Twilio email confirmation if member is going and has an email
+    if (parsed.data.status === "going" && profile.email && event) {
+      try {
+        await sendEmail({
+          to: profile.email,
+          subject: ,
+          body: ,
+        });
+      } catch (emailErr) {
+        // Email failure should not fail the RSVP
+        req.log.warn({ emailErr }, "Failed to send RSVP confirmation email");
+      }
+    }
+
     return res.json({ ...rsvp, event: event ?? null });
   } catch (err) {
     req.log.error(err);
