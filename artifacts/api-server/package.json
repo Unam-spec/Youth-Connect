@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "cross-env NODE_ENV=development pnpm run build && pnpm run start",
+    "dev": "cross-env NODE_ENV=development npm run build && npm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -21,19 +21,19 @@
     "cors": "^2",
     "date-fns-tz": "^3.2.0",
     "dotenv": "^17.4.2",
-    "drizzle-orm": "catalog:",
+    "drizzle-orm": "^0.45.2",
     "express": "^5",
     "http-proxy-middleware": "^4.0.0",
     "pino": "^9",
     "pino-http": "^10",
     "qrcode.react": "^4.2.0",
-    "zod": "catalog:"
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/node": "catalog:",
+    "@types/node": "^25.3.3",
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.9",
     "esbuild": "^0.27.3",
