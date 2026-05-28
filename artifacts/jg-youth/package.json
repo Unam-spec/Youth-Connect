@@ -15,7 +15,8 @@
     "@workspace/api-client-react": "*",
     "html5-qrcode": "^2.3.8",
     "qrcode": "^1.5.4",
-    "qrcode.react": "^4.2.0"
+    "qrcode.react": "^4.2.0",
+    "@sentry/react": "^8.0.0"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

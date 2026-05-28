@@ -28,7 +28,8 @@
     "pino-http": "^10",
     "qrcode.react": "^4.2.0",
     "zod": "^3.25.76",
-    "twilio": "^5.7.0"
+    "twilio": "^5.7.0",
+    "@sentry/node": "^8.0.0"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
