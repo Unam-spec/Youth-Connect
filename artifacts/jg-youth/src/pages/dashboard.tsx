@@ -290,10 +290,6 @@ export default function Dashboard() {
     is_public: true,
   });
 
-  if (!session) {
-    return <Redirect to="/leader-login" />;
-  }
-
   // ── KPI auto-refresh ────────────────────────────────────────────────────
   const [kpisUpdatedAt, setKpisUpdatedAt] = useState<string | null>(null);
   const {
@@ -752,6 +748,11 @@ export default function Dashboard() {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  // Guard: no session = redirect. Must be after all hooks.
+  if (!session) {
+    return <Redirect to="/leader-login" />;
+  }
 
   const superAdminCount =
     profiles?.filter((p: any) => p.role === "super_admin").length ?? 0;
