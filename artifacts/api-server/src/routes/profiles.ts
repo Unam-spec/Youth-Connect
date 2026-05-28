@@ -36,17 +36,31 @@ router.get("/profiles/me", async (req, res) => {
       where: eq(profilesTable.clerk_id, clerkId),
     });
 
-    // Auto-create a visitor profile for new Clerk users who don't have one yet.
-    // This happens when someone signs up via Clerk but hasn't completed first-timer registration.
-    // They get a placeholder profile they can then fill in, and can request membership.
     if (!profile) {
       // Try to get their name/email from Clerk auth object (populated by clerkMiddleware)
       const clerkUser = (req as any).auth?.sessionClaims ?? {};
       const firstName = clerkUser?.given_name ?? clerkUser?.first_name ?? "";
       const lastName = clerkUser?.family_name ?? clerkUser?.last_name ?? "";
       const fullName = [firstName, lastName].filter(Boolean).join(" ").trim() || "New Member";
-      const email = clerkUser?.email ?? null;
+      const email: string | null = clerkUser?.email ?? null;
 
+      // Check if a profile already exists with this email (e.g. manually created before Clerk signup)
+      // If so, link their Clerk ID to the existing profile instead of creating a duplicate
+      if (email) {
+        const existing = await db.query.profilesTable.findFirst({
+          where: eq(profilesTable.email, email),
+        });
+        if (existing) {
+          const [linked] = await db
+            .update(profilesTable)
+            .set({ clerk_id: clerkId })
+            .where(eq(profilesTable.id, existing.id))
+            .returning();
+          return res.json(linked);
+        }
+      }
+
+      // No existing profile found — create a fresh visitor profile
       const [created] = await db
         .insert(profilesTable)
         .values({
