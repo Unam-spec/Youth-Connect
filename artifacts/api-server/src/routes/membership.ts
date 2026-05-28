@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/express";
 import { eq } from "drizzle-orm";
 import { db, membershipRequestsTable, profilesTable } from "@workspace/db";
 import { CreateMembershipRequestBody } from "@workspace/api-zod";
+import { sendEmail } from "../lib/twilio";
 
 const router = Router();
 
@@ -96,7 +97,21 @@ router.post("/membership-requests/:id/approve", async (req, res) => {
       .update(profilesTable)
       .set({ role: "member" })
       .where(eq(profilesTable.id, updated.profile_id));
-    return res.json({ ...updated, profile: null });
+
+    // Notify member via email using Twilio
+    const member = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, updated.profile_id),
+    });
+    if (member?.email) {
+      await sendEmail({
+        to: member.email,
+        subject: "Your membership has been approved — Jeremiah Generation Youth",
+        text: `Hi ${member.full_name},\n\nGreat news! Your membership request has been approved. Welcome to Jeremiah Generation Youth!\n\nYou can now log in and access all member features.\n\nSee you at the next session,\nJeremiah Generation Youth`,
+        html: `<p>Hi <strong>${member.full_name}</strong>,</p><p>Great news! Your membership request has been <strong>approved</strong>. Welcome to Jeremiah Generation Youth!</p><p>You can now log in and access all member features.</p><p>See you at the next session,<br/>Jeremiah Generation Youth</p>`,
+      });
+    }
+
+    return res.json({ ...updated, profile: member ?? null });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -120,7 +135,21 @@ router.post("/membership-requests/:id/reject", async (req, res) => {
     if (!updated) {
       return res.status(404).json({ error: "Request not found" });
     }
-    return res.json({ ...updated, profile: null });
+
+    // Notify member via email using Twilio
+    const member = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, updated.profile_id),
+    });
+    if (member?.email) {
+      await sendEmail({
+        to: member.email,
+        subject: "Your membership request — Jeremiah Generation Youth",
+        text: `Hi ${member.full_name},\n\nThank you for your interest in joining Jeremiah Generation Youth. After review, your membership request was not approved at this time.\n\nPlease reach out to a leader if you have any questions.\n\nJeremiah Generation Youth`,
+        html: `<p>Hi <strong>${member.full_name}</strong>,</p><p>Thank you for your interest in joining Jeremiah Generation Youth. After review, your membership request was not approved at this time.</p><p>Please reach out to a leader if you have any questions.</p><p>Jeremiah Generation Youth</p>`,
+      });
+    }
+
+    return res.json({ ...updated, profile: member ?? null });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
