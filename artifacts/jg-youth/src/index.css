@@ -71,71 +71,71 @@
 :root {
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
-
   --opaque-button-border-intensity: 9;
-
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  /* Default to dark mode for JG Youth */
-  --background: 224 71% 4%;
-  --foreground: 213 31% 91%;
+  /* Brand: #0B0F14 bg, #2A9D8F teal primary, #E6E8EB text */
+  --background: 220 25% 7%;
+  --foreground: 210 11% 91%;
 
-  --border: 216 34% 17%;
-  --input: 216 34% 17%;
-  --ring: 262 83% 58%;
+  --border: 215 20% 16%;
+  --input: 215 20% 16%;
+  --ring: 174 57% 39%;
 
-  --card: 222 47% 11%;
-  --card-foreground: 213 31% 91%;
-  --card-border: 216 34% 17%;
+  --card: 220 22% 10%;
+  --card-foreground: 210 11% 91%;
+  --card-border: 215 20% 16%;
 
-  --popover: 224 71% 4%;
-  --popover-foreground: 215 20.2% 65.1%;
-  --popover-border: 216 34% 17%;
+  --popover: 220 25% 7%;
+  --popover-foreground: 215 16% 57%;
+  --popover-border: 215 20% 16%;
 
-  --primary: 262 83% 58%;
-  --primary-foreground: 210 40% 98%;
+  --primary: 174 57% 39%;
+  --primary-foreground: 0 0% 100%;
 
-  --secondary: 217 19% 27%;
-  --secondary-foreground: 210 40% 98%;
+  --secondary: 215 16% 20%;
+  --secondary-foreground: 210 11% 91%;
 
-  --muted: 223 47% 11%;
-  --muted-foreground: 215.4 16.3% 56.9%;
+  --muted: 220 22% 10%;
+  --muted-foreground: 215 16% 57%;
 
-  --accent: 262 83% 58%;
-  --accent-foreground: 210 40% 98%;
+  --accent: 177 13% 49%;
+  --accent-foreground: 0 0% 100%;
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 210 40% 98%;
 
-  --sidebar: 222 47% 11%;
-  --sidebar-foreground: 213 31% 91%;
-  --sidebar-border: 216 34% 17%;
-  --sidebar-primary: 262 83% 58%;
-  --sidebar-primary-foreground: 210 40% 98%;
-  --sidebar-accent: 217 19% 27%;
-  --sidebar-accent-foreground: 210 40% 98%;
-  --sidebar-ring: 262 83% 58%;
+  --sidebar: 220 22% 10%;
+  --sidebar-foreground: 210 11% 91%;
+  --sidebar-border: 215 20% 16%;
+  --sidebar-primary: 174 57% 39%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 215 16% 20%;
+  --sidebar-accent-foreground: 210 11% 91%;
+  --sidebar-ring: 174 57% 39%;
 
-  --chart-1: 262 83% 58%;
-  --chart-2: 280 65% 60%;
-  --chart-3: 340 75% 55%;
-  --chart-4: 200 80% 50%;
-  --chart-5: 160 60% 45%;
+  --chart-1: 174 57% 39%;
+  --chart-2: 177 40% 55%;
+  --chart-3: 200 70% 50%;
+  --chart-4: 160 50% 45%;
+  --chart-5: 140 45% 42%;
 
+  /* Sora for headings, Inter for body */
   --app-font-sans: 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 0.5rem;
-  
-  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
-  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
-  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
-  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
-  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 2px 4px -1px hsl(0 0% 0% / 0.1);
-  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 4px 6px -1px hsl(0 0% 0% / 0.1);
-  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 8px 10px -1px hsl(0 0% 0% / 0.1);
-  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
+  --app-font-heading: 'Sora', sans-serif;
+  --radius: 0.625rem;
+
+  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
+  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
+  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 1px 2px -1px hsl(0 0% 0% / 0.15);
+  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 1px 2px -1px hsl(0 0% 0% / 0.15);
+  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 2px 4px -1px hsl(0 0% 0% / 0.15);
+  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 4px 6px -1px hsl(0 0% 0% / 0.15);
+  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 8px 10px -1px hsl(0 0% 0% / 0.15);
+  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
 
   --tracking-normal: 0em;
   --spacing: 0.25rem;
@@ -152,86 +152,56 @@
 .dark {
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
-
-  --opaque-button-border-intensity: 9;  /* In terms of percentages */
-
-  /* Backgrounds applied on top of other backgrounds when hovered/active */
+  --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: red; /*replace with H S L */
+  /* Dark mode mirrors root (app is always dark) */
+  --background: 220 25% 7%;
+  --foreground: 210 11% 91%;
+  --border: 215 20% 16%;
+  --input: 215 20% 20%;
+  --ring: 174 57% 39%;
+  --card: 220 22% 10%;
+  --card-foreground: 210 11% 91%;
+  --card-border: 215 20% 16%;
+  --popover: 220 25% 7%;
+  --popover-foreground: 215 16% 57%;
+  --popover-border: 215 20% 16%;
+  --primary: 174 57% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 16% 20%;
+  --secondary-foreground: 210 11% 91%;
+  --muted: 220 22% 10%;
+  --muted-foreground: 215 16% 57%;
+  --accent: 177 13% 49%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --sidebar: 220 22% 10%;
+  --sidebar-foreground: 210 11% 91%;
+  --sidebar-border: 215 20% 16%;
+  --sidebar-primary: 174 57% 39%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 215 16% 20%;
+  --sidebar-accent-foreground: 210 11% 91%;
+  --sidebar-ring: 174 57% 39%;
+  --chart-1: 174 57% 39%;
+  --chart-2: 177 40% 55%;
+  --chart-3: 200 70% 50%;
+  --chart-4: 160 50% 45%;
+  --chart-5: 140 45% 42%;
 
-  --foreground: red; /*replace with H S L */
-
-  --border: red; /*replace with H S L */
-
-  --card: red; /*replace with H S L */
-
-  --card-foreground: red; /*replace with H S L */
-
-  --card-border: red; /*replace with H S L */
-
-  --sidebar: red; /*replace with H S L */
-
-  --sidebar-foreground: red; /*replace with H S L */
-
-  --sidebar-border: red; /*replace with H S L */
-
-  --sidebar-primary: red; /*replace with H S L */
-
-  --sidebar-primary-foreground: red; /*replace with H S L */
-
-  --sidebar-accent: red; /*replace with H S L */
-
-  --sidebar-accent-foreground: red; /*replace with H S L */
-
-  --sidebar-ring: red; /*replace with H S L */
-
-  --popover: red; /*replace with H S L */
-
-  --popover-foreground: red; /*replace with H S L */
-
-  --popover-border: red; /*replace with H S L */
-
-  --primary: red; /*replace with H S L */
-
-  --primary-foreground: red; /*replace with H S L */
-
-  --secondary: red; /*replace with H S L */
-
-  --secondary-foreground: red; /*replace with H S L */
-
-  --muted: red; /*replace with H S L */
-
-  --muted-foreground: red; /*replace with H S L */
-
-  --accent: red; /*replace with H S L */
-
-  --accent-foreground: red; /*replace with H S L */
-
-  --destructive: red; /*replace with H S L */
-
-  --destructive-foreground: red; /*replace with H S L */
-
-  /* Used as the border around inputs. Dark mode: Should be a border that is light enough to have high contrast when rendered on a --card background. More contrast than standard --border */
-  --input: red; /*replace with H S L */
-  --ring: red; /*replace with H S L */
-  --chart-1: red; /*replace with H S L */
-  --chart-2: red; /*replace with H S L */
-  --chart-3: red; /*replace with H S L */
-  --chart-4: red; /*replace with H S L */
-  --chart-5: red; /*replace with H S L */
-
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 2px 4px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 4px 6px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-
+  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
+  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
+  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 1px 2px -1px hsl(0 0% 0% / 0.20);
+  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 1px 2px -1px hsl(0 0% 0% / 0.20);
+  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 2px 4px -1px hsl(0 0% 0% / 0.20);
+  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 4px 6px -1px hsl(0 0% 0% / 0.20);
+  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 8px 10px -1px hsl(0 0% 0% / 0.20);
+  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
 }
+
 
 @layer base {
   * {
@@ -240,6 +210,10 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--app-font-heading);
   }
 }
 
