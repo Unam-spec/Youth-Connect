@@ -155,4 +155,51 @@ router.get("/qrcodes/:slug", async (req, res) => {
   }
 });
 
+
+router.post("/qrcodes/session", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+
+    // Allow both Clerk auth and x-leader-session header
+    let authorized = false;
+    if (auth?.userId) {
+      authorized = true;
+    } else {
+      const sessionHeader = req.headers["x-leader-session"];
+      if (typeof sessionHeader === "string") {
+        try {
+          const session: { profile_id?: string; expires_at?: number } = JSON.parse(sessionHeader);
+          if (session.profile_id && typeof session.expires_at === "number" && Date.now() < session.expires_at) {
+            authorized = true;
+          }
+        } catch { /* ignore */ }
+      }
+    }
+
+    if (!authorized) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Deactivate previous session QR codes
+    await db
+      .update(qrCodesTable)
+      .set({ active: false })
+      .where(and(eq(qrCodesTable.type, "leader"), eq(qrCodesTable.active, true)));
+
+    const [newQr] = await db
+      .insert(qrCodesTable)
+      .values({
+        slug: randomBytes(6).toString("hex"),
+        type: "leader",
+        active: true,
+      })
+      .returning();
+
+    return res.json(newQr);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
