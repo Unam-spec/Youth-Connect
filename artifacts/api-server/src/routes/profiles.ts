@@ -32,12 +32,34 @@ router.get("/profiles/me", async (req, res) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const profile = await db.query.profilesTable.findFirst({
+    let profile = await db.query.profilesTable.findFirst({
       where: eq(profilesTable.clerk_id, clerkId),
     });
 
+    // Auto-create a visitor profile for new Clerk users who don't have one yet.
+    // This happens when someone signs up via Clerk but hasn't completed first-timer registration.
+    // They get a placeholder profile they can then fill in, and can request membership.
     if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
+      // Try to get their name/email from Clerk auth object (populated by clerkMiddleware)
+      const clerkUser = (req as any).auth?.sessionClaims ?? {};
+      const firstName = clerkUser?.given_name ?? clerkUser?.first_name ?? "";
+      const lastName = clerkUser?.family_name ?? clerkUser?.last_name ?? "";
+      const fullName = [firstName, lastName].filter(Boolean).join(" ").trim() || "New Member";
+      const email = clerkUser?.email ?? null;
+
+      const [created] = await db
+        .insert(profilesTable)
+        .values({
+          clerk_id: clerkId,
+          full_name: fullName,
+          email: email,
+          role: "visitor",
+          gender: "other",
+          age: 0,
+          heard_from: "clerk_signup",
+        })
+        .returning();
+      profile = created;
     }
 
     return res.json(profile);
