@@ -225,6 +225,10 @@ router.get("/profiles", async (req, res) => {
         role: profilesTable.role,
         phone: profilesTable.phone,
         created_at: profilesTable.created_at,
+        can_create_events: profilesTable.can_create_events,
+        can_view_kpis: profilesTable.can_view_kpis,
+        can_view_members: profilesTable.can_view_members,
+        can_view_attendance: profilesTable.can_view_attendance,
       })
       .from(profilesTable)
       .where(whereClause)
