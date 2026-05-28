@@ -3,6 +3,7 @@ import { getAuth } from "@clerk/express";
 import { eq, and } from "drizzle-orm";
 import { db, rsvpsTable, eventsTable, profilesTable } from "@workspace/db";
 import { UpsertRsvpBody } from "@workspace/api-zod";
+import { sendEmail } from "../lib/twilio";
 
 const router = Router();
 
@@ -106,6 +107,10 @@ router.post("/rsvps/:eventId", async (req, res) => {
     if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
     }
+    // Fetch event for email confirmation
+    const event = await db.query.eventsTable.findFirst({
+      where: eq(eventsTable.id, req.params.eventId),
+    });
     const existing = await db.query.rsvpsTable.findFirst({
       where: and(
         eq(rsvpsTable.event_id, req.params.eventId),
