@@ -21,6 +21,7 @@ import MyDashboard from "@/pages/my";
 import BecomeMember from "@/pages/become-member";
 import Dashboard from "@/pages/dashboard";
 import LeaderQr from "@/pages/leader-qr";
+import SessionQr from "@/pages/session-qr";
 import QrResolver from "@/pages/qr-resolver";
 
 const queryClient = new QueryClient();
@@ -202,6 +203,7 @@ function ClerkProviderWithRoutes() {
           <Route path="/become-member" component={BecomeMember} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/leader-qr" component={LeaderQr} />
+          <Route path="/session-qr" component={SessionQr} />
           <Route path="/qr/:slug" component={QrResolver} />
 
           <Route path="/sign-in/*?" component={SignInPage} />

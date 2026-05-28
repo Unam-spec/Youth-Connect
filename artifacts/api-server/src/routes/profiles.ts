@@ -162,19 +162,30 @@ router.post("/profiles/register", async (req, res) => {
 router.get("/profiles", async (req, res) => {
   try {
     const auth = getAuth(req);
+    const hasLeaderSession = (() => {
+      try {
+        const h = req.headers["x-leader-session"];
+        if (!h) return false;
+        const s = JSON.parse(h as string);
+        return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
+      } catch { return false; }
+    })();
 
-    if (!auth?.userId) {
+    if (!auth?.userId && !hasLeaderSession) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const requester = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
-
-    if (
-      !requester ||
-      (requester.role !== "leader" && requester.role !== "super_admin")
-    ) {
+    // For Clerk-authenticated users, verify they are a leader/super_admin
+    if (auth?.userId) {
+      const requester = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, auth.userId),
+      });
+      if (!requester || (requester.role !== "leader" && requester.role !== "super_admin")) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+    }
+    // For leader-session users, the session itself proves authorization
+    if (false) { // dummy block to maintain structure
       return res.status(403).json({ error: "Forbidden" });
     }
 

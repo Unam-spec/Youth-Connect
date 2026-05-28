@@ -288,15 +288,18 @@ export default function Dashboard() {
       const res = await apiFetch("/api/qrcodes/session", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        setQrCodeUrl(`${window.location.origin}/checkin?session_id=${data.slug}`);
-        setShowSessionQrCodeDialog(true);
-        toast({ title: "Session QR code generated" });
+        const qrUrl = `${window.location.origin}/checkin?session_id=${data.slug}`;
+        setQrCodeUrl(qrUrl);
+        toast({ title: "Session QR generated — opening display page" });
+        // Navigate to the dedicated QR display page
+        window.location.href = `/session-qr?slug=${data.slug}`;
       } else {
-        const err = await res.json();
-        toast({ title: "Failed to generate QR code", description: err.error, variant: "destructive" });
+        let errMsg = "Failed to generate QR code";
+        try { const err = await res.json(); errMsg = err.error || errMsg; } catch {}
+        toast({ title: "Failed to generate QR code", description: errMsg, variant: "destructive" });
       }
     } catch {
-      toast({ title: "Failed to generate QR code", description: "Network error", variant: "destructive" });
+      toast({ title: "Failed to generate QR code", description: "Network error — check your connection", variant: "destructive" });
     } finally { setIsGeneratingQr(false); }
   };
 

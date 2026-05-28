@@ -35,6 +35,7 @@ import {
   MoonIcon,
 } from "lucide-react";
 import { QRCode as QRCodeDisplay } from "@/components/ui/qr-code";
+import { QRCodeSVG as QRCodeSVGInline } from "qrcode.react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,33 @@ function getCheckinWindowState(): WindowState {
   if (totalMins < start) return "before";
   if (totalMins >= end) return "after";
   return "open";
+}
+
+// ── Session QR Display (shown on check-in page) ─────────────────────────────
+
+function SessionQrDisplay() {
+  const [sessionUrl, setSessionUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check for session_id in URL
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    if (sessionId) {
+      setSessionUrl(`${window.location.origin}/checkin?session_id=${sessionId}`);
+    }
+  }, []);
+
+  if (!sessionUrl) return null;
+
+  return (
+    <div className="rounded-2xl border border-[#0A84FF]/20 bg-gradient-to-br from-[#0A84FF]/8 to-[#32ADE6]/5 p-5 flex flex-col items-center gap-4 mb-2">
+      <p className="text-sm font-semibold text-[#0A84FF]">Tonight's Session QR</p>
+      <div className="bg-white p-4 rounded-2xl shadow-sm">
+        <QRCodeSVGInline value={sessionUrl} size={200} />
+      </div>
+      <p className="text-xs text-muted-foreground text-center">Members can also scan this QR to check in</p>
+    </div>
+  );
 }
 
 // ── Time Window Banner ────────────────────────────────────────────────────────
@@ -519,6 +547,9 @@ export default function CheckIn() {
                 {errorMessage}
               </div>
             )}
+
+            {/* Live Session QR display */}
+            <SessionQrDisplay />
 
             {/* Mode picker */}
             {isSignedIn && (
