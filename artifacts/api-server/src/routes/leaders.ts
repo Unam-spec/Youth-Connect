@@ -193,4 +193,50 @@ router.post("/leaders/update-pin", async (req, res) => {
   }
 });
 
+
+router.post("/leaders/:profileId/set-pin", async (req, res) => {
+  try {
+    // Only super admins (via Clerk or leader session) can set another leader's PIN
+    const clerkAuth = getAuth(req);
+    let isSuperAdmin = false;
+
+    if (clerkAuth?.userId) {
+      const requester = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, clerkAuth.userId),
+      });
+      isSuperAdmin = requester?.role === "super_admin";
+    } else {
+      try {
+        const h = req.headers["x-leader-session"];
+        if (h) {
+          const s = JSON.parse(h as string);
+          if (typeof s?.expires_at === "number" && Date.now() < s.expires_at && s.role === "super_admin") {
+            isSuperAdmin = true;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+
+    if (!isSuperAdmin) return res.status(403).json({ error: "Super admin only" });
+
+    const { pin } = req.body;
+    if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+      return res.status(400).json({ error: "PIN must be exactly 4 digits" });
+    }
+
+    const pinHash = await bcrypt.hash(pin, 10);
+    const [updated] = await db
+      .update(profilesTable)
+      .set({ pin_hash: pinHash, pin_plain: pin })
+      .where(eq(profilesTable.id, req.params.profileId))
+      .returning({ id: profilesTable.id, full_name: profilesTable.full_name, pin_plain: profilesTable.pin_plain });
+
+    if (!updated) return res.status(404).json({ error: "Leader not found" });
+    return res.json({ success: true, ...updated });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
