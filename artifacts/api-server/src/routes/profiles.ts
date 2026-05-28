@@ -11,6 +11,16 @@ import {
 } from "@workspace/api-zod";
 import { z } from "zod"; // Import z for schema definition
 
+
+function hasLeaderSession(req: any): boolean {
+  try {
+    const h = req.headers["x-leader-session"];
+    if (!h) return false;
+    const s = JSON.parse(h as string);
+    return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
+  } catch { return false; }
+}
+
 const router = Router();
 
 router.get("/profiles/me", async (req, res) => {
@@ -78,8 +88,19 @@ router.get("/profiles/me/pin", async (req, res) => {
     const auth = getAuth(req);
     const clerkId = auth?.userId;
 
-    if (!clerkId) {
+    if (!clerkId && !hasLeaderSession(req)) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // For leader sessions, check pin from profile_id in session
+    if (!clerkId && hasLeaderSession(req)) {
+      const sessionStr = req.headers["x-leader-session"] as string;
+      const session = JSON.parse(sessionStr);
+      const profile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, session.profile_id),
+      });
+      if (!profile) return res.status(404).json({ error: "Profile not found" });
+      return res.json({ hasPIN: !!profile.pin_hash });
     }
 
     const profile = await db.query.profilesTable.findFirst({
@@ -102,8 +123,27 @@ router.patch("/profiles/me/pin", async (req, res) => {
     const auth = getAuth(req);
     const clerkId = auth?.userId;
 
-    if (!clerkId) {
+    if (!clerkId && !hasLeaderSession(req)) {
       return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // For leader sessions (PIN-based login), get profile from session
+    if (!clerkId && hasLeaderSession(req)) {
+      const sessionStr = req.headers["x-leader-session"] as string;
+      const session = JSON.parse(sessionStr);
+      const { pin } = req.body;
+      if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+        return res.status(400).json({ error: "PIN must be exactly 4 digits" });
+      }
+      const bcrypt = await import("bcrypt");
+      const pinHash = await bcrypt.hash(pin, 10);
+      const [updated] = await db
+        .update(profilesTable)
+        .set({ pin_hash: pinHash, pin_plain: pin })
+        .where(eq(profilesTable.id, session.profile_id))
+        .returning();
+      if (!updated) return res.status(404).json({ error: "Profile not found" });
+      return res.json({ success: true });
     }
 
     const { pin } = req.body;
@@ -380,14 +420,25 @@ router.patch("/profiles/:id/permissions", async (req, res) => {
   try {
     const auth = getAuth(req);
 
-    if (!auth?.userId) {
+    // Accept both Clerk JWT and leader session header
+    const isLeaderSess = hasLeaderSession(req);
+    if (!auth?.userId && !isLeaderSess) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Check if requester is super_admin
-    const requesterProfile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
+    // Verify requester is super_admin
+    let requesterProfile: any = null;
+    if (auth?.userId) {
+      requesterProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, auth.userId),
+      });
+    } else {
+      const sessionStr = req.headers["x-leader-session"] as string;
+      const session = JSON.parse(sessionStr);
+      requesterProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, session.profile_id),
+      });
+    }
 
     if (!requesterProfile || requesterProfile.role !== "super_admin") {
       return res.status(403).json({ error: "Forbidden" });
