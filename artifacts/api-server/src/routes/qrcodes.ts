@@ -7,9 +7,9 @@ import { RegenerateQrCodeBody } from "@workspace/api-zod";
 
 const router = Router();
 
-async function getActiveQr(type: "public" | "leader") {
+async function getActiveQr(type: "public" | "leader" | "session") {
   return db.query.qrCodesTable.findFirst({
-    where: and(eq(qrCodesTable.type, type), eq(qrCodesTable.active, true)),
+    where: and(eq(qrCodesTable.type, type as any), eq(qrCodesTable.active, true)),
   });
 }
 
@@ -52,6 +52,54 @@ router.get("/qrcodes/leader", async (req, res) => {
     await ensureDefaultQrCodes();
     const qr = await getActiveQr("leader");
     return res.json(qr);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /qrcodes/session — generates a fresh per-session QR code for check-in
+// Called by the leader dashboard "Generate Session QR" button.
+router.post("/qrcodes/session", async (req, res) => {
+  try {
+    // Allow both Clerk JWT and leader-session header auth
+    const auth = getAuth(req);
+    const leaderSessionHeader = req.headers["x-leader-session"];
+    let isAuthorized = !!auth?.userId;
+
+    if (!isAuthorized && leaderSessionHeader) {
+      try {
+        const session = JSON.parse(leaderSessionHeader as string);
+        if (session?.expires_at && Date.now() < session.expires_at) {
+          isAuthorized = true;
+        }
+      } catch {
+        // ignore malformed header
+      }
+    }
+
+    if (!isAuthorized) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // Deactivate any existing session QR codes
+    await db
+      .update(qrCodesTable)
+      .set({ active: false })
+      .where(and(eq(qrCodesTable.type, "session" as any), eq(qrCodesTable.active, true)));
+
+    // Create a fresh session QR
+    const slug = randomBytes(8).toString("hex");
+    const [newQr] = await db
+      .insert(qrCodesTable)
+      .values({
+        slug,
+        type: "session" as any,
+        active: true,
+      })
+      .returning();
+
+    return res.json({ slug: newQr.slug, type: newQr.type });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -101,38 +149,6 @@ router.get("/qrcodes/:slug", async (req, res) => {
     }
     const redirect_to = qr.type === "public" ? "/register" : "/leader-login";
     return res.json({ slug: qr.slug, type: qr.type, redirect_to });
-  } catch (err) {
-    req.log.error(err);
-    return res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-
-router.post("/qrcodes/session", async (req, res) => {
-  try {
-    const auth = getAuth(req);
-    const leaderSession = req.headers["x-leader-session"];
-
-    if (!auth?.userId && !leaderSession) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    // Deactivate existing session QR codes
-    await db
-      .update(qrCodesTable)
-      .set({ active: false })
-      .where(and(eq(qrCodesTable.type, "session"), eq(qrCodesTable.active, true)));
-
-    const [newQr] = await db
-      .insert(qrCodesTable)
-      .values({
-        slug: randomBytes(8).toString("hex"),
-        type: "session",
-        active: true,
-      })
-      .returning();
-
-    return res.json({ slug: newQr.slug, type: newQr.type });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
