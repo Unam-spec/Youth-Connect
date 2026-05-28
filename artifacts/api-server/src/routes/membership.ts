@@ -10,7 +10,15 @@ const router = Router();
 router.get("/membership-requests", async (req, res) => {
   try {
     const auth = getAuth(req);
-    if (!auth?.userId) {
+    const hasLeaderSess = (() => {
+      try {
+        const h = req.headers["x-leader-session"];
+        if (!h) return false;
+        const s = JSON.parse(h as string);
+        return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
+      } catch { return false; }
+    })();
+    if (!auth?.userId && !hasLeaderSess) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
@@ -79,12 +87,28 @@ router.post("/membership-requests", async (req, res) => {
 router.post("/membership-requests/:id/approve", async (req, res) => {
   try {
     const auth = getAuth(req);
-    if (!auth?.userId) {
+    const hasLeaderSess = (() => {
+      try {
+        const h = req.headers["x-leader-session"];
+        if (!h) return false;
+        const s = JSON.parse(h as string);
+        return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
+      } catch { return false; }
+    })();
+    if (!auth?.userId && !hasLeaderSess) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const reviewerProfile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
+    let reviewerProfile: any = null;
+    if (auth?.userId) {
+      reviewerProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, auth.userId),
+      });
+    } else {
+      const s = JSON.parse(req.headers["x-leader-session"] as string);
+      reviewerProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, s.profile_id),
+      });
+    }
     const [updated] = await db
       .update(membershipRequestsTable)
       .set({ status: "approved", reviewed_by: reviewerProfile?.id ?? null })
@@ -121,12 +145,28 @@ router.post("/membership-requests/:id/approve", async (req, res) => {
 router.post("/membership-requests/:id/reject", async (req, res) => {
   try {
     const auth = getAuth(req);
-    if (!auth?.userId) {
+    const hasLeaderSess = (() => {
+      try {
+        const h = req.headers["x-leader-session"];
+        if (!h) return false;
+        const s = JSON.parse(h as string);
+        return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
+      } catch { return false; }
+    })();
+    if (!auth?.userId && !hasLeaderSess) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const reviewerProfile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
+    let reviewerProfile: any = null;
+    if (auth?.userId) {
+      reviewerProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, auth.userId),
+      });
+    } else {
+      const s = JSON.parse(req.headers["x-leader-session"] as string);
+      reviewerProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, s.profile_id),
+      });
+    }
     const [updated] = await db
       .update(membershipRequestsTable)
       .set({ status: "rejected", reviewed_by: reviewerProfile?.id ?? null })
