@@ -2,6 +2,7 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
+  "packageManager": "pnpm@10.11.0",
   "scripts": {
     "dev": "concurrently \"pnpm --filter @workspace/api-server dev\" \"pnpm --filter @workspace/jg-youth dev\"",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
