@@ -26,29 +26,39 @@ function isAuthorized(req: any): boolean {
 router.get("/leaders", async (req, res) => {
   try {
     if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
-    const leaders = await db
+    // Query profilesTable directly — leaders may not have a leaderPermissionsTable row
+    // (e.g. promoted via role change rather than through the /leaders POST endpoint)
+    const { inArray } = await import("drizzle-orm");
+    const leaderProfiles = await db
       .select({
-        profile_id: leaderPermissionsTable.profile_id,
-        can_create_events: leaderPermissionsTable.can_create_events,
-        can_manage_members: leaderPermissionsTable.can_manage_members,
-        can_view_kpis: leaderPermissionsTable.can_view_kpis,
-        can_approve_membership: leaderPermissionsTable.can_approve_membership,
-        profile: {
-          id: profilesTable.id,
-          full_name: profilesTable.full_name,
-          role: profilesTable.role,
-          phone: profilesTable.phone,
-          email: profilesTable.email,
-          gender: profilesTable.gender,
-          age: profilesTable.age,
-          heard_from: profilesTable.heard_from,
-          clerk_id: profilesTable.clerk_id,
-          created_at: profilesTable.created_at,
-        },
+        id: profilesTable.id,
+        full_name: profilesTable.full_name,
+        role: profilesTable.role,
+        phone: profilesTable.phone,
+        email: profilesTable.email,
+        pin_plain: profilesTable.pin_plain,
+        can_create_events: profilesTable.can_create_events,
+        can_view_kpis: profilesTable.can_view_kpis,
+        can_view_members: profilesTable.can_view_members,
+        can_view_attendance: profilesTable.can_view_attendance,
+        created_at: profilesTable.created_at,
       })
-      .from(leaderPermissionsTable)
-      .leftJoin(profilesTable, eq(leaderPermissionsTable.profile_id, profilesTable.id));
-    return res.json(leaders);
+      .from(profilesTable)
+      .where(inArray(profilesTable.role, ["leader", "super_admin"]));
+
+    // Shape into the format the frontend expects: { profile_id, profile, can_* }
+    const shaped = leaderProfiles.map(p => ({
+      profile_id: p.id,
+      can_create_events: p.can_create_events ?? false,
+      can_manage_members: p.can_view_members ?? false,
+      can_view_kpis: p.can_view_kpis ?? false,
+      can_view_members: p.can_view_members ?? false,
+      can_view_attendance: p.can_view_attendance ?? false,
+      can_approve_membership: false,
+      profile: p,
+    }));
+
+    return res.json(shaped);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -145,6 +155,7 @@ router.post("/leaders/verify-pin", async (req, res) => {
 router.get("/leaders/pins", async (req, res) => {
   try {
     if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
+    const { inArray } = await import("drizzle-orm");
     const leaders = await db
       .select({
         id: profilesTable.id,
@@ -153,7 +164,7 @@ router.get("/leaders/pins", async (req, res) => {
         pin_plain: profilesTable.pin_plain,
       })
       .from(profilesTable)
-      .where(eq(profilesTable.role, "leader"));
+      .where(inArray(profilesTable.role, ["leader", "super_admin"]));
     return res.json(leaders);
   } catch (err) {
     req.log.error(err);
