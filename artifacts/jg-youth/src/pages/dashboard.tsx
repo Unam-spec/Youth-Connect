@@ -84,7 +84,7 @@ function useApiFetch() {
       };
       try {
         const token = await getToken();
-        if (token) headers["Authorization"] = ;
+        if (token) headers["Authorization"] = `Bearer ${token}`;
       } catch { /* ignore */ }
       try {
         const sessionStr = localStorage.getItem("jg_leader_session");
@@ -125,6 +125,8 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const apiFetch = useApiFetch();
+
+  // ── All useState first ───────────────────────────────────────────────────
   const [search, setSearch] = useState("");
   const [deleteEventId, setDeleteEventId] = useState<string | null>(null);
   const [deleteEventName, setDeleteEventName] = useState<string | null>(null);
@@ -160,7 +162,7 @@ export default function Dashboard() {
     is_public: true,
   });
 
-  // ── ALL hooks declared first ──────────────────────────────────────────────
+  // ── All react-query hooks ────────────────────────────────────────────────
   const { data: kpis, isLoading: isKpisLoading, refetch: refetchKpis } = useGetDashboardKpis({
     query: { queryKey: getGetDashboardKpisQueryKey() },
   });
@@ -170,7 +172,12 @@ export default function Dashboard() {
   const { data: attendance, isLoading: isAttendanceLoading } = useGetTodayAttendance({
     query: { queryKey: getGetTodayAttendanceQueryKey() },
   });
-  const { data: profiles, isLoading: isProfilesLoading, isError: isProfilesError, refetch: refetchProfiles } = useListProfiles(
+  const {
+    data: profiles,
+    isLoading: isProfilesLoading,
+    isError: isProfilesError,
+    refetch: refetchProfiles,
+  } = useListProfiles(
     search ? { search } : undefined,
     { query: { queryKey: getListProfilesQueryKey(search ? { search } : undefined) } },
   );
@@ -188,7 +195,43 @@ export default function Dashboard() {
   const approveRequest = useApproveMembershipRequest();
   const rejectRequest = useRejectMembershipRequest();
 
-  // ── All useEffects after all hooks ────────────────────────────────────────
+  // ── Callbacks (stable refs, safe before useEffect) ───────────────────────
+  const fetchHasPin = useCallback(async () => {
+    try {
+      const res = await apiFetch("/api/profiles/me/pin");
+      if (res.ok) {
+        const data = await res.json();
+        setHasPin(data.hasPIN);
+      }
+    } catch { /* ignore */ }
+  }, [apiFetch]);
+
+  const fetchRsvps = useCallback(async () => {
+    if (!selectedEventId) { setRsvps([]); return; }
+    setIsRsvpsLoading(true);
+    try {
+      const res = await apiFetch(`/api/rsvps?event_id=${selectedEventId}`);
+      if (res.ok) setRsvps(await res.json());
+    } catch { /* ignore */ } finally { setIsRsvpsLoading(false); }
+  }, [apiFetch, selectedEventId]);
+
+  const fetchPendingCheckIns = useCallback(async () => {
+    setIsPendingLoading(true);
+    try {
+      const res = await apiFetch("/api/checkin/requests?status=pending");
+      if (res.ok) setPendingCheckIns(await res.json());
+    } catch { /* ignore */ } finally { setIsPendingLoading(false); }
+  }, [apiFetch]);
+
+  const fetchLeaderPins = useCallback(async () => {
+    setIsLeaderPinsLoading(true);
+    try {
+      const res = await apiFetch("/api/leaders/pins");
+      if (res.ok) setLeaderPins(await res.json());
+    } catch { /* ignore */ } finally { setIsLeaderPinsLoading(false); }
+  }, [apiFetch]);
+
+  // ── All useEffects ───────────────────────────────────────────────────────
   useEffect(() => {
     if (!isKpisLoading && kpis) setKpisUpdatedAt(new Date().toLocaleTimeString());
   }, [isKpisLoading, kpis]);
@@ -201,7 +244,6 @@ export default function Dashboard() {
     return () => clearInterval(id);
   }, [refetchKpis]);
 
-  // Auto-select most recent event for RSVPs — safe now because events is declared above
   useEffect(() => {
     if (events && events.length > 0 && !selectedEventId) {
       const sorted = [...events].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -213,36 +255,8 @@ export default function Dashboard() {
     if (showPinDialog) setPin("");
   }, [showPinDialog]);
 
-  const fetchHasPin = useCallback(async () => {
-    try {
-      const res = await apiFetch("/api/profiles/me/pin");
-      if (res.ok) {
-        const data = await res.json();
-        setHasPin(data.hasPIN);
-      }
-    } catch { /* ignore */ }
-  }, [apiFetch]);
-
   useEffect(() => { fetchHasPin(); }, [fetchHasPin]);
-
-  const fetchRsvps = useCallback(async () => {
-    if (!selectedEventId) { setRsvps([]); return; }
-    setIsRsvpsLoading(true);
-    try {
-      const res = await apiFetch();
-      if (res.ok) setRsvps(await res.json());
-    } catch { /* ignore */ } finally { setIsRsvpsLoading(false); }
-  }, [apiFetch, selectedEventId]);
-
   useEffect(() => { fetchRsvps(); }, [fetchRsvps]);
-
-  const fetchPendingCheckIns = useCallback(async () => {
-    setIsPendingLoading(true);
-    try {
-      const res = await apiFetch("/api/checkin/requests?status=pending");
-      if (res.ok) setPendingCheckIns(await res.json());
-    } catch { /* ignore */ } finally { setIsPendingLoading(false); }
-  }, [apiFetch]);
 
   useEffect(() => {
     fetchPendingCheckIns();
@@ -250,20 +264,12 @@ export default function Dashboard() {
     return () => { if (pendingIntervalRef.current) clearInterval(pendingIntervalRef.current); };
   }, [fetchPendingCheckIns]);
 
-  const fetchLeaderPins = useCallback(async () => {
-    setIsLeaderPinsLoading(true);
-    try {
-      const res = await apiFetch("/api/leaders/pins");
-      if (res.ok) setLeaderPins(await res.json());
-    } catch { /* ignore */ } finally { setIsLeaderPinsLoading(false); }
-  }, [apiFetch]);
-
   const membersForCheckIn = useMemo(
     () => profiles?.filter((p: any) => p.role === "member" || p.role === "visitor") ?? [],
     [profiles],
   );
 
-  // ── Guard: must be after ALL hooks ────────────────────────────────────────
+  // ── Guard: must come after ALL hooks ─────────────────────────────────────
   if (!session) return <Redirect to="/leader-login" />;
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -282,7 +288,7 @@ export default function Dashboard() {
       const res = await apiFetch("/api/qrcodes/session", { method: "POST" });
       if (res.ok) {
         const data = await res.json();
-        setQrCodeUrl();
+        setQrCodeUrl(`${window.location.origin}/checkin?session_id=${data.slug}`);
         setShowSessionQrCodeDialog(true);
         toast({ title: "Session QR code generated" });
       } else {
@@ -300,7 +306,19 @@ export default function Dashboard() {
       return;
     }
     createEvent.mutate(
-      { data: { title: eventForm.title, description: eventForm.description || undefined, date: eventForm.date, time: eventForm.time, location: eventForm.location, age_min: eventForm.age_min ? Number(eventForm.age_min) : null, age_max: eventForm.age_max ? Number(eventForm.age_max) : null, custom_requirements: [], is_public: eventForm.is_public } },
+      {
+        data: {
+          title: eventForm.title,
+          description: eventForm.description || undefined,
+          date: eventForm.date,
+          time: eventForm.time,
+          location: eventForm.location,
+          age_min: eventForm.age_min ? Number(eventForm.age_min) : null,
+          age_max: eventForm.age_max ? Number(eventForm.age_max) : null,
+          custom_requirements: [],
+          is_public: eventForm.is_public,
+        },
+      },
       {
         onSuccess: () => {
           setEventForm({ title: "", description: "", date: today, time: "18:00", location: "", age_min: "", age_max: "", is_public: true });
@@ -315,7 +333,7 @@ export default function Dashboard() {
   async function handleDeleteEvent() {
     if (!deleteEventId) return;
     try {
-      const res = await apiFetch(, { method: "DELETE" });
+      const res = await apiFetch(`/api/events/${deleteEventId}`, { method: "DELETE" });
       if (!res.ok) {
         const err = await res.json();
         toast({ title: "Delete failed", description: err.error, variant: "destructive" });
@@ -326,7 +344,7 @@ export default function Dashboard() {
       setDeleteEventName(null);
       refreshDashboard();
     } catch {
-      toast({ title: "Delete failed", description: "An error occurred", variant: "destructive" });
+      toast({ title: "Delete failed", variant: "destructive" });
     }
   }
 
@@ -339,14 +357,14 @@ export default function Dashboard() {
       return prev.map((p: any) => p.id === profile.id ? { ...p, role: targetRole } : p);
     });
     try {
-      const res = await apiFetch(, { method: "PATCH", body: JSON.stringify({ role: targetRole }) });
+      const res = await apiFetch(`/api/profiles/${profile.id}/role`, { method: "PATCH", body: JSON.stringify({ role: targetRole }) });
       if (!res.ok) {
         const err = await res.json();
         toast({ title: "Failed to update role", description: err.error, variant: "destructive" });
         refreshDashboard();
         return;
       }
-      toast({ title: "Role updated", description:  });
+      toast({ title: "Role updated", description: `${profile.full_name} is now ${targetRole.replace("_", " ")}` });
       refreshDashboard();
     } catch {
       toast({ title: "Failed to update role", variant: "destructive" });
@@ -374,7 +392,7 @@ export default function Dashboard() {
   async function handlePermissionChange(profileId: string, permissionKey: keyof LeaderSession, newValue: boolean) {
     setIsUpdatingPermissions(true);
     try {
-      const res = await apiFetch(, { method: "PATCH", body: JSON.stringify({ [permissionKey]: newValue }) });
+      const res = await apiFetch(`/api/profiles/${profileId}/permissions`, { method: "PATCH", body: JSON.stringify({ [permissionKey]: newValue }) });
       if (!res.ok) {
         const err = await res.json();
         toast({ title: "Failed to update permissions", description: err.error, variant: "destructive" });
@@ -408,7 +426,7 @@ export default function Dashboard() {
 
   async function handleApproveCheckIn(requestId: string) {
     try {
-      const res = await apiFetch(, { method: "PATCH" });
+      const res = await apiFetch(`/api/checkin/requests/${requestId}/approve`, { method: "PATCH" });
       if (!res.ok) { const err = await res.json(); toast({ title: "Approval failed", description: err.error, variant: "destructive" }); return; }
       toast({ title: "Check-in approved" });
       setPendingCheckIns(prev => prev.filter(r => r.id !== requestId));
@@ -418,7 +436,7 @@ export default function Dashboard() {
 
   async function handleRejectCheckIn(requestId: string) {
     try {
-      const res = await apiFetch(, { method: "PATCH" });
+      const res = await apiFetch(`/api/checkin/requests/${requestId}/reject`, { method: "PATCH" });
       if (!res.ok) { const err = await res.json(); toast({ title: "Rejection failed", description: err.error, variant: "destructive" }); return; }
       toast({ title: "Check-in rejected" });
       setPendingCheckIns(prev => prev.filter(r => r.id !== requestId));
@@ -431,7 +449,7 @@ export default function Dashboard() {
 
   const superAdminCount = profiles?.filter((p: any) => p.role === "super_admin").length ?? 0;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <Layout>
       <div className="space-y-6 pb-8">
@@ -464,17 +482,17 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Today's Check-ins summary banner */}
+        {/* Today's Check-ins banner */}
         {session.can_view_attendance && (
-          <div className="rounded-xl border border-blue-500/20 bg-blue-500/5 p-4">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold text-blue-400">Today's Check-ins</h2>
-              <span className="text-2xl font-bold text-blue-400">{isAttendanceLoading ? "—" : (attendance?.length ?? 0)}</span>
+          <div className="rounded-xl border border-teal-500/20 bg-teal-500/5 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-teal-400">Today's Check-ins</h2>
+              <span className="text-2xl font-bold text-teal-400">{isAttendanceLoading ? "—" : (attendance?.length ?? 0)}</span>
             </div>
             {isAttendanceLoading ? <Skeleton className="h-8 w-full" /> : attendance && attendance.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
-                {attendance.slice(0, 8).map((record: any) => (
-                  <span key={record.id ?? record.profile?.id} className="text-xs px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-medium">
+                {attendance.slice(0, 8).map((record: any, i: number) => (
+                  <span key={record.id ?? i} className="text-xs px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 font-medium">
                     {record.profile?.full_name ?? "Unknown"}
                   </span>
                 ))}
@@ -522,7 +540,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <SectionTitle title="Pending Check-in Approvals" />
               <Button variant="ghost" size="sm" onClick={fetchPendingCheckIns} disabled={isPendingLoading} className="text-muted-foreground">
-                <RefreshCw className={} /> Refresh
+                <RefreshCw className={`w-4 h-4 mr-1.5 ${isPendingLoading ? "animate-spin" : ""}`} /> Refresh
               </Button>
             </div>
             <p className="text-xs text-muted-foreground mb-4">Auto-refreshes every 30s. First-timers are labelled <span className="font-medium text-foreground">visitor</span>.</p>
@@ -595,12 +613,12 @@ export default function Dashboard() {
                             ].map(({ key, label }) => (
                               <div key={key} className="flex items-center space-x-2">
                                 <Switch
-                                  id={}
+                                  id={`${key}-${profile.id}`}
                                   checked={profile[key]}
                                   onCheckedChange={checked => handlePermissionChange(profile.id, key as keyof LeaderSession, checked)}
                                   disabled={isUpdatingPermissions}
                                 />
-                                <Label htmlFor={}>{label}</Label>
+                                <Label htmlFor={`${key}-${profile.id}`}>{label}</Label>
                               </div>
                             ))}
                             <Button size="sm" onClick={() => setRoleConfirm({ profile, targetRole: "super_admin" })}>Make Super Admin</Button>
@@ -684,7 +702,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-4">
                 <SectionTitle title="Event RSVPs" />
                 <Button variant="ghost" size="sm" onClick={fetchRsvps} disabled={isRsvpsLoading} className="text-muted-foreground">
-                  <RefreshCw className={} /> Refresh
+                  <RefreshCw className={`w-4 h-4 mr-1.5 ${isRsvpsLoading ? "animate-spin" : ""}`} /> Refresh
                 </Button>
               </div>
               <div className="mb-4">
@@ -702,7 +720,7 @@ export default function Dashboard() {
                     </CardHeader>
                     <CardContent className="pt-4">
                       {isRsvpsLoading ? <Skeleton className="h-20 w-full" /> : rsvps.filter((r: any) => r.status === "going").length > 0 ? (
-                        <SimpleTable headers={["Name", "RSVP Date"]} rows={rsvps.filter((r: any) => r.status === "going").map((rsvp: any) => [rsvp.member_name, format(new Date(rsvp.created_at), "MMM d HH:mm")])} />
+                        <SimpleTable headers={["Name", "Date"]} rows={rsvps.filter((r: any) => r.status === "going").map((rsvp: any) => [rsvp.member_name, format(new Date(rsvp.created_at), "MMM d HH:mm")])} />
                       ) : <EmptyLine text="No responses yet." />}
                     </CardContent>
                   </Card>
@@ -712,7 +730,7 @@ export default function Dashboard() {
                     </CardHeader>
                     <CardContent className="pt-4">
                       {isRsvpsLoading ? <Skeleton className="h-20 w-full" /> : rsvps.filter((r: any) => r.status === "not_going").length > 0 ? (
-                        <SimpleTable headers={["Name", "RSVP Date"]} rows={rsvps.filter((r: any) => r.status === "not_going").map((rsvp: any) => [rsvp.member_name, format(new Date(rsvp.created_at), "MMM d HH:mm")])} />
+                        <SimpleTable headers={["Name", "Date"]} rows={rsvps.filter((r: any) => r.status === "not_going").map((rsvp: any) => [rsvp.member_name, format(new Date(rsvp.created_at), "MMM d HH:mm")])} />
                       ) : <EmptyLine text="No responses yet." />}
                     </CardContent>
                   </Card>
@@ -751,7 +769,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-4">
                 <SectionTitle title="Leader PINs" />
                 <Button variant="ghost" size="sm" onClick={fetchLeaderPins} disabled={isLeaderPinsLoading} className="text-muted-foreground">
-                  <RefreshCw className={} /> Refresh
+                  <RefreshCw className={`w-4 h-4 mr-1.5 ${isLeaderPinsLoading ? "animate-spin" : ""}`} /> Refresh
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mb-4">Visible to super admins only.</p>
@@ -788,7 +806,7 @@ export default function Dashboard() {
               ) : (
                 <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
                   <ShieldAlert className="mb-2 h-5 w-5" />
-                  No leaders found or PINs not set yet. Click Refresh to load.
+                  No leaders found or PINs not set. Click Refresh to load.
                 </div>
               )}
             </TabsContent>
@@ -813,16 +831,11 @@ export default function Dashboard() {
                     ))}
                   </div>
                   <div className="border-t pt-4">
-                    <SectionTitle title="Your PIN" />
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{hasPin ? "PIN is set" : "No PIN set"}</p>
-                        <p className="text-xs text-muted-foreground">Used for leader authentication</p>
-                      </div>
-                      <Button variant="outline" size="sm" onClick={() => setShowPinDialog(true)}>
-                        {hasPin ? "Change PIN" : "Set PIN"}
-                      </Button>
-                    </div>
+                    <p className="text-sm font-medium mb-1">Your PIN</p>
+                    <p className="text-xs text-muted-foreground mb-3">{hasPin ? "PIN is set — used for leader authentication." : "No PIN set yet."}</p>
+                    <Button variant="outline" size="sm" onClick={() => setShowPinDialog(true)}>
+                      {hasPin ? "Change PIN" : "Set PIN"}
+                    </Button>
                   </div>
                 </div>
               )}
@@ -834,7 +847,7 @@ export default function Dashboard() {
             <TabsContent value="channel" className="p-4 border rounded-xl mt-4 bg-card">
               <SectionTitle title="Leader Channel" />
               <div className="rounded-lg border border-dashed p-8 text-center">
-                <p className="text-sm text-muted-foreground">A private channel for leaders is coming soon.</p>
+                <p className="text-sm text-muted-foreground">A private channel for leaders is on its way.</p>
               </div>
             </TabsContent>
           )}
@@ -846,7 +859,7 @@ export default function Dashboard() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Scan for Session Check-in</DialogTitle>
-            <DialogDescription>Members and visitors scan this to check in.</DialogDescription>
+            <DialogDescription>Members and visitors scan this to check in tonight.</DialogDescription>
           </DialogHeader>
           <div className="flex justify-center p-4">
             {qrCodeUrl ? <QRCodeSVG value={qrCodeUrl} size={256} level="H" includeMargin /> : <p>Generating...</p>}
@@ -874,7 +887,9 @@ export default function Dashboard() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Change Role</AlertDialogTitle>
-            <AlertDialogDescription>Promote <strong>{roleConfirm?.profile?.full_name}</strong> to <strong>{roleConfirm?.targetRole.replace("_", " ")}</strong>?</AlertDialogDescription>
+            <AlertDialogDescription>
+              Promote <strong>{roleConfirm?.profile?.full_name}</strong> to <strong>{roleConfirm?.targetRole.replace("_", " ")}</strong>?
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -903,7 +918,7 @@ export default function Dashboard() {
   );
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 function RoleBadge({ role }: { role: string }) {
   let classes = "";
@@ -916,7 +931,13 @@ function RoleBadge({ role }: { role: string }) {
   return <Badge className={classes} variant="outline">{role.replace("_", " ")}</Badge>;
 }
 
-function KpiCard({ title, value, loading, icon, lastUpdated }: { title: string; value?: number; loading: boolean; icon: ReactNode; lastUpdated?: string | null }) {
+function KpiCard({ title, value, loading, icon, lastUpdated }: {
+  title: string;
+  value?: number;
+  loading: boolean;
+  icon: ReactNode;
+  lastUpdated?: string | null;
+}) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -924,7 +945,9 @@ function KpiCard({ title, value, loading, icon, lastUpdated }: { title: string; 
         {icon}
       </CardHeader>
       <CardContent>
-        {loading ? <><Skeleton className="h-7 w-16" /><Skeleton className="mt-1.5 h-3 w-28" /></> : (
+        {loading ? (
+          <><Skeleton className="h-7 w-16" /><Skeleton className="mt-1.5 h-3 w-28" /></>
+        ) : (
           <><div className="text-2xl font-bold">{value ?? 0}</div>{lastUpdated && <p className="mt-1 text-xs text-muted-foreground">Updated {lastUpdated}</p>}</>
         )}
       </CardContent>
@@ -950,7 +973,7 @@ function SimpleTable({ headers, rows }: { headers: string[]; rows: (string | Rea
         <tbody>
           {rows.map((row, i) => (
             <tr key={i} className="border-t">
-              {row.map((cell, j) => <td key={} className="px-3 py-2">{cell}</td>)}
+              {row.map((cell, j) => <td key={`${i}-${j}`} className="px-3 py-2">{cell}</td>)}
             </tr>
           ))}
         </tbody>
