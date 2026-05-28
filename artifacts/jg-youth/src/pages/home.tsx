@@ -1,23 +1,40 @@
-import { Show, useUser } from "@clerk/react";
+import { useState } from "react";
+import { useUser } from "@clerk/react";
 import { Link, useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Clock, ArrowRight, UserPlus, LogIn, ClipboardCheck } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, ClipboardCheck, Users, UserCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
 
 function PublicHome() {
-  const { data: kpis, isLoading: isKpisLoading } = useGetDashboardKpis({ query: { enabled: true, queryKey: getGetDashboardKpisQueryKey() } });
-  const { data: events, isLoading: isEventsLoading } = useListEvents({ public_only: true, upcoming: true }, { query: { enabled: true, queryKey: getListEventsQueryKey({ public_only: true, upcoming: true }) } });
+  const [, setLocation] = useLocation();
+  const [showLoginChoice, setShowLoginChoice] = useState(false);
+
+  const { data: kpis, isLoading: isKpisLoading } = useGetDashboardKpis({
+    query: { enabled: true, queryKey: getGetDashboardKpisQueryKey() },
+  });
+  const { data: events, isLoading: isEventsLoading } = useListEvents(
+    { public_only: true, upcoming: true },
+    { query: { enabled: true, queryKey: getListEventsQueryKey({ public_only: true, upcoming: true }) } },
+  );
 
   return (
     <Layout>
       <div className="flex flex-col gap-16 pb-16">
+        {/* Hero */}
         <section className="pt-16 pb-12 flex flex-col items-center text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-primary/15 text-primary hover:bg-primary/20 mb-6">
+          <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-primary/15 text-primary border-transparent mb-6">
             Jeremiah Generation AFM
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-4">
@@ -39,22 +56,30 @@ function PublicHome() {
                 Self Check-In
               </Button>
             </Link>
-            <Link href="/sign-in">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto h-12 px-8 text-base">
-                <LogIn className="mr-2 h-5 w-5" />
-                Login
-              </Button>
-            </Link>
+            <Button
+              size="lg"
+              variant="outline"
+              className="w-full sm:w-auto h-12 px-8 text-base"
+              onClick={() => setShowLoginChoice(true)}
+            >
+              <LogIn className="mr-2 h-5 w-5" />
+              Login
+            </Button>
           </div>
         </section>
 
+        {/* KPIs */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-card/50 backdrop-blur">
             <CardHeader className="pb-2">
               <CardDescription>Total Members</CardDescription>
             </CardHeader>
             <CardContent>
-              {isKpisLoading ? <Skeleton className="h-10 w-24" /> : <div className="text-4xl font-bold">{kpis?.total_members || 0}</div>}
+              {isKpisLoading ? (
+                <Skeleton className="h-10 w-24" />
+              ) : (
+                <div className="text-4xl font-bold">{kpis?.total_members || 0}</div>
+              )}
             </CardContent>
           </Card>
           <Card className="bg-card/50 backdrop-blur border-primary/20">
@@ -62,7 +87,11 @@ function PublicHome() {
               <CardDescription className="text-primary font-medium">Today's Visitors</CardDescription>
             </CardHeader>
             <CardContent>
-              {isKpisLoading ? <Skeleton className="h-10 w-24" /> : <div className="text-4xl font-bold text-primary">{kpis?.today_new_visitors || 0}</div>}
+              {isKpisLoading ? (
+                <Skeleton className="h-10 w-24" />
+              ) : (
+                <div className="text-4xl font-bold text-primary">{kpis?.today_new_visitors || 0}</div>
+              )}
             </CardContent>
           </Card>
           <Card className="bg-card/50 backdrop-blur">
@@ -70,16 +99,20 @@ function PublicHome() {
               <CardDescription>Today's Attendance</CardDescription>
             </CardHeader>
             <CardContent>
-              {isKpisLoading ? <Skeleton className="h-10 w-24" /> : <div className="text-4xl font-bold">{kpis?.today_attendance || 0}</div>}
+              {isKpisLoading ? (
+                <Skeleton className="h-10 w-24" />
+              ) : (
+                <div className="text-4xl font-bold">{kpis?.today_attendance || 0}</div>
+              )}
             </CardContent>
           </Card>
         </section>
 
+        {/* Events */}
         <section>
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold tracking-tight">Upcoming Public Events</h2>
           </div>
-          
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {isEventsLoading ? (
               Array.from({ length: 3 }).map((_, i) => (
@@ -133,13 +166,41 @@ function PublicHome() {
           </div>
         </section>
       </div>
+
+      {/* Login choice dialog */}
+      <Dialog open={showLoginChoice} onOpenChange={setShowLoginChoice}>
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Welcome back!</DialogTitle>
+            <DialogDescription>
+              Are you an existing member or visiting for the first time?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              className="w-full h-12 rounded-xl bg-gradient-to-r from-[#0A84FF] to-[#32ADE6] hover:opacity-90 border-0"
+              onClick={() => { setShowLoginChoice(false); setLocation("/sign-in"); }}
+            >
+              <UserCheck className="w-4 h-4 mr-2" />
+              I'm a Member — Sign In
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full h-12 rounded-xl"
+              onClick={() => { setShowLoginChoice(false); setLocation("/register"); }}
+            >
+              <Users className="w-4 h-4 mr-2" />
+              First Timer — Register
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
 
 export default function Home() {
   const { user, isLoaded } = useUser();
-  const [location, setLocation] = useLocation();
 
   if (!isLoaded) {
     return (
