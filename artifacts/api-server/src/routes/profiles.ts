@@ -409,6 +409,21 @@ router.patch("/profiles/:id/role", async (req, res) => {
       return res.status(404).json({ error: "Profile not found" });
     }
 
+    // When promoting to leader, ensure a leaderPermissionsTable row exists
+    if (role === "leader") {
+      const { leaderPermissionsTable } = await import("@workspace/db");
+      await db
+        .insert(leaderPermissionsTable)
+        .values({
+          profile_id: req.params.id,
+          can_create_events: false,
+          can_manage_members: false,
+          can_view_kpis: false,
+          can_approve_membership: false,
+        })
+        .onConflictDoNothing();
+    }
+
     return res.json(updated);
   } catch (err) {
     req.log.error(err);
