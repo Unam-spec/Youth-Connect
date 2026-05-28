@@ -827,7 +827,40 @@ export default function Dashboard() {
           </div>
         )}
 
-        <Tabs defaultValue="attendance" className="mt-8">
+        {/* ── Today's Check-ins summary ──────────────────────────────────── */}
+        {session.can_view_attendance && (
+          <div className="rounded-2xl border border-[#0A84FF]/20 bg-gradient-to-br from-[#0A84FF]/8 to-[#32ADE6]/5 p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-base font-semibold text-[#0A84FF]">Today's Check-ins</h2>
+              <span className="text-2xl font-bold text-[#0A84FF]">
+                {isAttendanceLoading ? "—" : (attendance?.length ?? 0)}
+              </span>
+            </div>
+            {isAttendanceLoading ? (
+              <Skeleton className="h-10 w-full" />
+            ) : attendance && attendance.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {attendance.slice(0, 6).map((record: any) => (
+                  <span key={record.id ?? record.profile?.id} className="text-xs px-2.5 py-1 rounded-full bg-[#0A84FF]/10 text-[#0A84FF] font-medium">
+                    {record.profile?.full_name ?? "Unknown"}
+                  </span>
+                ))}
+                {attendance.length > 6 && (
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-muted text-muted-foreground">
+                    +{attendance.length - 6} more
+                  </span>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No check-ins yet today.</p>
+            )}
+          </div>
+        )}
+
+        <Tabs defaultValue="attendance" className="mt-8" onValueChange={(val) => {
+          if (val === "leader-pins") fetchLeaderPins();
+          if (val === "leaders") { /* leaders data loads via useListLeaders already */ }
+        }}>
           <TabsList className="grid grid-cols-2 md:grid-cols-5 h-auto md:h-10 gap-2 md:gap-0">
             {session.can_view_attendance && (
               <TabsTrigger value="attendance">Today</TabsTrigger>
@@ -1312,7 +1345,7 @@ export default function Dashboard() {
             value="events"
             className="p-4 border rounded-xl mt-4 bg-card"
           >
-            {session.can_create_events && (
+            {(session.can_create_events || session.role === 'super_admin') && (
               <>
                 <SectionTitle title="Create Event" />
                 <div className="grid gap-3 md:grid-cols-2">
@@ -1539,8 +1572,7 @@ export default function Dashboard() {
               ) : (
                 <div className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
                   <ShieldAlert className="mb-2 h-5 w-5" />
-                  No delegated leaders yet. Use the API/Supabase seed path for
-                  the first leader, then leader creation can be added here.
+                  No leaders found yet. Promote a member to Leader from the Members tab.
                 </div>
               )}
             </TabsContent>
