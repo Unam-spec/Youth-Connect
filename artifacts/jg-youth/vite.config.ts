@@ -8,6 +8,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),
+      // Resolve workspace packages directly from source — no npm workspace needed
+      "@workspace/api-client-react": path.resolve(__dirname, "../../lib/api-client-react/src/index.ts"),
+      "@workspace/api-zod": path.resolve(__dirname, "../../lib/api-zod/src/index.ts"),
     },
     dedupe: ["react", "react-dom"],
   },
