@@ -1,7 +1,7 @@
 {
   "version": 2,
-  "installCommand": "npm install --prefix artifacts/jg-youth --legacy-peer-deps",
-  "buildCommand": "npm run build --prefix artifacts/jg-youth",
+  "installCommand": "npm install --prefix artifacts/jg-youth --legacy-peer-deps --include=dev",
+  "buildCommand": "cd artifacts/jg-youth && npx --no-install vite build --config vite.config.ts",
   "outputDirectory": "artifacts/jg-youth/dist/public",
   "framework": null,
   "rewrites": [
