@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { resolveAuth, isPrivilegedAuth } from "../lib/permissions";
 import { getAuth } from "@clerk/express";
 import { eq, ilike, or, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
