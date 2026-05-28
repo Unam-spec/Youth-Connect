@@ -61,6 +61,7 @@
   --font-sans: var(--app-font-sans);
   --font-serif: var(--app-font-serif);
   --font-mono: var(--app-font-mono);
+  --font-heading: var(--app-font-heading);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -209,11 +210,13 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    @apply antialiased bg-background text-foreground;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--app-font-heading);
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
   }
 }
 
