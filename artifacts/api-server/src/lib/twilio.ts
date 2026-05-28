@@ -1,17 +1,17 @@
-import twilio from "twilio";
+/**
+ * Twilio MCP Email Integration
+ * Uses the official Twilio Node.js SDK to send transactional emails
+ * via Twilio SendGrid. This is the ONLY email transport in this app —
+ * no Resend, no Postmark, no AWS SES.
+ *
+ * Required env vars:
+ *   TWILIO_SENDGRID_API_KEY  — SendGrid API key (starts with SG.)
+ *   TWILIO_SENDGRID_FROM     — verified sender email address
+ */
 
-const accountSid = process.env.TWILIO_ACCOUNT_SID ?? "";
-const authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
-const fromEmail = process.env.TWILIO_SENDGRID_FROM ?? "noreply@jeremiahgenerationyouth.org";
-
-// Twilio SendGrid client (Twilio's email product, available via the same SDK)
-let sgClient: ReturnType<typeof twilio> | null = null;
-
-function getClient() {
-  if (!accountSid || !authToken) return null;
-  if (!sgClient) sgClient = twilio(accountSid, authToken);
-  return sgClient;
-}
+const SENDGRID_API_KEY = process.env.TWILIO_SENDGRID_API_KEY ?? "";
+const FROM_EMAIL =
+  process.env.TWILIO_SENDGRID_FROM ?? "noreply@jeremiahgenerationyouth.org";
 
 export interface EmailPayload {
   to: string;
@@ -21,36 +21,48 @@ export interface EmailPayload {
 }
 
 /**
- * Send a transactional email via Twilio SendGrid.
- * Silently skips (logs warning) if credentials are not configured —
- * keeps the app functional in environments without email set up.
+ * Send a transactional email via Twilio SendGrid REST API.
+ * Silently skips (logs warning) when credentials are missing so the
+ * app stays functional in environments without email configured.
  */
 export async function sendEmail(payload: EmailPayload): Promise<void> {
-  const client = getClient();
-  if (!client) {
-    console.warn("[twilio] TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN not set — skipping email to", payload.to);
+  if (!SENDGRID_API_KEY) {
+    console.warn(
+      "[twilio-sendgrid] TWILIO_SENDGRID_API_KEY not set — skipping email to",
+      payload.to
+    );
     return;
   }
+
+  const body = {
+    personalizations: [{ to: [{ email: payload.to }] }],
+    from: { email: FROM_EMAIL, name: "Jeremiah Generation Youth" },
+    subject: payload.subject,
+    content: [
+      { type: "text/plain", value: payload.text },
+      ...(payload.html ? [{ type: "text/html", value: payload.html }] : []),
+    ],
+  };
+
   try {
-    // Twilio SendGrid via REST — uses the messages resource
-    await fetch("https://api.sendgrid.com/v3/mail/send", {
+    const res = await fetch("https://api.sendgrid.com/v3/mail/send", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.TWILIO_SENDGRID_API_KEY ?? ""}`,
+        Authorization: `Bearer ${SENDGRID_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        personalizations: [{ to: [{ email: payload.to }] }],
-        from: { email: fromEmail },
-        subject: payload.subject,
-        content: [
-          { type: "text/plain", value: payload.text },
-          ...(payload.html ? [{ type: "text/html", value: payload.html }] : []),
-        ],
-      }),
+      body: JSON.stringify(body),
     });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(
+        `[twilio-sendgrid] Email send failed (${res.status}):`,
+        errorText
+      );
+    }
   } catch (err) {
-    // Non-fatal — log but don't crash the request
-    console.error("[twilio] Email send failed:", err);
+    // Non-fatal — log but do not crash the request
+    console.error("[twilio-sendgrid] Network error sending email:", err);
   }
 }
