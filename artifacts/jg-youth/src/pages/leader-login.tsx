@@ -153,8 +153,12 @@ export default function LeaderLogin() {
               setLeaderSession({
                 role: result.role,
                 profile_id: result.profile_id,
+                can_create_events: result.can_create_events ?? false,
+                can_view_kpis: result.can_view_kpis ?? false,
+                can_view_members: result.can_view_members ?? false,
+                can_view_attendance: result.can_view_attendance ?? false,
               });
-              toast({ title: "Welcome back, leader." });
+              toast({ title: "Welcome back!" });
               setLocation("/dashboard");
             } else {
               toast({
@@ -191,8 +195,12 @@ export default function LeaderLogin() {
             setLeaderSession({
               role: result.role,
               profile_id: result.profile_id,
+              can_create_events: result.can_create_events ?? false,
+              can_view_kpis: result.can_view_kpis ?? false,
+              can_view_members: result.can_view_members ?? false,
+              can_view_attendance: result.can_view_attendance ?? false,
             });
-            toast({ title: "Welcome back, leader." });
+            toast({ title: "Welcome back!" });
             setLocation("/dashboard");
           } else {
             toast({
@@ -254,8 +262,8 @@ export default function LeaderLogin() {
             <CardTitle className="text-2xl">Leader Access</CardTitle>
             <CardDescription>
               {mode === "pin-only"
-                ? "Enter your PIN to access the leader dashboard."
-                : "Enter your phone number and PIN to access the leader dashboard."}
+                ? "Enter your PIN to access the leader dashboard. You can also view your member profile from the dashboard."
+                : "Enter your phone number and PIN to access the leader dashboard. You can also view your member profile from the dashboard."}
             </CardDescription>
           </CardHeader>
           <CardContent className="pb-8">
