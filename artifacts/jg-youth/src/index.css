@@ -79,35 +79,6 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-<<<<<<< HEAD
-  /* Default to sleek dark mode for JG Youth (#0B0F14 background, #E6E8EB text, #2A9D8F primary, #6C8E8B accent) */
-  --background: 210 29% 6%;
-  --foreground: 210 11% 91%;
-
-  --border: 210 20% 16%;
-  --input: 210 20% 18%;
-  --ring: 172 58% 39%;
-
-  --card: 210 29% 9%;
-  --card-foreground: 210 11% 91%;
-  --card-border: 210 20% 16%;
-
-  --popover: 210 29% 6%;
-  --popover-foreground: 210 10% 65%;
-  --popover-border: 210 20% 16%;
-
-  --primary: 172 58% 39%;
-  --primary-foreground: 210 40% 98%;
-
-  --secondary: 210 25% 15%;
-  --secondary-foreground: 210 40% 98%;
-
-  --muted: 210 25% 12%;
-  --muted-foreground: 210 10% 65%;
-
-  --accent: 173 14% 49%;
-  --accent-foreground: 210 40% 98%;
-=======
   /* Brand: #0B0F14 bg, #2A9D8F teal primary, #E6E8EB text */
   --background: 220 25% 7%;
   --foreground: 210 11% 91%;
@@ -135,27 +106,10 @@
 
   --accent: 177 13% 49%;
   --accent-foreground: 0 0% 100%;
->>>>>>> 52162a5949a949c576f91a9d8e39deb1277f2ea5
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 210 40% 98%;
 
-<<<<<<< HEAD
-  --sidebar: 210 29% 9%;
-  --sidebar-foreground: 210 11% 91%;
-  --sidebar-border: 210 20% 16%;
-  --sidebar-primary: 172 58% 39%;
-  --sidebar-primary-foreground: 210 11% 91%;
-  --sidebar-accent: 173 14% 49%;
-  --sidebar-accent-foreground: 210 11% 91%;
-  --sidebar-ring: 172 58% 39%;
-
-  --chart-1: 172 58% 39%;
-  --chart-2: 173 14% 49%;
-  --chart-3: 340 75% 55%;
-  --chart-4: 200 80% 50%;
-  --chart-5: 160 60% 45%;
-=======
   --sidebar: 220 22% 10%;
   --sidebar-foreground: 210 11% 91%;
   --sidebar-border: 215 20% 16%;
@@ -170,7 +124,6 @@
   --chart-3: 200 70% 50%;
   --chart-4: 160 50% 45%;
   --chart-5: 140 45% 42%;
->>>>>>> 52162a5949a949c576f91a9d8e39deb1277f2ea5
 
   /* Sora for headings, Inter for body */
   --app-font-sans: 'Inter', sans-serif;
@@ -203,66 +156,6 @@
 .dark {
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
-<<<<<<< HEAD
-
-  --opaque-button-border-intensity: 9;
-
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
-
-  --background: 210 29% 6%;
-  --foreground: 210 11% 91%;
-
-  --border: 210 20% 16%;
-  --card: 210 29% 9%;
-  --card-foreground: 210 11% 91%;
-  --card-border: 210 20% 16%;
-
-  --sidebar: 210 29% 9%;
-  --sidebar-foreground: 210 11% 91%;
-  --sidebar-border: 210 20% 16%;
-  --sidebar-primary: 172 58% 39%;
-  --sidebar-primary-foreground: 210 11% 91%;
-  --sidebar-accent: 173 14% 49%;
-  --sidebar-accent-foreground: 210 11% 91%;
-  --sidebar-ring: 172 58% 39%;
-
-  --popover: 210 29% 6%;
-  --popover-foreground: 210 10% 65%;
-  --popover-border: 210 20% 16%;
-
-  --primary: 172 58% 39%;
-  --primary-foreground: 210 40% 98%;
-
-  --secondary: 210 25% 15%;
-  --secondary-foreground: 210 40% 98%;
-
-  --muted: 210 25% 12%;
-  --muted-foreground: 210 10% 65%;
-
-  --accent: 173 14% 49%;
-  --accent-foreground: 210 40% 98%;
-
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
-
-  --input: 210 20% 18%;
-  --ring: 172 58% 39%;
-  --chart-1: 172 58% 39%;
-  --chart-2: 173 14% 49%;
-  --chart-3: 340 75% 55%;
-  --chart-4: 200 80% 50%;
-  --chart-5: 160 60% 45%;
-
-  --shadow-2xs: 0px 2px 0px 0px hsl(172 58% 39% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(172 58% 39% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(172 58% 39% / 0.00), 0px 1px 2px -1px hsl(172 58% 39% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(172 58% 39% / 0.00), 0px 1px 2px -1px hsl(172 58% 39% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(172 58% 39% / 0.00), 0px 2px 4px -1px hsl(172 58% 39% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(172 58% 39% / 0.00), 0px 4px 6px -1px hsl(172 58% 39% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(172 58% 39% / 0.00), 0px 8px 10px -1px hsl(172 58% 39% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(172 58% 39% / 0.00);
-=======
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
@@ -311,7 +204,6 @@
   --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 4px 6px -1px hsl(0 0% 0% / 0.20);
   --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 8px 10px -1px hsl(0 0% 0% / 0.20);
   --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
->>>>>>> 52162a5949a949c576f91a9d8e39deb1277f2ea5
 }
 
 
@@ -328,10 +220,6 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Sora', sans-serif;
     font-weight: 700;
-  }
-
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Sora', sans-serif !important;
   }
 }
 
