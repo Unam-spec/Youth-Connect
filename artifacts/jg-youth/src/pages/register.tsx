@@ -96,6 +96,11 @@ export default function Register() {
       });
 
       if (response.status === 201) {
+        // Store their details so we can pre-fill Clerk sign-up
+        if (data.email) {
+          sessionStorage.setItem("jg_pending_signup_email", data.email);
+          sessionStorage.setItem("jg_pending_signup_name", data.full_name);
+        }
         setIsSuccess(true);
         return;
       }
@@ -139,12 +144,20 @@ export default function Register() {
                 request. You'll be called up once approved.
               </div>
               <div className="flex flex-col gap-3 pt-2">
-                <Link href="/">
+                <Link href="/sign-up">
                   <Button className="w-full" size="lg">
+                    Create Your Login Account
+                  </Button>
+                </Link>
+                <Link href="/">
+                  <Button variant="outline" className="w-full" size="lg">
                     Return Home
                   </Button>
                 </Link>
               </div>
+              <p className="text-xs text-muted-foreground text-center pt-1">
+                Creating a login lets you RSVP to events and check in on Fridays.
+              </p>
             </CardContent>
           </Card>
         </div>
