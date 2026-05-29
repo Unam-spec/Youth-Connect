@@ -23,11 +23,28 @@ function isAuthorized(req: any): boolean {
   } catch { return false; }
 }
 
+async function getRequesterProfile(req: any) {
+  const clerkAuth = getAuth(req);
+  if (clerkAuth?.userId) {
+    return db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, clerkAuth.userId),
+    });
+  }
+  try {
+    const h = req.headers["x-leader-session"];
+    if (h) {
+      const s = JSON.parse(h as string);
+      return db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, s.profile_id),
+      });
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 router.get("/leaders", async (req, res) => {
   try {
     if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
-    // Query profilesTable directly — leaders may not have a leaderPermissionsTable row
-    // (e.g. promoted via role change rather than through the /leaders POST endpoint)
     const { inArray } = await import("drizzle-orm");
     const leaderProfiles = await db
       .select({
@@ -46,15 +63,15 @@ router.get("/leaders", async (req, res) => {
       .from(profilesTable)
       .where(inArray(profilesTable.role, ["leader", "super_admin"]));
 
-    // Shape into the format the frontend expects: { profile_id, profile, can_* }
     const shaped = leaderProfiles.map(p => ({
       profile_id: p.id,
-      can_create_events: p.can_create_events ?? false,
-      can_manage_members: p.can_view_members ?? false,
-      can_view_kpis: p.can_view_kpis ?? false,
-      can_view_members: p.can_view_members ?? false,
-      can_view_attendance: p.can_view_attendance ?? false,
-      can_approve_membership: false,
+      // super_admins always have all permissions checked
+      can_create_events: p.role === "super_admin" ? true : (p.can_create_events ?? false),
+      can_manage_members: p.role === "super_admin" ? true : (p.can_view_members ?? false),
+      can_view_kpis: p.role === "super_admin" ? true : (p.can_view_kpis ?? false),
+      can_view_members: p.role === "super_admin" ? true : (p.can_view_members ?? false),
+      can_view_attendance: p.role === "super_admin" ? true : (p.can_view_attendance ?? false),
+      can_approve_membership: p.role === "super_admin" ? true : false,
       profile: p,
     }));
 
@@ -105,6 +122,86 @@ router.patch("/leaders/:profileId", async (req, res) => {
   }
 });
 
+// Demote leader → member (super admin only)
+router.post("/leaders/:profileId/demote", async (req, res) => {
+  try {
+    const requester = await getRequesterProfile(req);
+    if (!requester || requester.role !== "super_admin")
+      return res.status(403).json({ error: "Super admin only" });
+
+    const [updated] = await db
+      .update(profilesTable)
+      .set({ role: "member", pin_hash: null, pin_plain: null })
+      .where(eq(profilesTable.id, req.params.profileId))
+      .returning();
+    if (!updated) return res.status(404).json({ error: "Profile not found" });
+
+    await db.delete(leaderPermissionsTable)
+      .where(eq(leaderPermissionsTable.profile_id, req.params.profileId));
+
+    return res.json({ success: true, profile: updated });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Demote super_admin → leader (super admin only)
+router.post("/leaders/:profileId/demote-to-leader", async (req, res) => {
+  try {
+    const requester = await getRequesterProfile(req);
+    if (!requester || requester.role !== "super_admin")
+      return res.status(403).json({ error: "Super admin only" });
+
+    const [updated] = await db
+      .update(profilesTable)
+      .set({ role: "leader" })
+      .where(eq(profilesTable.id, req.params.profileId))
+      .returning();
+    if (!updated) return res.status(404).json({ error: "Profile not found" });
+
+    return res.json({ success: true, profile: updated });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Delete account from DB entirely (super admin only)
+// Also attempts to delete from Clerk if CLERK_SECRET_KEY is set
+router.delete("/leaders/:profileId/account", async (req, res) => {
+  try {
+    const requester = await getRequesterProfile(req);
+    if (!requester || requester.role !== "super_admin")
+      return res.status(403).json({ error: "Super admin only" });
+
+    const target = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, req.params.profileId),
+    });
+    if (!target) return res.status(404).json({ error: "Profile not found" });
+
+    // Delete from Clerk if they have a clerk_id
+    if (target.clerk_id && process.env.CLERK_SECRET_KEY) {
+      try {
+        await fetch(`https://api.clerk.com/v1/users/${target.clerk_id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+        });
+      } catch (clerkErr) {
+        req.log.warn({ clerkErr }, "Failed to delete Clerk user — continuing with DB delete");
+      }
+    }
+
+    await db.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.profileId));
+    await db.delete(profilesTable).where(eq(profilesTable.id, req.params.profileId));
+
+    return res.status(204).send();
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.delete("/leaders/:profileId", async (req, res) => {
   try {
     if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
@@ -141,10 +238,10 @@ router.post("/leaders/verify-pin", async (req, res) => {
       success: true,
       profile_id: profile.id,
       role: profile.role,
-      can_create_events: profile.can_create_events,
-      can_view_kpis: profile.can_view_kpis,
-      can_view_members: profile.can_view_members,
-      can_view_attendance: profile.can_view_attendance,
+      can_create_events: profile.role === "super_admin" ? true : profile.can_create_events,
+      can_view_kpis: profile.role === "super_admin" ? true : profile.can_view_kpis,
+      can_view_members: profile.role === "super_admin" ? true : profile.can_view_members,
+      can_view_attendance: profile.role === "super_admin" ? true : profile.can_view_attendance,
     });
   } catch (err) {
     req.log.error(err);
@@ -193,36 +290,15 @@ router.post("/leaders/update-pin", async (req, res) => {
   }
 });
 
-
 router.post("/leaders/:profileId/set-pin", async (req, res) => {
   try {
-    // Only super admins (via Clerk or leader session) can set another leader's PIN
-    const clerkAuth = getAuth(req);
-    let isSuperAdmin = false;
-
-    if (clerkAuth?.userId) {
-      const requester = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.clerk_id, clerkAuth.userId),
-      });
-      isSuperAdmin = requester?.role === "super_admin";
-    } else {
-      try {
-        const h = req.headers["x-leader-session"];
-        if (h) {
-          const s = JSON.parse(h as string);
-          if (typeof s?.expires_at === "number" && Date.now() < s.expires_at && s.role === "super_admin") {
-            isSuperAdmin = true;
-          }
-        }
-      } catch { /* ignore */ }
-    }
-
+    const requester = await getRequesterProfile(req);
+    const isSuperAdmin = requester?.role === "super_admin";
     if (!isSuperAdmin) return res.status(403).json({ error: "Super admin only" });
 
     const { pin } = req.body;
-    if (typeof pin !== "string" || !/^\d{4}$/.test(pin)) {
+    if (typeof pin !== "string" || !/^\d{4}$/.test(pin))
       return res.status(400).json({ error: "PIN must be exactly 4 digits" });
-    }
 
     const pinHash = await bcrypt.hash(pin, 10);
     const [updated] = await db
