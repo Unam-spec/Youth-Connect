@@ -38,7 +38,7 @@ const registerSchema = z.object({
     .string()
     .min(10, "Valid phone number is required")
     .max(15, "Phone number is too long"),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  email: z.string().email("Invalid email address"),
   gender: z.enum(["male", "female", "other"], {
     required_error: "Please select a gender",
   }),
@@ -96,6 +96,11 @@ export default function Register() {
       });
 
       if (response.status === 201) {
+        // Store their details so we can pre-fill Clerk sign-up
+        if (data.email) {
+          sessionStorage.setItem("jg_pending_signup_email", data.email);
+          sessionStorage.setItem("jg_pending_signup_name", data.full_name);
+        }
         setIsSuccess(true);
         return;
       }
@@ -145,6 +150,9 @@ export default function Register() {
                   </Button>
                 </Link>
               </div>
+              <p className="text-xs text-muted-foreground text-center pt-1">
+                Once a leader approves your membership request, you will receive an email with a link to create your login.
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -232,7 +240,7 @@ export default function Register() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email (Optional)</FormLabel>
+                          <FormLabel>Email *</FormLabel>
                           <FormControl>
                             <Input
                               type="email"

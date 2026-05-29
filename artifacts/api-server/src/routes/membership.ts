@@ -10,7 +10,15 @@ const router = Router();
 router.get("/membership-requests", async (req, res) => {
   try {
     const auth = getAuth(req);
-    if (!auth?.userId) {
+    const hasLeaderSess = (() => {
+      try {
+        const h = req.headers["x-leader-session"];
+        if (!h) return false;
+        const s = JSON.parse(h as string);
+        return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
+      } catch { return false; }
+    })();
+    if (!auth?.userId && !hasLeaderSess) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
@@ -79,12 +87,28 @@ router.post("/membership-requests", async (req, res) => {
 router.post("/membership-requests/:id/approve", async (req, res) => {
   try {
     const auth = getAuth(req);
-    if (!auth?.userId) {
+    const hasLeaderSess = (() => {
+      try {
+        const h = req.headers["x-leader-session"];
+        if (!h) return false;
+        const s = JSON.parse(h as string);
+        return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
+      } catch { return false; }
+    })();
+    if (!auth?.userId && !hasLeaderSess) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const reviewerProfile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
+    let reviewerProfile: any = null;
+    if (auth?.userId) {
+      reviewerProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, auth.userId),
+      });
+    } else {
+      const s = JSON.parse(req.headers["x-leader-session"] as string);
+      reviewerProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, s.profile_id),
+      });
+    }
     const [updated] = await db
       .update(membershipRequestsTable)
       .set({ status: "approved", reviewed_by: reviewerProfile?.id ?? null })
@@ -103,11 +127,20 @@ router.post("/membership-requests/:id/approve", async (req, res) => {
       where: eq(profilesTable.id, updated.profile_id),
     });
     if (member?.email) {
+      // If they don't have a Clerk account yet, include the sign-up link in the email
+      const hasClerkAccount = !!member.clerk_id;
+      const signUpUrl = `${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/sign-up`;
+      const ctaText = hasClerkAccount
+        ? "Log in to see upcoming events, RSVP, and check in on Fridays."
+        : `Create your login account to access all member features: ${signUpUrl}`;
+      const ctaHtml = hasClerkAccount
+        ? `<p>Log in to see upcoming events, RSVP, and check in on Fridays.</p>`
+        : `<p><a href="${signUpUrl}" style="background:#2A9D8F;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;margin-top:8px">Create Your Login Account</a></p><p style="font-size:12px;color:#888;margin-top:4px">Or copy this link: ${signUpUrl}</p>`;
       await sendEmail({
         to: member.email,
         subject: "Your membership has been approved — Jeremiah Generation Youth",
-        text: `Hi ${member.full_name},\n\nGreat news! Your membership request has been approved. Welcome to Jeremiah Generation Youth!\n\nYou can now log in and access all member features.\n\nSee you at the next session,\nJeremiah Generation Youth`,
-        html: `<p>Hi <strong>${member.full_name}</strong>,</p><p>Great news! Your membership request has been <strong>approved</strong>. Welcome to Jeremiah Generation Youth!</p><p>You can now log in and access all member features.</p><p>See you at the next session,<br/>Jeremiah Generation Youth</p>`,
+        text: `Hi ${member.full_name},\n\nGreat news! Your membership request has been approved. Welcome to Jeremiah Generation Youth!\n\n${ctaText}\n\nSee you at the next session,\nJeremiah Generation Youth`,
+        html: `<p>Hi <strong>${member.full_name}</strong>,</p><p>Great news! Your membership request has been <strong>approved</strong>. Welcome to Jeremiah Generation Youth!</p>${ctaHtml}<p>See you at the next session,<br/>Jeremiah Generation Youth</p>`,
       });
     }
 
@@ -121,12 +154,28 @@ router.post("/membership-requests/:id/approve", async (req, res) => {
 router.post("/membership-requests/:id/reject", async (req, res) => {
   try {
     const auth = getAuth(req);
-    if (!auth?.userId) {
+    const hasLeaderSess = (() => {
+      try {
+        const h = req.headers["x-leader-session"];
+        if (!h) return false;
+        const s = JSON.parse(h as string);
+        return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
+      } catch { return false; }
+    })();
+    if (!auth?.userId && !hasLeaderSess) {
       return res.status(401).json({ error: "Unauthorized" });
     }
-    const reviewerProfile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
+    let reviewerProfile: any = null;
+    if (auth?.userId) {
+      reviewerProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, auth.userId),
+      });
+    } else {
+      const s = JSON.parse(req.headers["x-leader-session"] as string);
+      reviewerProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, s.profile_id),
+      });
+    }
     const [updated] = await db
       .update(membershipRequestsTable)
       .set({ status: "rejected", reviewed_by: reviewerProfile?.id ?? null })

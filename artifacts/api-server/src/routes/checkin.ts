@@ -11,6 +11,8 @@ import {
   type Profile,
 } from "@workspace/db";
 
+import { sendEmail } from "../lib/twilio";
+
 const router = Router();
 
 // ── Auth helpers ──────────────────────────────────────────────────────────────
@@ -413,6 +415,24 @@ router.patch("/checkin/requests/:id/approve", async (req, res) => {
     await db
       .delete(checkInRequestsTable)
       .where(eq(checkInRequestsTable.id, req.params.id));
+
+    // Send check-in confirmation email via Twilio if profile has an email
+    if (request.profile_id) {
+      const profile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, request.profile_id),
+      });
+      if (profile?.email) {
+        const sessionDate = new Date(request.session_date).toLocaleDateString("en-ZA", {
+          weekday: "long", year: "numeric", month: "long", day: "numeric",
+        });
+        await sendEmail({
+          to: profile.email,
+          subject: "You are checked in — Jeremiah Generation Youth",
+          text: `Hi ${profile.full_name},\n\nYou have been checked in for the session on ${sessionDate}.\n\nSee you in there!\nJeremiah Generation Youth`,
+          html: `<p>Hi <strong>${profile.full_name}</strong>,</p><p>You have been successfully checked in for the session on <strong>${sessionDate}</strong>.</p><p>See you in there!<br/>Jeremiah Generation Youth</p>`,
+        });
+      }
+    }
 
     return res.json({
       message: "Check-in approved.",

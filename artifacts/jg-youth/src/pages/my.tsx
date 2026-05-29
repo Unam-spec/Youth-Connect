@@ -1,6 +1,18 @@
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
+import { getLeaderSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   useGetMyProfile,
   getGetMyProfileQueryKey,
@@ -10,20 +22,47 @@ import {
   getListMyRsvpsQueryKey,
   useUpsertRsvp,
   getGetEventStatsQueryKey,
+  useUpdateMyProfile,
 } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { CalendarIcon, Clock, MapPin, CheckCircle, XCircle, QrCode } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function MyDashboard() {
-  const [, setLocation] = useLocation();
-  const { data: profile, isLoading: isProfileLoading } = useGetMyProfile({
+  const leaderSession = getLeaderSession();
+
+  // For PIN-authenticated leaders, fetch profile directly by profile_id from session
+  const [leaderProfile, setLeaderProfile] = useState<any>(null);
+  const [isLeaderProfileLoading, setIsLeaderProfileLoading] = useState(false);
+
+  useEffect(() => {
+    if (leaderSession?.profile_id && !window.__clerkIsSignedIn) {
+      setIsLeaderProfileLoading(true);
+      const sessionStr = localStorage.getItem("jg_leader_session");
+      fetch(`/api/profiles/${leaderSession.profile_id}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(sessionStr ? { "x-leader-session": sessionStr } : {}),
+        },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setLeaderProfile(data); })
+        .catch(() => {})
+        .finally(() => setIsLeaderProfileLoading(false));
+    }
+  }, [leaderSession?.profile_id]);
+
+  const { data: clerkProfile, isLoading: isClerkProfileLoading } = useGetMyProfile({
     query: { enabled: true, queryKey: getGetMyProfileQueryKey() },
   });
+
+  // Use Clerk profile if available, fall back to leader PIN session profile
+  const profile = clerkProfile ?? leaderProfile;
+  const isProfileLoading = isClerkProfileLoading || isLeaderProfileLoading;
   const { data: events, isLoading: isEventsLoading } = useListEvents(
     { upcoming: true },
     { query: { enabled: true, queryKey: getListEventsQueryKey({ upcoming: true }) } },
@@ -33,8 +72,53 @@ export default function MyDashboard() {
   });
 
   const upsertRsvp = useUpsertRsvp();
+  const updateProfile = useUpdateMyProfile();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  // Phone/name prompt state
+  const [showProfilePrompt, setShowProfilePrompt] = useState(false);
+  const [promptPhone, setPromptPhone] = useState("");
+  const [promptName, setPromptName] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Active tab state — so RSVP switches tab
+  const [eventsTab, setEventsTab] = useState<"upcoming" | "my-rsvps">("upcoming");
+
+  // Show prompt if profile loaded and missing phone or has default name
+  const profileLoaded = !isProfileLoading && !!profile;
+  const needsPhone = profileLoaded && !profile!.phone;
+  const needsName = profileLoaded && (!profile!.full_name || profile!.full_name === "New Member");
+  const shouldPrompt = needsPhone || needsName;
+
+  // Open prompt once when profile loads and is incomplete
+  if (profileLoaded && shouldPrompt && !showProfilePrompt && promptPhone === "" && promptName === "") {
+    setShowProfilePrompt(true);
+    setPromptPhone(profile!.phone ?? "");
+    setPromptName(profile!.full_name === "New Member" ? "" : (profile!.full_name ?? ""));
+  }
+
+  async function handleSaveProfile() {
+    if (!promptPhone.trim() || promptPhone.trim().length < 9) {
+      toast({ title: "Phone number required", description: "Please enter a valid phone number.", variant: "destructive" });
+      return;
+    }
+    if (!promptName.trim() || promptName.trim().split(" ").length < 2) {
+      toast({ title: "Full name required", description: "Please enter your first and last name.", variant: "destructive" });
+      return;
+    }
+    setIsSavingProfile(true);
+    try {
+      await updateProfile.mutateAsync({ data: { phone: promptPhone.trim(), full_name: promptName.trim() } });
+      queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
+      toast({ title: "Profile updated" });
+      setShowProfilePrompt(false);
+    } catch {
+      toast({ title: "Failed to save profile", variant: "destructive" });
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
 
   const handleRsvp = (eventId: string, status: "going" | "not_going" | "maybe") => {
     upsertRsvp.mutate(
@@ -44,6 +128,8 @@ export default function MyDashboard() {
           queryClient.invalidateQueries({ queryKey: getListMyRsvpsQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetEventStatsQueryKey(eventId) });
           toast({ title: "RSVP updated" });
+          // Switch to My RSVPs tab so they see their response
+          setEventsTab("my-rsvps");
         },
         onError: () => {
           toast({ title: "Failed to update RSVP", variant: "destructive" });
@@ -81,7 +167,16 @@ export default function MyDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="text-sm text-muted-foreground space-y-1 mt-2">
-                  <p>Phone: {profile.phone || "Not provided"}</p>
+                  {profile.phone ? (
+                    <p>Phone: {profile.phone}</p>
+                  ) : (
+                    <button
+                      onClick={() => setShowProfilePrompt(true)}
+                      className="text-primary text-xs underline underline-offset-2"
+                    >
+                      + Add phone number
+                    </button>
+                  )}
                   {profile.email && <p>Email: {profile.email}</p>}
                 </div>
               </CardContent>
@@ -126,7 +221,7 @@ export default function MyDashboard() {
 
         {/* Events */}
         <section>
-          <Tabs defaultValue="upcoming">
+          <Tabs value={eventsTab} onValueChange={(v) => setEventsTab(v as "upcoming" | "my-rsvps")}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-xl font-bold tracking-tight">Events</h2>
               <TabsList className="rounded-xl">
@@ -201,9 +296,9 @@ export default function MyDashboard() {
                     <Card key={rsvp.id} className="rounded-2xl border-border/60">
                       <CardContent className="p-4 flex items-center justify-between">
                         <div>
-                          <p className="font-semibold text-sm">{rsvp.event?.title || "Unknown Event"}</p>
+                          <p className="font-semibold text-sm">{rsvp.event?.title || "Event"}</p>
                           <p className="text-xs text-muted-foreground">
-                            {rsvp.event ? format(new Date(rsvp.event.date), "MMM d, yyyy") : ""}
+                            {rsvp.event?.date ? format(new Date(rsvp.event.date), "MMM d, yyyy") : ""}
                           </p>
                         </div>
                         <div
@@ -225,6 +320,48 @@ export default function MyDashboard() {
           </Tabs>
         </section>
       </div>
+
+      {/* Phone + name prompt dialog */}
+      <Dialog open={showProfilePrompt} onOpenChange={(open) => { if (!open && !needsPhone && !needsName) setShowProfilePrompt(false); }}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Complete your profile</DialogTitle>
+            <DialogDescription>
+              Your full name and phone number are required so leaders can identify you at sessions.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="prompt-name">Full Name <span className="text-destructive">*</span></Label>
+              <Input
+                id="prompt-name"
+                placeholder="First Last"
+                value={promptName}
+                onChange={(e) => setPromptName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="prompt-phone">Phone Number <span className="text-destructive">*</span></Label>
+              <Input
+                id="prompt-phone"
+                type="tel"
+                placeholder="082 123 4567"
+                value={promptPhone}
+                onChange={(e) => setPromptPhone(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={isSavingProfile}
+              className="w-full"
+            >
+              {isSavingProfile ? "Saving…" : "Save Profile"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

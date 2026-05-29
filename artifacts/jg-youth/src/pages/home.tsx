@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, ClipboardCheck, Users, UserCheck } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, Users, UserCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
 
@@ -38,7 +38,12 @@ function PublicHome() {
             Jeremiah Generation AFM
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-4">
+<<<<<<< HEAD
             Don’t be the one we ask <span className="text-primary">‘where were you?’</span>
+=======
+            Don&apos;t be the one we ask{" "}
+            <span className="text-primary">&apos;where were you?&apos;</span>
+>>>>>>> 52162a5949a949c576f91a9d8e39deb1277f2ea5
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl">
             Register, show up, be part of it.
@@ -50,12 +55,7 @@ function PublicHome() {
                 Register as First Timer
               </Button>
             </Link>
-            <Link href="/checkin">
-              <Button size="lg" variant="secondary" className="w-full sm:w-auto h-12 px-8 text-base">
-                <ClipboardCheck className="mr-2 h-5 w-5" />
-                Self Check-In
-              </Button>
-            </Link>
+
             <Button
               size="lg"
               variant="outline"

@@ -64,6 +64,7 @@
   --font-sans: var(--app-font-sans);
   --font-serif: var(--app-font-serif);
   --font-mono: var(--app-font-mono);
+  --font-heading: var(--app-font-heading);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -74,12 +75,11 @@
 :root {
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
-
   --opaque-button-border-intensity: 9;
-
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
+<<<<<<< HEAD
   /* Default to sleek dark mode for JG Youth (#0B0F14 background, #E6E8EB text, #2A9D8F primary, #6C8E8B accent) */
   --background: 210 29% 6%;
   --foreground: 210 11% 91%;
@@ -107,10 +107,40 @@
 
   --accent: 173 14% 49%;
   --accent-foreground: 210 40% 98%;
+=======
+  /* Brand: #0B0F14 bg, #2A9D8F teal primary, #E6E8EB text */
+  --background: 220 25% 7%;
+  --foreground: 210 11% 91%;
+
+  --border: 215 20% 16%;
+  --input: 215 20% 16%;
+  --ring: 174 57% 39%;
+
+  --card: 220 22% 10%;
+  --card-foreground: 210 11% 91%;
+  --card-border: 215 20% 16%;
+
+  --popover: 220 25% 7%;
+  --popover-foreground: 215 16% 57%;
+  --popover-border: 215 20% 16%;
+
+  --primary: 174 57% 39%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 215 16% 20%;
+  --secondary-foreground: 210 11% 91%;
+
+  --muted: 220 22% 10%;
+  --muted-foreground: 215 16% 57%;
+
+  --accent: 177 13% 49%;
+  --accent-foreground: 0 0% 100%;
+>>>>>>> 52162a5949a949c576f91a9d8e39deb1277f2ea5
 
   --destructive: 0 84% 60%;
   --destructive-foreground: 210 40% 98%;
 
+<<<<<<< HEAD
   --sidebar: 210 29% 9%;
   --sidebar-foreground: 210 11% 91%;
   --sidebar-border: 210 20% 16%;
@@ -125,20 +155,38 @@
   --chart-3: 340 75% 55%;
   --chart-4: 200 80% 50%;
   --chart-5: 160 60% 45%;
+=======
+  --sidebar: 220 22% 10%;
+  --sidebar-foreground: 210 11% 91%;
+  --sidebar-border: 215 20% 16%;
+  --sidebar-primary: 174 57% 39%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 215 16% 20%;
+  --sidebar-accent-foreground: 210 11% 91%;
+  --sidebar-ring: 174 57% 39%;
 
+  --chart-1: 174 57% 39%;
+  --chart-2: 177 40% 55%;
+  --chart-3: 200 70% 50%;
+  --chart-4: 160 50% 45%;
+  --chart-5: 140 45% 42%;
+>>>>>>> 52162a5949a949c576f91a9d8e39deb1277f2ea5
+
+  /* Sora for headings, Inter for body */
   --app-font-sans: 'Inter', sans-serif;
   --app-font-serif: Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --radius: 0.5rem;
-  
-  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
-  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
-  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
-  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 1px 2px -1px hsl(0 0% 0% / 0.1);
-  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 2px 4px -1px hsl(0 0% 0% / 0.1);
-  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 4px 6px -1px hsl(0 0% 0% / 0.1);
-  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.1), 0px 8px 10px -1px hsl(0 0% 0% / 0.1);
-  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.1);
+  --app-font-heading: 'Sora', sans-serif;
+  --radius: 0.625rem;
+
+  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
+  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
+  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 1px 2px -1px hsl(0 0% 0% / 0.15);
+  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 1px 2px -1px hsl(0 0% 0% / 0.15);
+  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 2px 4px -1px hsl(0 0% 0% / 0.15);
+  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 4px 6px -1px hsl(0 0% 0% / 0.15);
+  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 8px 10px -1px hsl(0 0% 0% / 0.15);
+  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
 
   --tracking-normal: 0em;
   --spacing: 0.25rem;
@@ -155,6 +203,7 @@
 .dark {
   --button-outline: rgba(255,255,255, .10);
   --badge-outline: rgba(255,255,255, .05);
+<<<<<<< HEAD
 
   --opaque-button-border-intensity: 9;
 
@@ -213,7 +262,58 @@
   --shadow-lg: 0px 2px 0px 0px hsl(172 58% 39% / 0.00), 0px 4px 6px -1px hsl(172 58% 39% / 0.00);
   --shadow-xl: 0px 2px 0px 0px hsl(172 58% 39% / 0.00), 0px 8px 10px -1px hsl(172 58% 39% / 0.00);
   --shadow-2xl: 0px 2px 0px 0px hsl(172 58% 39% / 0.00);
+=======
+  --opaque-button-border-intensity: 9;
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .09);
+
+  /* Dark mode mirrors root (app is always dark) */
+  --background: 220 25% 7%;
+  --foreground: 210 11% 91%;
+  --border: 215 20% 16%;
+  --input: 215 20% 20%;
+  --ring: 174 57% 39%;
+  --card: 220 22% 10%;
+  --card-foreground: 210 11% 91%;
+  --card-border: 215 20% 16%;
+  --popover: 220 25% 7%;
+  --popover-foreground: 215 16% 57%;
+  --popover-border: 215 20% 16%;
+  --primary: 174 57% 39%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 215 16% 20%;
+  --secondary-foreground: 210 11% 91%;
+  --muted: 220 22% 10%;
+  --muted-foreground: 215 16% 57%;
+  --accent: 177 13% 49%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 210 40% 98%;
+  --sidebar: 220 22% 10%;
+  --sidebar-foreground: 210 11% 91%;
+  --sidebar-border: 215 20% 16%;
+  --sidebar-primary: 174 57% 39%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 215 16% 20%;
+  --sidebar-accent-foreground: 210 11% 91%;
+  --sidebar-ring: 174 57% 39%;
+  --chart-1: 174 57% 39%;
+  --chart-2: 177 40% 55%;
+  --chart-3: 200 70% 50%;
+  --chart-4: 160 50% 45%;
+  --chart-5: 140 45% 42%;
+
+  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
+  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
+  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 1px 2px -1px hsl(0 0% 0% / 0.20);
+  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 1px 2px -1px hsl(0 0% 0% / 0.20);
+  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 2px 4px -1px hsl(0 0% 0% / 0.20);
+  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 4px 6px -1px hsl(0 0% 0% / 0.20);
+  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 8px 10px -1px hsl(0 0% 0% / 0.20);
+  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
+>>>>>>> 52162a5949a949c576f91a9d8e39deb1277f2ea5
 }
+
 
 @layer base {
   * {
@@ -221,7 +321,13 @@
   }
 
   body {
-    @apply font-sans antialiased bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+    @apply antialiased bg-background text-foreground;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
   }
 
   h1, h2, h3, h4, h5, h6 {
