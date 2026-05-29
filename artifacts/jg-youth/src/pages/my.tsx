@@ -1,5 +1,7 @@
 import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Layout } from "@/components/layout";
+import { getLeaderSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,9 +34,36 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function MyDashboard() {
-  const { data: profile, isLoading: isProfileLoading } = useGetMyProfile({
+  const leaderSession = getLeaderSession();
+
+  // For PIN-authenticated leaders, fetch profile directly by profile_id from session
+  const [leaderProfile, setLeaderProfile] = useState<any>(null);
+  const [isLeaderProfileLoading, setIsLeaderProfileLoading] = useState(false);
+
+  useEffect(() => {
+    if (leaderSession?.profile_id && !window.__clerkIsSignedIn) {
+      setIsLeaderProfileLoading(true);
+      const sessionStr = localStorage.getItem("jg_leader_session");
+      fetch(`/api/profiles/${leaderSession.profile_id}`, {
+        headers: {
+          "Content-Type": "application/json",
+          ...(sessionStr ? { "x-leader-session": sessionStr } : {}),
+        },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => { if (data) setLeaderProfile(data); })
+        .catch(() => {})
+        .finally(() => setIsLeaderProfileLoading(false));
+    }
+  }, [leaderSession?.profile_id]);
+
+  const { data: clerkProfile, isLoading: isClerkProfileLoading } = useGetMyProfile({
     query: { enabled: true, queryKey: getGetMyProfileQueryKey() },
   });
+
+  // Use Clerk profile if available, fall back to leader PIN session profile
+  const profile = clerkProfile ?? leaderProfile;
+  const isProfileLoading = isClerkProfileLoading || isLeaderProfileLoading;
   const { data: events, isLoading: isEventsLoading } = useListEvents(
     { upcoming: true },
     { query: { enabled: true, queryKey: getListEventsQueryKey({ upcoming: true }) } },
