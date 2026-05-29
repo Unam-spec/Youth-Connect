@@ -44,9 +44,14 @@ router.get("/profiles/me", async (req, res) => {
       const lastName = clerkUser?.family_name ?? clerkUser?.last_name ?? "";
       const fullName = [firstName, lastName].filter(Boolean).join(" ").trim() || "New Member";
       const email: string | null = clerkUser?.email ?? null;
+      // NOTE: clerkUser block also used below for phone matching
 
-      // Check if a profile already exists with this email (e.g. manually created before Clerk signup)
-      // If so, link their Clerk ID to the existing profile instead of creating a duplicate
+      // Check if a profile already exists with this email or phone
+      // (e.g. manually created leaders / first-timers before Clerk signup)
+      // If found, link their Clerk ID to that profile instead of creating a duplicate
+      const clerkUser = (req as any).auth?.sessionClaims ?? {};
+      const phone: string | null = clerkUser?.phone_number ?? null;
+
       if (email) {
         const existing = await db.query.profilesTable.findFirst({
           where: eq(profilesTable.email, email),
@@ -54,8 +59,23 @@ router.get("/profiles/me", async (req, res) => {
         if (existing) {
           const [linked] = await db
             .update(profilesTable)
-            .set({ clerk_id: clerkId })
+            .set({ clerk_id: clerkId, email: email })
             .where(eq(profilesTable.id, existing.id))
+            .returning();
+          return res.json(linked);
+        }
+      }
+
+      // No email match — try matching by phone (covers leaders with no email)
+      if (phone) {
+        const existingByPhone = await db.query.profilesTable.findFirst({
+          where: eq(profilesTable.phone, phone),
+        });
+        if (existingByPhone) {
+          const [linked] = await db
+            .update(profilesTable)
+            .set({ clerk_id: clerkId })
+            .where(eq(profilesTable.id, existingByPhone.id))
             .returning();
           return res.json(linked);
         }
