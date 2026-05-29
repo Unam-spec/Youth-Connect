@@ -9,6 +9,7 @@ import {
   profilesTable,
 } from "@workspace/db";
 import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
+import { sendEmail } from "../lib/twilio";
 
 const router = Router();
 
@@ -89,6 +90,59 @@ router.post("/events", async (req, res) => {
         created_by: creatorProfile?.id ?? null,
       })
       .returning();
+    // Notify all members & leaders with emails about the new event (public events only)
+    if (event.is_public) {
+      const { inArray } = await import("drizzle-orm");
+      const recipients = await db
+        .select({ email: profilesTable.email, full_name: profilesTable.full_name })
+        .from(profilesTable)
+        .where(inArray(profilesTable.role, ["member", "leader", "super_admin"]));
+
+      const eventDate = new Date(event.date).toLocaleDateString("en-ZA", {
+        weekday: "long", year: "numeric", month: "long", day: "numeric",
+      });
+
+      // Send in parallel, non-blocking — failures are swallowed by sendEmail
+      await Promise.allSettled(
+        recipients
+          .filter(r => !!r.email)
+          .map(r =>
+            sendEmail({
+              to: r.email!,
+              subject: `New event: ${event.title} — Jeremiah Generation Youth`,
+              text: `Hi ${r.full_name},\n\nA new event has been published.\n\n${event.title}\nDate: ${eventDate}\nTime: ${event.time}\nLocation: ${event.location}\n${event.description ? "\n" + event.description + "\n" : ""}\nLog in to RSVP.\n\nJeremiah Generation Youth`,
+              html: `<p>Hi <strong>${r.full_name}</strong>,</p><p>A new event has been published:</p><table style="border-collapse:collapse;margin:8px 0"><tr><td style="padding:4px 12px 4px 0;color:#888">Event</td><td><strong>${event.title}</strong></td></tr><tr><td style="padding:4px 12px 4px 0;color:#888">Date</td><td>${eventDate}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#888">Time</td><td>${event.time}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#888">Location</td><td>${event.location}</td></tr></table>${event.description ? `<p>${event.description}</p>` : ""}<p>Log in to RSVP.<br/>Jeremiah Generation Youth</p>`,
+            })
+          )
+      );
+
+      // 24h reminder: if the event is exactly tomorrow, send reminder emails now.
+      // (For a proper scheduler this would run as a cron job — this covers the case
+      //  where an event is created the day before.)
+      const eventDateObj = new Date(event.date);
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const isTomorrow =
+        eventDateObj.getFullYear() === tomorrow.getFullYear() &&
+        eventDateObj.getMonth() === tomorrow.getMonth() &&
+        eventDateObj.getDate() === tomorrow.getDate();
+
+      if (isTomorrow) {
+        await Promise.allSettled(
+          recipients
+            .filter(r => !!r.email)
+            .map(r =>
+              sendEmail({
+                to: r.email!,
+                subject: `Reminder: ${event.title} is tomorrow — Jeremiah Generation Youth`,
+                text: `Hi ${r.full_name},\n\nJust a reminder that "${event.title}" is tomorrow.\n\nDate: ${eventDate}\nTime: ${event.time}\nLocation: ${event.location}\n\nSee you there,\nJeremiah Generation Youth`,
+                html: `<p>Hi <strong>${r.full_name}</strong>,</p><p>Just a reminder that <strong>${event.title}</strong> is tomorrow.</p><table style="border-collapse:collapse;margin:8px 0"><tr><td style="padding:4px 12px 4px 0;color:#888">Time</td><td>${event.time}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#888">Location</td><td>${event.location}</td></tr></table><p>See you there,<br/>Jeremiah Generation Youth</p>`,
+              })
+            )
+        );
+      }
+    }
+
     return res
       .status(201)
       .json({ ...event, rsvp_count: 0, attendance_count: 0 });
