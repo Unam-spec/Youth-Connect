@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, ClipboardCheck, Users, UserCheck } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, Users, UserCheck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
 
@@ -51,12 +51,7 @@ function PublicHome() {
                 Register as First Timer
               </Button>
             </Link>
-            <Link href="/checkin">
-              <Button size="lg" variant="secondary" className="w-full sm:w-auto h-12 px-8 text-base">
-                <ClipboardCheck className="mr-2 h-5 w-5" />
-                Self Check-In
-              </Button>
-            </Link>
+
             <Button
               size="lg"
               variant="outline"
