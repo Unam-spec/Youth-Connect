@@ -48,38 +48,16 @@ router.get("/leaders", async (req, res) => {
     const { inArray } = await import("drizzle-orm");
     const leaderProfiles = await db
       .select({
-<<<<<<< HEAD
-        profile_id: profilesTable.id,
-=======
         id: profilesTable.id,
         full_name: profilesTable.full_name,
         role: profilesTable.role,
         phone: profilesTable.phone,
         email: profilesTable.email,
         pin_plain: profilesTable.pin_plain,
->>>>>>> 52162a5949a949c576f91a9d8e39deb1277f2ea5
         can_create_events: profilesTable.can_create_events,
         can_view_kpis: profilesTable.can_view_kpis,
         can_view_members: profilesTable.can_view_members,
         can_view_attendance: profilesTable.can_view_attendance,
-<<<<<<< HEAD
-        profile: {
-          id: profilesTable.id,
-          full_name: profilesTable.full_name,
-          role: profilesTable.role,
-          phone: profilesTable.phone,
-          email: profilesTable.email,
-          gender: profilesTable.gender,
-          age: profilesTable.age,
-          heard_from: profilesTable.heard_from,
-          clerk_id: profilesTable.clerk_id,
-          created_at: profilesTable.created_at,
-        },
-      })
-      .from(profilesTable)
-      .where(eq(profilesTable.role, "leader"));
-    return res.json(leaders);
-=======
         created_at: profilesTable.created_at,
       })
       .from(profilesTable)
@@ -98,7 +76,6 @@ router.get("/leaders", async (req, res) => {
     }));
 
     return res.json(shaped);
->>>>>>> 52162a5949a949c576f91a9d8e39deb1277f2ea5
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
