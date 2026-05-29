@@ -1,20 +1,20 @@
 import { useState } from "react";
 import { useUser } from "@clerk/react";
 import { Link, useLocation } from "wouter";
-import { Layout } from "@/components/layout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Layout } from "@components/layout";
+import { Button } from "@components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from "@components/ui/dialog";
 import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, Users, UserCheck } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "@components/ui/skeleton";
 import { Redirect } from "wouter";
 
 function PublicHome() {
@@ -51,7 +51,6 @@ function PublicHome() {
                 Register as First Timer
               </Button>
             </Link>
-
             <Button
               size="lg"
               variant="outline"
@@ -63,7 +62,6 @@ function PublicHome() {
             </Button>
           </div>
         </section>
-
         {/* KPIs */}
         <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card className="bg-card/50 backdrop-blur">
@@ -103,7 +101,6 @@ function PublicHome() {
             </CardContent>
           </Card>
         </section>
-
         {/* Events */}
         <section>
           <div className="flex items-center justify-between mb-8">
@@ -162,7 +159,6 @@ function PublicHome() {
           </div>
         </section>
       </div>
-
       {/* Login choice dialog */}
       <Dialog open={showLoginChoice} onOpenChange={setShowLoginChoice}>
         <DialogContent className="rounded-2xl max-w-sm">
