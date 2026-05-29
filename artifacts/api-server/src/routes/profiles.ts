@@ -9,7 +9,8 @@ import {
   UpdateMyProfileBody,
   ListProfilesQueryParams,
 } from "@workspace/api-zod";
-import { z } from "zod"; // Import z for schema definition
+import { z } from "zod";
+import { sendEmail } from "../lib/twilio";
 
 
 function hasLeaderSession(req: any): boolean {
@@ -357,6 +358,16 @@ router.post("/profiles/:id/promote", async (req, res) => {
 
     if (!updated) {
       return res.status(404).json({ error: "Profile not found" });
+    }
+
+    // Notify the new member by email via Twilio
+    if (updated.email) {
+      await sendEmail({
+        to: updated.email,
+        subject: "Welcome — you are now a member of Jeremiah Generation Youth",
+        text: `Hi ${updated.full_name},\n\nGreat news! You have been approved as a full member of Jeremiah Generation Youth.\n\nLog in to see upcoming events, RSVP, and check in on Fridays.\n\nSee you on Friday,\nJeremiah Generation Youth`,
+        html: `<p>Hi <strong>${updated.full_name}</strong>,</p><p>Great news! You have been approved as a full member of Jeremiah Generation Youth.</p><p>Log in to see upcoming events, RSVP, and check in on Fridays.</p><p>See you on Friday,<br/>Jeremiah Generation Youth</p>`,
+      });
     }
 
     return res.json(updated);
