@@ -65,7 +65,6 @@ router.get("/leaders", async (req, res) => {
 
     const shaped = leaderProfiles.map(p => ({
       profile_id: p.id,
-      // super_admins always have all permissions checked
       can_create_events: p.role === "super_admin" ? true : (p.can_create_events ?? false),
       can_manage_members: p.role === "super_admin" ? true : (p.can_view_members ?? false),
       can_view_kpis: p.role === "super_admin" ? true : (p.can_view_kpis ?? false),
