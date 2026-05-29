@@ -38,7 +38,7 @@ const registerSchema = z.object({
     .string()
     .min(10, "Valid phone number is required")
     .max(15, "Phone number is too long"),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  email: z.string().email("Invalid email address"),
   gender: z.enum(["male", "female", "other"], {
     required_error: "Please select a gender",
   }),
@@ -144,19 +144,14 @@ export default function Register() {
                 request. You'll be called up once approved.
               </div>
               <div className="flex flex-col gap-3 pt-2">
-                <Link href="/sign-up">
-                  <Button className="w-full" size="lg">
-                    Create Your Login Account
-                  </Button>
-                </Link>
                 <Link href="/">
-                  <Button variant="outline" className="w-full" size="lg">
+                  <Button className="w-full" size="lg">
                     Return Home
                   </Button>
                 </Link>
               </div>
               <p className="text-xs text-muted-foreground text-center pt-1">
-                Creating a login lets you RSVP to events and check in on Fridays.
+                Once a leader approves your membership request, you will receive an email with a link to create your login.
               </p>
             </CardContent>
           </Card>
@@ -245,7 +240,7 @@ export default function Register() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email (Optional)</FormLabel>
+                          <FormLabel>Email *</FormLabel>
                           <FormControl>
                             <Input
                               type="email"
