@@ -39,6 +39,17 @@ app.use(cors({ credentials: true, origin: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Map query parameters to headers for direct EventSource compatibility (as EventSource does not support custom headers natively)
+app.use((req, res, next) => {
+  if (req.query.token && !req.headers.authorization) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+  }
+  if (req.query.leader_session && !req.headers["x-leader-session"]) {
+    req.headers["x-leader-session"] = String(req.query.leader_session);
+  }
+  next();
+});
+
 app.use(clerkMiddleware());
 
 app.use("/api", router);
