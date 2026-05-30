@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "pnpm run build --filter=@workspace/api-server"
+buildCommand = "pnpm run typecheck:libs && pnpm --filter=@workspace/api-server run build"
 
 [deploy]
 startCommand = "pnpm run start --filter=@workspace/api-server"
