@@ -163,7 +163,7 @@ export default function Register() {
   // ── Registration form ────────────────────────────────────────────────────────
   return (
     <Layout>
-      <div className="max-w-xl mx-auto py-8">
+      <div className="max-w-xl mx-auto py-8 px-4">
         <div className="mb-6">
           <Link href="/">
             <Button
@@ -177,15 +177,17 @@ export default function Register() {
           </Link>
         </div>
 
-        <Card className="shadow-lg border-border/60">
-          <CardHeader>
-            <CardTitle className="text-2xl">First Timer Registration</CardTitle>
-            <CardDescription>
+        <Card className="shadow-xl border-border/80 bg-card overflow-hidden">
+          {/* Colourful accent stripe at top */}
+          <div className="h-1.5 w-full bg-gradient-to-r from-primary via-teal-400 to-primary/60" />
+          <CardHeader className="pb-4 pt-6">
+            <CardTitle className="text-2xl text-foreground font-bold">First Timer Registration</CardTitle>
+            <CardDescription className="text-muted-foreground/90 text-sm leading-relaxed">
               Welcome! Please fill in your details so we can get to know you
               better.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pb-8">
             {/* Server-side error banner */}
             {serverError && (
               <div className="mb-5 flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
@@ -323,10 +325,10 @@ export default function Register() {
 
                 <Button
                   type="submit"
-                  className="w-full text-base h-12"
+                  className="w-full text-base h-12 bg-gradient-to-r from-primary to-teal-400 hover:from-primary/90 hover:to-teal-400/90 text-white font-semibold rounded-xl shadow-md border-0 transition-all duration-200"
                   disabled={isPending}
                 >
-                  {isPending ? "Registering..." : "Register"}
+                  {isPending ? "Registering..." : "Register →"}
                 </Button>
               </form>
             </Form>

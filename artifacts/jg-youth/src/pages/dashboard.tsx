@@ -663,7 +663,9 @@ export default function Dashboard() {
     const sastTotalMinutes = sastHours * 60 + sastMinutes;
     const requiredTime = 18 * 60 + 30; // 18:30
 
-    if (sastTotalMinutes < requiredTime) {
+    const isSuperAdmin = session?.role === "super_admin";
+
+    if (sastTotalMinutes < requiredTime && !isSuperAdmin) {
       toast({
         title: `${action === "approve" ? "Approval" : "Rejection"} restricted`,
         description:
@@ -706,7 +708,9 @@ export default function Dashboard() {
     const sastTotalMinutes = sastHours * 60 + sastMinutes;
     const requiredTime = 18 * 60 + 30; // 18:30
 
-    if (sastTotalMinutes < requiredTime) {
+    const isSuperAdmin = session?.role === "super_admin";
+
+    if (sastTotalMinutes < requiredTime && !isSuperAdmin) {
       toast({
         title: "Approval restricted",
         description: "You can only approve check-ins at 18:30 SAST or later",
@@ -747,7 +751,9 @@ export default function Dashboard() {
     const sastTotalMinutes = sastHours * 60 + sastMinutes;
     const requiredTime = 18 * 60 + 30; // 18:30
 
-    if (sastTotalMinutes < requiredTime) {
+    const isSuperAdmin = session?.role === "super_admin";
+
+    if (sastTotalMinutes < requiredTime && !isSuperAdmin) {
       toast({
         title: "Rejection restricted",
         description: "You can only reject check-ins at 18:30 SAST or later",
@@ -2228,16 +2234,16 @@ function CheckInCard({
     <div
       className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between transition-colors ${
         isFirstTimer
-          ? "border-amber-500/20 bg-amber-500/5 hover:border-amber-500/35"
-          : "border-teal-500/20 bg-teal-500/5 hover:border-teal-500/35"
+          ? "border-amber-500/40 bg-amber-500/10 dark:border-amber-500/30 dark:bg-amber-500/5 hover:border-amber-500/60"
+          : "border-teal-500/40 bg-teal-500/10 dark:border-teal-500/30 dark:bg-teal-500/5 hover:border-teal-500/60"
       }`}
     >
       <div className="flex items-start gap-3">
         <div
           className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
             isFirstTimer
-              ? "bg-amber-500/15 text-amber-300"
-              : "bg-teal-500/15 text-teal-300"
+              ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
+              : "bg-teal-500/20 text-teal-700 dark:text-teal-300"
           }`}
         >
           {req.name?.charAt(0)?.toUpperCase() ?? "?"}
@@ -2248,7 +2254,7 @@ function CheckInCard({
             {isFirstTimer && (
               <Badge
                 variant="outline"
-                className="text-xs text-amber-300 border-amber-500/30 py-0"
+                className="text-xs text-amber-700 dark:text-amber-300 border-amber-500/40 bg-amber-500/15 dark:bg-amber-500/10 py-0"
               >
                 First Timer
               </Badge>
@@ -2264,7 +2270,7 @@ function CheckInCard({
         <Button
           size="sm"
           onClick={onApprove}
-          className={`h-7 text-xs border-0 text-white ${isFirstTimer ? "bg-amber-500 hover:bg-amber-400" : "bg-teal-500 hover:bg-teal-400"}`}
+          className={`h-7 text-xs border-0 text-white font-medium ${isFirstTimer ? "bg-amber-600 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400" : "bg-teal-600 hover:bg-teal-500 dark:bg-teal-500 dark:hover:bg-teal-400"}`}
         >
           Approve
         </Button>

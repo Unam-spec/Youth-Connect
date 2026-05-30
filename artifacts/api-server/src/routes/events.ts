@@ -213,13 +213,30 @@ router.patch("/events/:id", async (req: Request, res: Response) => {
 router.delete("/events/:id", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
-    if (!auth?.userId) {
+    const isLeaderSess = (() => {
+      try {
+        const h = req.headers["x-leader-session"];
+        if (!h) return false;
+        const s = JSON.parse(h as string);
+        return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
+      } catch { return false; }
+    })();
+
+    if (!auth?.userId && !isLeaderSess) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
+    let profile: any = null;
+    if (auth?.userId) {
+      profile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, auth.userId),
+      });
+    } else {
+      const session = JSON.parse(req.headers["x-leader-session"] as string);
+      profile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, session.profile_id),
+      });
+    }
 
     if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
@@ -246,6 +263,7 @@ router.delete("/events/:id", async (req: Request, res: Response) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 router.get("/events/:id/stats", async (req: Request, res: Response) => {
   try {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@clerk/react";
+import { getLeaderSession } from "@/lib/auth";
 import { Link } from "wouter";
 import { Html5Qrcode } from "html5-qrcode";
 import { Layout } from "@/components/layout";
@@ -483,6 +484,14 @@ export default function CheckIn() {
   }
 
   const windowState = getCheckinWindowState();
+  const leaderSession = getLeaderSession();
+  const isLeaderOrAdmin =
+    leaderSession?.role === "super_admin" ||
+    leaderSession?.role === "leader" ||
+    userProfile?.role === "super_admin" ||
+    userProfile?.role === "leader";
+  // Leaders and super admins always see the check-in form regardless of time
+  const canBypassWindow = isLeaderOrAdmin;
 
   // ── Default: check-in form ───────────────────────────────────────────────────
   return (
@@ -519,11 +528,11 @@ export default function CheckIn() {
           </p>
         </div>
 
-        {/* Time window banner — shown before/after/wrong day */}
-        {windowState !== "open" && <TimeWindowBanner />}
+        {/* Time window banner — shown before/after/wrong day unless bypassed */}
+        {windowState !== "open" && !canBypassWindow && <TimeWindowBanner />}
 
-        {/* Check-in form — only shown during the open window */}
-        {windowState === "open" && (
+        {/* Check-in form — always shown for leaders/admins, otherwise only during open window */}
+        {(windowState === "open" || canBypassWindow) && (
           <div className="space-y-5">
 
             {/* Not signed in */}
