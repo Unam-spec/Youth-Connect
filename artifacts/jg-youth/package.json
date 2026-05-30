@@ -12,6 +12,8 @@
   "dependencies": {
     "@clerk/react": "^6.6.1",
     "@clerk/themes": "^2.4.57",
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/sora": "^5.2.8",
     "@sentry/react": "^8.0.0",
     "@workspace/api-client-react": "workspace:*",
     "html5-qrcode": "^2.3.8",

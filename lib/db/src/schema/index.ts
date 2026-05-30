@@ -60,7 +60,6 @@ export const profilesTable = pgTable("profiles", {
   heard_from: text("heard_from"),
   role: roleEnum("role").notNull().default("visitor"),
   pin_hash: text("pin_hash"),
-  pin_plain: text("pin_plain"),
   can_create_events: boolean("can_create_events").notNull().default(true),
   can_view_kpis: boolean("can_view_kpis").notNull().default(true),
   can_view_members: boolean("can_view_members").notNull().default(true),
@@ -70,6 +69,10 @@ export const profilesTable = pgTable("profiles", {
   parent_name: text("parent_name"),
   whatsapp_opt_in: boolean("whatsapp_opt_in").notNull().default(false),
   avatar_url: text("avatar_url"),
+  link_token: text("link_token"),
+  link_token_expires_at: timestamp("link_token_expires_at", { withTimezone: true }),
+  link_token_used: boolean("link_token_used").notNull().default(false),
+  session_token: uuid("session_token"),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -259,3 +262,24 @@ export type CheckInRequest = typeof checkInRequestsTable.$inferSelect;
 export type InsertCheckInRequest = z.infer<typeof insertCheckInRequestSchema>;
 export type Visitor = typeof visitorsTable.$inferSelect;
 export type InsertVisitor = z.infer<typeof insertVisitorSchema>;
+
+// ── Pending emails table ───────────────────────────────────────────────────────
+export const pendingEmailsTable = pgTable("pending_emails", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  to_address: text("to_address").notNull(),
+  subject: text("subject").notNull(),
+  body_html: text("body_html").notNull(),
+  created_at: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  sent_at: timestamp("sent_at", { withTimezone: true }),
+  attempts: integer("attempts").default(0),
+  last_error: text("last_error"),
+});
+
+export const insertPendingEmailSchema = createInsertSchema(pendingEmailsTable).omit({
+  id: true,
+  created_at: true,
+});
+
+export type PendingEmail = typeof pendingEmailsTable.$inferSelect;
+export type InsertPendingEmail = z.infer<typeof insertPendingEmailSchema>;
+

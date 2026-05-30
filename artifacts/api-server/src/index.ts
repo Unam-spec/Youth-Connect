@@ -2,9 +2,11 @@ import "dotenv/config";
 import app from "./app";
 import { logger } from "./lib/logger";
 import { runMigrations } from "./db";
+import { startEmailProcessor, stopEmailProcessor } from "./jobs/emailProcessor";
 
 process.on("SIGTERM", () => {
   logger.info("Received SIGTERM, shutting down gracefully");
+  stopEmailProcessor();
 });
 
 const rawPort = process.env["PORT"];
@@ -23,6 +25,7 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function startServer() {
   await runMigrations();
+  startEmailProcessor();
 
   app.listen(port, (err) => {
     if (err) {

@@ -1,9 +1,9 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { eq, and } from "drizzle-orm";
-import { db, rsvpsTable, eventsTable, profilesTable } from "@workspace/db";
+import { db, rsvpsTable, eventsTable, profilesTable, pendingEmailsTable } from "@workspace/db";
 import { UpsertRsvpBody } from "@workspace/api-zod";
-import { sendEmail } from "../lib/twilio";
+import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 
 const router = Router();
 
@@ -74,16 +74,9 @@ router.get("/rsvps/my", async (req, res) => {
   }
 });
 
-router.get("/rsvps", async (req, res) => {
+// GET /rsvps - Retrieve all RSVPs (protected: leader only)
+router.get("/rsvps", requireLeaderSession("leader"), async (req, res) => {
   try {
-    const auth = getAuth(req);
-    if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
-    const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
-    if (profile.role !== "leader" && profile.role !== "super_admin")
-      return res.status(403).json({ error: "Forbidden" });
     const { event_id, status } = req.query;
     const rsvps = await db
       .select({
@@ -154,13 +147,28 @@ router.post("/rsvps/:eventId", async (req, res) => {
 
     if (parsed.data.status === "going" && profile.email && event) {
       try {
-        await sendEmail({
-          to: profile.email,
+        const emailBody = `
+          <div style="font-family: 'Inter', sans-serif; background-color: #0B0F14; color: #E6E8EB; padding: 24px; border-radius: 8px;">
+            <h2 style="color: #2A9D8F; font-family: 'Sora', sans-serif;">You're going to ${event.title}!</h2>
+            <p>Hi ${profile.full_name},</p>
+            <p>You've successfully confirmed attendance for <strong>${event.title}</strong>.</p>
+            <div style="background-color: rgba(255,255,255,0.05); padding: 16px; border-radius: 6px; margin: 20px 0;">
+              <p style="margin: 4px 0;"><strong>Date:</strong> ${event.date}</p>
+              <p style="margin: 4px 0;"><strong>Time:</strong> ${event.time}</p>
+              <p style="margin: 4px 0;"><strong>Location:</strong> ${event.location}</p>
+            </div>
+            <p>See you there!</p>
+            <p style="margin-top: 24px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation AFM Team</p>
+          </div>
+        `;
+        
+        await db.insert(pendingEmailsTable).values({
+          to_address: profile.email,
           subject: `You're going to ${event.title}!`,
-          text: `Hi ${profile.full_name},\n\nYou've confirmed attendance for ${event.title} on ${event.date} at ${event.time}.\nLocation: ${event.location}\n\nSee you there!\n\nJeremiah Generation AFM`,
+          body_html: emailBody,
         });
       } catch (emailErr) {
-        req.log.warn({ emailErr }, "RSVP confirmation email failed");
+        req.log.warn({ emailErr }, "RSVP confirmation email queuing failed");
       }
     }
 

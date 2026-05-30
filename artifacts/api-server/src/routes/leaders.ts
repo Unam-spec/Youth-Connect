@@ -1,50 +1,20 @@
 import { Router } from "express";
-import { getAuth } from "@clerk/express";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
-import { db, leaderPermissionsTable, profilesTable } from "@workspace/db";
+import crypto from "crypto";
+import { db, leaderPermissionsTable, profilesTable, pendingEmailsTable } from "@workspace/db";
 import {
   AddLeaderBody,
   UpdateLeaderPermissionsBody,
   VerifyLeaderPinBody,
-  UpdateLeaderPinBody,
 } from "@workspace/api-zod";
+import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 
 const router = Router();
 
-function isAuthorized(req: any): boolean {
-  const clerkAuth = getAuth(req);
-  if (clerkAuth?.userId) return true;
+// GET /leaders - Lists all leaders (protected: leaders and super_admins)
+router.get("/leaders", requireLeaderSession("leader"), async (req, res) => {
   try {
-    const h = req.headers["x-leader-session"];
-    if (!h) return false;
-    const s = JSON.parse(h as string);
-    return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
-  } catch { return false; }
-}
-
-async function getRequesterProfile(req: any) {
-  const clerkAuth = getAuth(req);
-  if (clerkAuth?.userId) {
-    return db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, clerkAuth.userId),
-    });
-  }
-  try {
-    const h = req.headers["x-leader-session"];
-    if (h) {
-      const s = JSON.parse(h as string);
-      return db.query.profilesTable.findFirst({
-        where: eq(profilesTable.id, s.profile_id),
-      });
-    }
-  } catch { /* ignore */ }
-  return null;
-}
-
-router.get("/leaders", async (req, res) => {
-  try {
-    if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
     const { inArray } = await import("drizzle-orm");
     const leaderProfiles = await db
       .select({
@@ -53,7 +23,6 @@ router.get("/leaders", async (req, res) => {
         role: profilesTable.role,
         phone: profilesTable.phone,
         email: profilesTable.email,
-        pin_plain: profilesTable.pin_plain,
         can_create_events: profilesTable.can_create_events,
         can_view_kpis: profilesTable.can_view_kpis,
         can_view_members: profilesTable.can_view_members,
@@ -81,20 +50,25 @@ router.get("/leaders", async (req, res) => {
   }
 });
 
-router.post("/leaders", async (req, res) => {
+// POST /leaders - Promotes a member to a leader (protected: super_admin only)
+router.post("/leaders", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
     const parsed = AddLeaderBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     const { profile_id, pin, ...perms } = parsed.data;
-    const pinHash = await bcrypt.hash(pin, 10);
+    
+    // Hash PIN with 12 rounds
+    const pinHash = await bcrypt.hash(pin, 12);
+    
     await db.update(profilesTable)
-      .set({ role: "leader", pin_hash: pinHash, pin_plain: pin })
+      .set({ role: "leader", pin_hash: pinHash })
       .where(eq(profilesTable.id, profile_id));
+      
     const [permissions] = await db.insert(leaderPermissionsTable)
       .values({ profile_id, ...perms })
       .onConflictDoUpdate({ target: leaderPermissionsTable.profile_id, set: perms })
       .returning();
+      
     const profile = await db.query.profilesTable.findFirst({ where: eq(profilesTable.id, profile_id) });
     return res.status(201).json({ ...permissions, profile });
   } catch (err) {
@@ -103,15 +77,17 @@ router.post("/leaders", async (req, res) => {
   }
 });
 
-router.patch("/leaders/:profileId", async (req, res) => {
+// PATCH /leaders/:profileId - Update leader permissions (protected: super_admin only)
+router.patch("/leaders/:profileId", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
     const parsed = UpdateLeaderPermissionsBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    
     const [updated] = await db.update(leaderPermissionsTable)
       .set(parsed.data)
       .where(eq(leaderPermissionsTable.profile_id, req.params.profileId))
       .returning();
+      
     if (!updated) return res.status(404).json({ error: "Leader not found" });
     const profile = await db.query.profilesTable.findFirst({ where: eq(profilesTable.id, req.params.profileId) });
     return res.json({ ...updated, profile });
@@ -121,16 +97,12 @@ router.patch("/leaders/:profileId", async (req, res) => {
   }
 });
 
-// Demote leader → member (super admin only)
-router.post("/leaders/:profileId/demote", async (req, res) => {
+// POST /leaders/:profileId/demote - Demote leader to member (protected: super_admin only)
+router.post("/leaders/:profileId/demote", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    const requester = await getRequesterProfile(req);
-    if (!requester || requester.role !== "super_admin")
-      return res.status(403).json({ error: "Super admin only" });
-
     const [updated] = await db
       .update(profilesTable)
-      .set({ role: "member", pin_hash: null, pin_plain: null })
+      .set({ role: "member", pin_hash: null, session_token: null })
       .where(eq(profilesTable.id, req.params.profileId))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
@@ -145,16 +117,12 @@ router.post("/leaders/:profileId/demote", async (req, res) => {
   }
 });
 
-// Demote super_admin → leader (super admin only)
-router.post("/leaders/:profileId/demote-to-leader", async (req, res) => {
+// POST /leaders/:profileId/demote-to-leader - Demote super_admin to leader (protected: super_admin only)
+router.post("/leaders/:profileId/demote-to-leader", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    const requester = await getRequesterProfile(req);
-    if (!requester || requester.role !== "super_admin")
-      return res.status(403).json({ error: "Super admin only" });
-
     const [updated] = await db
       .update(profilesTable)
-      .set({ role: "leader" })
+      .set({ role: "leader", session_token: null })
       .where(eq(profilesTable.id, req.params.profileId))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
@@ -166,14 +134,9 @@ router.post("/leaders/:profileId/demote-to-leader", async (req, res) => {
   }
 });
 
-// Delete account from DB entirely (super admin only)
-// Also attempts to delete from Clerk if CLERK_SECRET_KEY is set
-router.delete("/leaders/:profileId/account", async (req, res) => {
+// DELETE /leaders/:profileId/account - Delete profile entirely (protected: super_admin only)
+router.delete("/leaders/:profileId/account", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    const requester = await getRequesterProfile(req);
-    if (!requester || requester.role !== "super_admin")
-      return res.status(403).json({ error: "Super admin only" });
-
     const target = await db.query.profilesTable.findFirst({
       where: eq(profilesTable.id, req.params.profileId),
     });
@@ -201,12 +164,12 @@ router.delete("/leaders/:profileId/account", async (req, res) => {
   }
 });
 
-router.delete("/leaders/:profileId", async (req, res) => {
+// DELETE /leaders/:profileId - Remove leader permissions (protected: super_admin only)
+router.delete("/leaders/:profileId", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
     await db.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.profileId));
     await db.update(profilesTable)
-      .set({ role: "member", pin_hash: null, pin_plain: null })
+      .set({ role: "member", pin_hash: null, session_token: null })
       .where(eq(profilesTable.id, req.params.profileId));
     return res.status(204).send();
   } catch (err) {
@@ -215,27 +178,41 @@ router.delete("/leaders/:profileId", async (req, res) => {
   }
 });
 
+// POST /leaders/verify-pin - Leader PIN login (Public)
 router.post("/leaders/verify-pin", async (req, res) => {
   try {
     const parsed = VerifyLeaderPinBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     const { phone, pin } = parsed.data;
+    
     const profile = await db.query.profilesTable.findFirst({ where: eq(profilesTable.phone, phone) });
     if (!profile || !profile.pin_hash) return res.status(401).json({ error: "Invalid phone number or PIN" });
+    
     let valid = false;
     if (profile.pin_hash.length < 20) {
       if (pin === profile.pin_hash) {
         valid = true;
-        const newHash = await bcrypt.hash(pin, 10);
-        await db.update(profilesTable).set({ pin_hash: newHash, pin_plain: pin }).where(eq(profilesTable.id, profile.id));
+        const newHash = await bcrypt.hash(pin, 12); // Hash with strength 12
+        await db.update(profilesTable).set({ pin_hash: newHash }).where(eq(profilesTable.id, profile.id));
       }
     } else {
       valid = await bcrypt.compare(pin, profile.pin_hash);
     }
     if (!valid) return res.status(401).json({ error: "Invalid PIN" });
+
+    // Generate database-backed session_token
+    const sessionToken = crypto.randomUUID();
+    const expiresAt = Date.now() + 8 * 60 * 60 * 1000; // 8 hours
+
+    await db.update(profilesTable)
+      .set({ session_token: sessionToken })
+      .where(eq(profilesTable.id, profile.id));
+
     return res.json({
       success: true,
       profile_id: profile.id,
+      session_token: sessionToken,
+      expires_at: expiresAt,
       role: profile.role,
       can_create_events: profile.role === "super_admin" ? true : profile.can_create_events,
       can_view_kpis: profile.role === "super_admin" ? true : profile.can_view_kpis,
@@ -248,16 +225,15 @@ router.post("/leaders/verify-pin", async (req, res) => {
   }
 });
 
-router.get("/leaders/pins", async (req, res) => {
+// GET /leaders/pins - Lists leaders without PIN information (protected: super_admin only)
+router.get("/leaders/pins", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    if (!isAuthorized(req)) return res.status(401).json({ error: "Unauthorized" });
     const { inArray } = await import("drizzle-orm");
     const leaders = await db
       .select({
         id: profilesTable.id,
         full_name: profilesTable.full_name,
         phone: profilesTable.phone,
-        pin_plain: profilesTable.pin_plain,
       })
       .from(profilesTable)
       .where(inArray(profilesTable.role, ["leader", "super_admin"]));
@@ -268,46 +244,68 @@ router.get("/leaders/pins", async (req, res) => {
   }
 });
 
-router.post("/leaders/update-pin", async (req, res) => {
+// POST /leaders/:id/reset-pin - Secure random PIN reset (protected: super_admin only)
+router.post("/leaders/:id/reset-pin", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    const auth = getAuth(req);
-    if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
-    const parsed = UpdateLeaderPinBody.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const profile = await db.query.profilesTable.findFirst({ where: eq(profilesTable.clerk_id, auth.userId) });
-    if (!profile || !profile.pin_hash) return res.status(401).json({ error: "No PIN set" });
-    const valid = await bcrypt.compare(parsed.data.current_pin, profile.pin_hash);
-    if (!valid) return res.status(401).json({ error: "Current PIN is incorrect" });
-    const newHash = await bcrypt.hash(parsed.data.new_pin, 10);
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, req.params.id),
+    });
+    if (!profile) return res.status(404).json({ error: "Leader not found" });
+
+    // Generate crypto-random 6 digit PIN
+    const rawPin = crypto.randomInt(100000, 999999).toString();
+    const pinHash = await bcrypt.hash(rawPin, 12); // Strength 12 bcrypt
+
     await db.update(profilesTable)
-      .set({ pin_hash: newHash, pin_plain: parsed.data.new_pin })
+      .set({ pin_hash: pinHash })
       .where(eq(profilesTable.id, profile.id));
-    return res.json({ message: "PIN updated successfully" });
+
+    // Send PIN via background emails queue (SendGrid)
+    const emailBody = `
+      <div style="font-family: 'Inter', sans-serif; background-color: #0B0F14; color: #E6E8EB; padding: 24px; border-radius: 8px;">
+        <h2 style="color: #2A9D8F; font-family: 'Sora', sans-serif;">Youth Connect PIN Reset</h2>
+        <p>Hi ${profile.full_name},</p>
+        <p>A super administrator has reset your leader PIN. Here is your temporary PIN for accessing the leader dashboard:</p>
+        <div style="background-color: rgba(255,255,255,0.05); padding: 16px; text-align: center; border-radius: 6px; margin: 20px 0;">
+          <span style="font-size: 32px; font-weight: bold; letter-spacing: 0.25em; color: #3DBFB0;">${rawPin}</span>
+        </div>
+        <p style="font-size: 14px; color: #A0AEC0;">Please log in using this PIN and update it immediately to a personal PIN under your settings.</p>
+      </div>
+    `;
+
+    await db.insert(pendingEmailsTable).values({
+      to_address: profile.email || "",
+      subject: "Youth Connect — Secure PIN Reset",
+      body_html: emailBody,
+    });
+
+    return res.json({ success: true });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
   }
 });
 
-router.post("/leaders/:profileId/set-pin", async (req, res) => {
+// POST /leaders/logout - Clear own session (protected: leader)
+router.post("/leaders/logout", requireLeaderSession("leader"), async (req, res) => {
   try {
-    const requester = await getRequesterProfile(req);
-    const isSuperAdmin = requester?.role === "super_admin";
-    if (!isSuperAdmin) return res.status(403).json({ error: "Super admin only" });
+    await db.update(profilesTable)
+      .set({ session_token: null })
+      .where(eq(profilesTable.id, req.leaderId!));
+    return res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
-    const { pin } = req.body;
-    if (typeof pin !== "string" || !/^\d{4}$/.test(pin))
-      return res.status(400).json({ error: "PIN must be exactly 4 digits" });
-
-    const pinHash = await bcrypt.hash(pin, 10);
-    const [updated] = await db
-      .update(profilesTable)
-      .set({ pin_hash: pinHash, pin_plain: pin })
-      .where(eq(profilesTable.id, req.params.profileId))
-      .returning({ id: profilesTable.id, full_name: profilesTable.full_name, pin_plain: profilesTable.pin_plain });
-
-    if (!updated) return res.status(404).json({ error: "Leader not found" });
-    return res.json({ success: true, ...updated });
+// POST /leaders/:id/revoke-session - Revoke leader session (protected: super_admin only)
+router.post("/leaders/:id/revoke-session", requireLeaderSession("super_admin"), async (req, res) => {
+  try {
+    await db.update(profilesTable)
+      .set({ session_token: null })
+      .where(eq(profilesTable.id, req.params.id));
+    return res.json({ success: true });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });

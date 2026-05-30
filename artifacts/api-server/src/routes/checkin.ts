@@ -8,19 +8,14 @@ import {
   checkInRequestsTable,
   attendanceTable,
   visitorsTable,
+  pendingEmailsTable,
   type Profile,
 } from "@workspace/db";
-
-import { sendEmail } from "../lib/twilio";
+import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 
 const router = Router();
 
-// ── Auth helpers ──────────────────────────────────────────────────────────────
-
-/**
- * Resolve the authenticated profile from a Clerk JWT.
- * Returns null if the request has no valid Clerk session.
- */
+// Resolve profile from Clerk token
 async function resolveClerkProfile(req: Request): Promise<Profile | null> {
   const auth = getAuth(req);
   if (!auth?.userId) return null;
@@ -30,64 +25,8 @@ async function resolveClerkProfile(req: Request): Promise<Profile | null> {
   return profile ?? null;
 }
 
-/**
- * Resolve a leader/super_admin profile from either:
- *   1. A valid Clerk JWT whose profile has role leader|super_admin, OR
- *   2. A valid x-leader-session header (PIN-based leader auth).
- *
- * Returns null if neither auth method yields a leader/super_admin.
- */
-async function resolveLeaderOrAdmin(req: Request): Promise<Profile | null> {
-  // 1. Try Clerk auth
-  const clerkAuth = getAuth(req);
-  if (clerkAuth?.userId) {
-    const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, clerkAuth.userId),
-    });
-    if (
-      profile &&
-      (profile.role === "leader" || profile.role === "super_admin")
-    ) {
-      return profile;
-    }
-    // Clerk user found but not a leader — do NOT fall through to session header
-    return null;
-  }
-
-  // 2. Fall back to x-leader-session (PIN-based leader auth from dashboard)
-  const sessionHeader = req.headers["x-leader-session"];
-  if (typeof sessionHeader === "string") {
-    try {
-      const session: { profile_id?: string; expires_at?: number } =
-        JSON.parse(sessionHeader);
-      if (
-        session.profile_id &&
-        typeof session.expires_at === "number" &&
-        Date.now() < session.expires_at
-      ) {
-        const profile = await db.query.profilesTable.findFirst({
-          where: eq(profilesTable.id, session.profile_id),
-        });
-        if (
-          profile &&
-          (profile.role === "leader" || profile.role === "super_admin")
-        ) {
-          return profile;
-        }
-      }
-    } catch {
-      // ignore malformed session header
-    }
-  }
-
-  return null;
-}
-
 // ── Time-window helpers ───────────────────────────────────────────────────────
 
-/**
- * Returns true only on Fridays between 18:30 and 22:00 Africa/Johannesburg.
- */
 function isCheckinWindowOpen(): boolean {
   const sast = toZonedTime(new Date(), "Africa/Johannesburg");
   const day = sast.getDay(); // 0 = Sunday, 5 = Friday
@@ -95,9 +34,6 @@ function isCheckinWindowOpen(): boolean {
   return day === 5 && totalMinutes >= 18 * 60 + 30 && totalMinutes < 22 * 60;
 }
 
-/**
- * Returns today's date string in Africa/Johannesburg timezone (YYYY-MM-DD).
- */
 function getSastToday(): string {
   const sast = toZonedTime(new Date(), "Africa/Johannesburg");
   const y = sast.getFullYear();
@@ -108,11 +44,7 @@ function getSastToday(): string {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
-/**
- * GET /api/checkin/search
- * Search profiles by name or phone — used by the leader dashboard manual
- * check-in panel. No auth required (results are non-sensitive).
- */
+// GET /api/checkin/search - Search members (Public)
 router.get("/checkin/search", async (req, res) => {
   try {
     const query = typeof req.query.query === "string" ? req.query.query : "";
@@ -136,22 +68,9 @@ router.get("/checkin/search", async (req, res) => {
   }
 });
 
-/**
- * POST /api/checkin/requests
- *
- * Member self check-in. Requires a valid Clerk JWT — the authenticated user's
- * profile is always used; profile_id in the request body is ignored (and
- * rejected if it doesn't match the authenticated user).
- *
- * Time restriction: Fridays 18:30–22:00 Africa/Johannesburg only.
- *
- * Role behaviour:
- *   leader | super_admin → inserted directly into attendance (approved)
- *   member | visitor     → inserted into check_in_requests as pending
- */
+// POST /api/checkin/requests - Member self check-in request (Clerk-auth)
 router.post("/checkin/requests", async (req, res) => {
   try {
-    // ── 1. Require Clerk auth ─────────────────────────────────────────────────
     const clerkAuth = getAuth(req);
     if (!clerkAuth?.userId) {
       return res
@@ -159,7 +78,6 @@ router.post("/checkin/requests", async (req, res) => {
         .json({ error: "Unauthorized. Please sign in to check in." });
     }
 
-    // ── 2. Server-side time-window check (Africa/Johannesburg) ────────────────
     if (!isCheckinWindowOpen()) {
       const sast = toZonedTime(new Date(), "Africa/Johannesburg");
       const day = sast.getDay();
@@ -180,7 +98,6 @@ router.post("/checkin/requests", async (req, res) => {
       });
     }
 
-    // ── 3. Resolve profile from Clerk token (never from request body) ─────────
     const profile = await resolveClerkProfile(req);
     if (!profile) {
       return res.status(404).json({
@@ -188,7 +105,6 @@ router.post("/checkin/requests", async (req, res) => {
       });
     }
 
-    // ── 4. Reject if body contains a mismatched profile_id ───────────────────
     const bodyData =
       req.body && typeof req.body === "object"
         ? (req.body as Record<string, unknown>)
@@ -202,15 +118,12 @@ router.post("/checkin/requests", async (req, res) => {
       });
     }
 
-    // Log the sessionSlug for now, as we cannot modify the DB schema to store it.
-    // The check-in will still be associated with the current day's session.
     if (sessionSlug) {
       req.log.info(`Check-in request for sessionSlug: ${sessionSlug}`);
     }
 
     const today = getSastToday();
 
-    // ── 5. Duplicate check: already in attendance ─────────────────────────────
     const existingAttendance = await db.query.attendanceTable.findFirst({
       where: and(
         eq(attendanceTable.profile_id, profile.id),
@@ -223,7 +136,6 @@ router.post("/checkin/requests", async (req, res) => {
       });
     }
 
-    // ── 6. Duplicate check: already has a pending request ────────────────────
     const existingRequest = await db.query.checkInRequestsTable.findFirst({
       where: and(
         eq(checkInRequestsTable.profile_id, profile.id),
@@ -237,9 +149,7 @@ router.post("/checkin/requests", async (req, res) => {
       });
     }
 
-    // ── 7. Role-based routing ─────────────────────────────────────────────────
     if (profile.role === "leader" || profile.role === "super_admin") {
-      // Leaders and super admins bypass the approval queue
       const [attendance] = await db
         .insert(attendanceTable)
         .values({
@@ -257,7 +167,6 @@ router.post("/checkin/requests", async (req, res) => {
       });
     }
 
-    // Members and visitors → pending approval
     const [request] = await db
       .insert(checkInRequestsTable)
       .values({
@@ -279,30 +188,12 @@ router.post("/checkin/requests", async (req, res) => {
   }
 });
 
-/**
- * GET /api/checkin/requests?status=pending
- *
- * Returns today's check-in requests, optionally filtered by status.
- * Joins with profiles (members) and visitors (first-timers) to include names.
- * Auth: leaders and super admins only (Clerk JWT or x-leader-session header).
- */
-router.get("/checkin/requests", async (req, res) => {
+// GET /api/checkin/requests - List today's check-in requests (protected: leader)
+router.get("/checkin/requests", requireLeaderSession("leader"), async (req, res) => {
   try {
-    const leader = await resolveLeaderOrAdmin(req);
-    if (!leader) {
-      const clerkAuth = getAuth(req);
-      if (!clerkAuth?.userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      return res
-        .status(403)
-        .json({ error: "Forbidden. Leaders and super admins only." });
-    }
-
     const today = getSastToday();
     const statusFilter = req.query.status as string | undefined;
 
-    // Build status condition
     const validStatuses = ["pending", "approved", "rejected"] as const;
     type ValidStatus = (typeof validStatuses)[number];
     const statusCondition =
@@ -319,11 +210,9 @@ router.get("/checkin/requests", async (req, res) => {
         session_date: checkInRequestsTable.session_date,
         status: checkInRequestsTable.status,
         requested_at: checkInRequestsTable.requested_at,
-        // Member fields (null for visitor requests)
         member_name: profilesTable.full_name,
         member_phone: profilesTable.phone,
         member_role: profilesTable.role,
-        // Visitor fields (null for member requests)
         visitor_name: visitorsTable.full_name,
         visitor_phone: visitorsTable.phone_number,
         visitor_age: visitorsTable.age,
@@ -347,7 +236,6 @@ router.get("/checkin/requests", async (req, res) => {
       )
       .orderBy(desc(checkInRequestsTable.requested_at));
 
-    // Normalise: expose a single `name`, `phone`, `role` regardless of type
     const requests = rows.map((row) => ({
       id: row.id,
       type: row.type,
@@ -375,28 +263,9 @@ router.get("/checkin/requests", async (req, res) => {
   }
 });
 
-/**
- * PATCH /api/checkin/requests/:id/approve
- *
- * Approve a pending check-in request:
- *   1. Insert a row into attendance.
- *   2. Delete the row from check_in_requests.
- *
- * Auth: leaders and super admins only.
- */
-router.patch("/checkin/requests/:id/approve", async (req, res) => {
+// PATCH /api/checkin/requests/:id/approve - Approve check-in request (protected: leader)
+router.patch("/checkin/requests/:id/approve", requireLeaderSession("leader"), async (req, res) => {
   try {
-    const leader = await resolveLeaderOrAdmin(req);
-    if (!leader) {
-      const clerkAuth = getAuth(req);
-      if (!clerkAuth?.userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      return res
-        .status(403)
-        .json({ error: "Forbidden. Leaders and super admins only." });
-    }
-
     const request = await db.query.checkInRequestsTable.findFirst({
       where: eq(checkInRequestsTable.id, req.params.id),
     });
@@ -411,7 +280,6 @@ router.patch("/checkin/requests/:id/approve", async (req, res) => {
         .json({ error: "Request has already been processed." });
     }
 
-    // Insert into attendance (profile_id may be null for visitor requests)
     await db.insert(attendanceTable).values({
       profile_id: request.profile_id ?? undefined,
       session_date: request.session_date,
@@ -419,12 +287,11 @@ router.patch("/checkin/requests/:id/approve", async (req, res) => {
       type: request.type,
     });
 
-    // Remove from check_in_requests — no longer needed
     await db
       .delete(checkInRequestsTable)
       .where(eq(checkInRequestsTable.id, req.params.id));
 
-    // Send check-in confirmation email via Twilio if profile has an email
+    // Send check-in confirmation email via database pending_emails queue
     if (request.profile_id) {
       const profile = await db.query.profilesTable.findFirst({
         where: eq(profilesTable.id, request.profile_id),
@@ -438,11 +305,21 @@ router.patch("/checkin/requests/:id/approve", async (req, res) => {
         } catch {
           sessionDate = String(request.session_date);
         }
-        await sendEmail({
-          to: profile.email,
+
+        const emailBody = `
+          <div style="font-family: 'Inter', sans-serif; background-color: #0B0F14; color: #E6E8EB; padding: 24px; border-radius: 8px;">
+            <h2 style="color: #2A9D8F; font-family: 'Sora', sans-serif;">You are Checked In!</h2>
+            <p>Hi <strong>${profile.full_name}</strong>,</p>
+            <p>You have been successfully checked in for the youth session on <strong>${sessionDate}</strong>.</p>
+            <p>See you in there!</p>
+            <p style="margin-top: 24px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation Youth Team</p>
+          </div>
+        `;
+
+        await db.insert(pendingEmailsTable).values({
+          to_address: profile.email,
           subject: "You are checked in — Jeremiah Generation Youth",
-          text: `Hi ${profile.full_name},\n\nYou have been checked in for the session on ${sessionDate}.\n\nSee you in there!\nJeremiah Generation Youth`,
-          html: `<p>Hi <strong>${profile.full_name}</strong>,</p><p>You have been successfully checked in for the session on <strong>${sessionDate}</strong>.</p><p>See you in there!<br/>Jeremiah Generation Youth</p>`,
+          body_html: emailBody,
         });
       }
     }
@@ -457,25 +334,9 @@ router.patch("/checkin/requests/:id/approve", async (req, res) => {
   }
 });
 
-/**
- * PATCH /api/checkin/requests/:id/reject
- *
- * Reject a pending check-in request by deleting it from check_in_requests.
- * Auth: leaders and super admins only.
- */
-router.patch("/checkin/requests/:id/reject", async (req, res) => {
+// PATCH /api/checkin/requests/:id/reject - Reject check-in request (protected: leader)
+router.patch("/checkin/requests/:id/reject", requireLeaderSession("leader"), async (req, res) => {
   try {
-    const leader = await resolveLeaderOrAdmin(req);
-    if (!leader) {
-      const clerkAuth = getAuth(req);
-      if (!clerkAuth?.userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-      return res
-        .status(403)
-        .json({ error: "Forbidden. Leaders and super admins only." });
-    }
-
     const request = await db.query.checkInRequestsTable.findFirst({
       where: eq(checkInRequestsTable.id, req.params.id),
     });
@@ -490,7 +351,6 @@ router.patch("/checkin/requests/:id/reject", async (req, res) => {
         .json({ error: "Request has already been processed." });
     }
 
-    // Delete from check_in_requests
     await db
       .delete(checkInRequestsTable)
       .where(eq(checkInRequestsTable.id, req.params.id));
@@ -502,6 +362,81 @@ router.patch("/checkin/requests/:id/reject", async (req, res) => {
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── SSE Check-in Status Stream Endpoint ───────────────────────────────────────
+router.get("/checkin/stream/:requestId", async (req, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  
+  res.write("retry: 5000\n"); // Tell client to retry in 5s if disconnected
+  res.write("data: {\"status\":\"pending\"}\n\n");
+
+  const requestId = req.params.requestId;
+
+  try {
+    // 1. Resolve request to get profile_id / visitor_id
+    const initialRequest = await db.query.checkInRequestsTable.findFirst({
+      where: eq(checkInRequestsTable.id, requestId),
+    });
+
+    if (!initialRequest) {
+      res.write("data: {\"status\":\"rejected\"}\n\n");
+      res.end();
+      return;
+    }
+
+    const { profile_id, visitor_id, session_date } = initialRequest;
+
+    const interval = setInterval(async () => {
+      try {
+        const request = await db.query.checkInRequestsTable.findFirst({
+          where: eq(checkInRequestsTable.id, requestId),
+        });
+
+        if (request) {
+          // Request still exists -> pending
+          res.write("data: {\"status\":\"pending\"}\n\n");
+        } else {
+          // Request deleted! Check if approved or rejected
+          let checkedIn = false;
+          if (profile_id) {
+            const attendance = await db.query.attendanceTable.findFirst({
+              where: and(
+                eq(attendanceTable.profile_id, profile_id),
+                eq(attendanceTable.session_date, session_date)
+              ),
+            });
+            checkedIn = !!attendance;
+          } else if (visitor_id) {
+            const visitor = await db.query.visitorsTable.findFirst({
+              where: eq(visitorsTable.id, visitor_id),
+            });
+            checkedIn = visitor?.status === "approved";
+          }
+
+          if (checkedIn) {
+            res.write("data: {\"status\":\"approved\"}\n\n");
+          } else {
+            res.write("data: {\"status\":\"rejected\"}\n\n");
+          }
+          
+          clearInterval(interval);
+          res.end();
+        }
+      } catch (err) {
+        clearInterval(interval);
+        res.end();
+      }
+    }, 2000);
+
+    req.on("close", () => {
+      clearInterval(interval);
+    });
+  } catch (err) {
+    res.end();
   }
 });
 

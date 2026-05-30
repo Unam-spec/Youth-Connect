@@ -38,6 +38,8 @@ import {
 import { QRCode as QRCodeDisplay } from "@/components/ui/qr-code";
 import { QRCodeSVG as QRCodeSVGInline } from "qrcode.react";
 
+import { CheckInWaitingState } from "@/components/CheckInWaitingState";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type CheckInStatus = "idle" | "loading" | "approved" | "pending" | "error";
@@ -46,6 +48,7 @@ type FlowMode = "qr" | "search";
 interface CheckInResult {
   status: "approved" | "pending";
   message: string;
+  requestId?: string;
 }
 
 interface Profile {
@@ -353,7 +356,7 @@ export default function CheckIn() {
         return;
       }
       const status: "approved" | "pending" = data.status ?? "pending";
-      setResult({ status, message: data.message });
+      setResult({ status, message: data.message, requestId: data.request?.id });
       setCheckInStatus(status);
     } catch {
       setCheckInStatus("error");
@@ -414,7 +417,7 @@ export default function CheckIn() {
         return;
       }
       const status: "approved" | "pending" = data.status ?? "pending";
-      setResult({ status, message: data.message });
+      setResult({ status, message: data.message, requestId: data.request?.id });
       setCheckInStatus(status);
     } catch {
       setCheckInStatus("error");
@@ -470,7 +473,16 @@ export default function CheckIn() {
   }
 
   // ── Success: pending ─────────────────────────────────────────────────────────
-  if (checkInStatus === "pending") {
+  if (checkInStatus === "pending" && result?.requestId) {
+    return (
+      <Layout>
+        <div className="max-w-sm mx-auto pt-12 px-4">
+          <CheckInWaitingState requestId={result.requestId} />
+        </div>
+      </Layout>
+    );
+  } else if (checkInStatus === "pending") {
+    // Fallback if no request ID is returned
     return (
       <Layout>
         <div className="max-w-sm mx-auto pt-12 px-4">

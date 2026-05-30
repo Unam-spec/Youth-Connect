@@ -66,9 +66,10 @@ export async function sendEmail(payload: EmailPayload): Promise<void> {
         `[twilio-sendgrid] Email send failed (${res.status}):`,
         errorText
       );
+      throw new Error(`SendGrid API error (${res.status}): ${errorText}`);
     }
   } catch (err) {
-    // Non-fatal — log but do not crash the request
     console.error("[twilio-sendgrid] Network error sending email:", err);
+    throw err;
   }
 }

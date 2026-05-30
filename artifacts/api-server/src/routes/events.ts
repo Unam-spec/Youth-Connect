@@ -1,5 +1,4 @@
 import { Router, Request, Response } from "express";
-import { getAuth } from "@clerk/express";
 import { eq, and, gte, sql, count } from "drizzle-orm";
 import {
   db,
@@ -7,12 +6,14 @@ import {
   rsvpsTable,
   attendanceTable,
   profilesTable,
+  pendingEmailsTable,
 } from "@workspace/db";
 import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
-import { sendEmail } from "../lib/twilio";
+import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 
 const router = Router();
 
+// GET /events - Retrieve list of events
 router.get("/events", async (req: Request, res: Response) => {
   try {
     const publicOnly = req.query.public_only === "true";
@@ -57,19 +58,14 @@ router.get("/events", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/events", async (req: Request, res: Response) => {
+// POST /events - Create a new event (protected: leader)
+router.post("/events", requireLeaderSession("leader"), async (req: Request, res: Response) => {
   try {
-    const auth = getAuth(req);
-    if (!auth?.userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
     const parsed = CreateEventBody.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten() });
     }
-    const creatorProfile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
+    
     const eventDate =
       parsed.data.date instanceof Date
         ? parsed.data.date.toISOString().split("T")[0]
@@ -87,10 +83,11 @@ router.post("/events", async (req: Request, res: Response) => {
         age_max: parsed.data.age_max ?? null,
         custom_requirements: parsed.data.custom_requirements ?? null,
         is_public: parsed.data.is_public ?? true,
-        created_by: creatorProfile?.id ?? null,
+        created_by: req.leaderId ?? null,
       })
       .returning();
-    // Notify all members & leaders with emails about the new event (public events only)
+
+    // Queue email notifications for new public events
     if (event.is_public) {
       const { inArray } = await import("drizzle-orm");
       const recipients = await db
@@ -98,52 +95,77 @@ router.post("/events", async (req: Request, res: Response) => {
         .from(profilesTable)
         .where(inArray(profilesTable.role, ["member", "leader", "super_admin"]));
 
-      let eventDate = "";
+      let SouthAfricaDate = "";
       try {
-        eventDate = new Date(event.date).toLocaleDateString("en-ZA", {
+        SouthAfricaDate = new Date(event.date).toLocaleDateString("en-ZA", {
           weekday: "long", year: "numeric", month: "long", day: "numeric",
         });
       } catch {
-        eventDate = String(event.date);
+        SouthAfricaDate = String(event.date);
       }
 
-      await Promise.allSettled(
-        recipients
+      if (recipients.length > 0) {
+        const emailInserts = recipients
           .filter((r: any) => !!r.email)
-          .map((r: any) =>
-            sendEmail({
-              to: r.email!,
-              subject: `New event: ${event.title} — Jeremiah Generation Youth`,
-              text: `Hi ${r.full_name},\n\nA new event has been published.\n\n${event.title}\nDate: ${eventDate}\nTime: ${event.time}\nLocation: ${event.location}\n${event.description ? "\n" + event.description + "\n" : ""}\nLog in to RSVP.\n\nJeremiah Generation Youth`,
-              html: `<p>Hi <strong>${r.full_name}</strong>,</p><p>A new event has been published:</p><table style="border-collapse:collapse;margin:8px 0"><tr><td style="padding:4px 12px 4px 0;color:#888">Event</td><td><strong>${event.title}</strong></td></tr><tr><td style="padding:4px 12px 4px 0;color:#888">Date</td><td>${eventDate}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#888">Time</td><td>${event.time}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#888">Location</td><td>${event.location}</td></tr></table>${event.description ? `<p>${event.description}</p>` : ""}<p>Log in to RSVP.<br/>Jeremiah Generation Youth</p>`,
-            })
-          )
-      );
+          .map((r: any) => ({
+            to_address: r.email!,
+            subject: `New event: ${event.title} — Jeremiah Generation Youth`,
+            body_html: `
+              <div style="font-family: 'Inter', sans-serif; background-color: #0B0F14; color: #E6E8EB; padding: 24px; border-radius: 8px;">
+                <h2 style="color: #2A9D8F; font-family: 'Sora', sans-serif;">New Event Published!</h2>
+                <p>Hi <strong>${r.full_name}</strong>,</p>
+                <p>A new event has been published on the calendar:</p>
+                <table style="border-collapse: collapse; margin: 16px 0; background-color: rgba(255,255,255,0.02); border-radius: 6px; width: 100%;">
+                  <tr><td style="padding: 8px 12px; color: #A0AEC0; width: 100px;">Event:</td><td style="padding: 8px 12px; font-weight: bold; color: #3DBFB0;">${event.title}</td></tr>
+                  <tr><td style="padding: 8px 12px; color: #A0AEC0;">Date:</td><td style="padding: 8px 12px;">${SouthAfricaDate}</td></tr>
+                  <tr><td style="padding: 8px 12px; color: #A0AEC0;">Time:</td><td style="padding: 8px 12px;">${event.time}</td></tr>
+                  <tr><td style="padding: 8px 12px; color: #A0AEC0;">Location:</td><td style="padding: 8px 12px;">${event.location}</td></tr>
+                </table>
+                ${event.description ? `<p style="margin-top: 16px; color: #CBD5E0;">${event.description}</p>` : ""}
+                <p style="margin-top: 24px;">Please log in to your dashboard to RSVP.</p>
+                <p style="margin-top: 16px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation Youth Team</p>
+              </div>
+            `,
+          }));
 
-      // 24h reminder: if the event is exactly tomorrow, send reminder emails now.
-      // (For a proper scheduler this would run as a cron job — this covers the case
-      //  where an event is created the day before.)
-      const eventDateObj = new Date(event.date);
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const isTomorrow =
-        eventDateObj.getFullYear() === tomorrow.getFullYear() &&
-        eventDateObj.getMonth() === tomorrow.getMonth() &&
-        eventDateObj.getDate() === tomorrow.getDate();
+        if (emailInserts.length > 0) {
+          await db.insert(pendingEmailsTable).values(emailInserts);
+        }
 
-      if (isTomorrow) {
-        await Promise.allSettled(
-          recipients
+        // 24h tomorrow reminder email check
+        const eventDateObj = new Date(event.date);
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const isTomorrow =
+          eventDateObj.getFullYear() === tomorrow.getFullYear() &&
+          eventDateObj.getMonth() === tomorrow.getMonth() &&
+          eventDateObj.getDate() === tomorrow.getDate();
+
+        if (isTomorrow) {
+          const reminderInserts = recipients
             .filter((r: any) => !!r.email)
-            .map((r: any) =>
-              sendEmail({
-                to: r.email!,
-                subject: `Reminder: ${event.title} is tomorrow — Jeremiah Generation Youth`,
-                text: `Hi ${r.full_name},\n\nJust a reminder that "${event.title}" is tomorrow.\n\nDate: ${eventDate}\nTime: ${event.time}\nLocation: ${event.location}\n\nSee you there,\nJeremiah Generation Youth`,
-                html: `<p>Hi <strong>${r.full_name}</strong>,</p><p>Just a reminder that <strong>${event.title}</strong> is tomorrow.</p><table style="border-collapse:collapse;margin:8px 0"><tr><td style="padding:4px 12px 4px 0;color:#888">Time</td><td>${event.time}</td></tr><tr><td style="padding:4px 12px 4px 0;color:#888">Location</td><td>${event.location}</td></tr></table><p>See you there,<br/>Jeremiah Generation Youth</p>`,
-              })
-            )
-        );
+            .map((r: any) => ({
+              to_address: r.email!,
+              subject: `Reminder: ${event.title} is tomorrow — Jeremiah Generation Youth`,
+              body_html: `
+                <div style="font-family: 'Inter', sans-serif; background-color: #0B0F14; color: #E6E8EB; padding: 24px; border-radius: 8px;">
+                  <h2 style="color: #2A9D8F; font-family: 'Sora', sans-serif;">Event Reminder</h2>
+                  <p>Hi <strong>${r.full_name}</strong>,</p>
+                  <p>Just a quick reminder that <strong>${event.title}</strong> is happening tomorrow!</p>
+                  <table style="border-collapse: collapse; margin: 16px 0; background-color: rgba(255,255,255,0.02); border-radius: 6px; width: 100%;">
+                    <tr><td style="padding: 8px 12px; color: #A0AEC0; width: 100px;">Time:</td><td style="padding: 8px 12px;">${event.time}</td></tr>
+                    <tr><td style="padding: 8px 12px; color: #A0AEC0;">Location:</td><td style="padding: 8px 12px;">${event.location}</td></tr>
+                  </table>
+                  <p>We look forward to seeing you there!</p>
+                  <p style="margin-top: 24px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation Youth Team</p>
+                </div>
+              `,
+            }));
+
+          if (reminderInserts.length > 0) {
+            await db.insert(pendingEmailsTable).values(reminderInserts);
+          }
+        }
       }
     }
 
@@ -156,6 +178,7 @@ router.post("/events", async (req: Request, res: Response) => {
   }
 });
 
+// GET /events/:id - View single event details
 router.get("/events/:id", async (req: Request, res: Response) => {
   try {
     const event = await db.query.eventsTable.findFirst({
@@ -183,12 +206,9 @@ router.get("/events/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.patch("/events/:id", async (req: Request, res: Response) => {
+// PATCH /events/:id - Update event (protected: leader)
+router.patch("/events/:id", requireLeaderSession("leader"), async (req: Request, res: Response) => {
   try {
-    const auth = getAuth(req);
-    if (!auth?.userId) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
     const parsed = UpdateEventBody.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten() });
@@ -215,42 +235,9 @@ router.patch("/events/:id", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/events/:id", async (req: Request, res: Response) => {
+// DELETE /events/:id - Delete event (protected: leader)
+router.delete("/events/:id", requireLeaderSession("leader"), async (req: Request, res: Response) => {
   try {
-    const auth = getAuth(req);
-    const isLeaderSess = (() => {
-      try {
-        const h = req.headers["x-leader-session"];
-        if (!h) return false;
-        const s = JSON.parse(h as string);
-        return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
-      } catch { return false; }
-    })();
-
-    if (!auth?.userId && !isLeaderSess) {
-      return res.status(401).json({ error: "Unauthorized" });
-    }
-
-    let profile: any = null;
-    if (auth?.userId) {
-      profile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.clerk_id, auth.userId),
-      });
-    } else {
-      const session = JSON.parse(req.headers["x-leader-session"] as string);
-      profile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.id, session.profile_id),
-      });
-    }
-
-    if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
-    }
-
-    if (profile.role !== "leader" && profile.role !== "super_admin") {
-      return res.status(403).json({ error: "Forbidden" });
-    }
-
     const eventId = req.params.id as string;
 
     await db.transaction(async (tx: any) => {
@@ -269,7 +256,7 @@ router.delete("/events/:id", async (req: Request, res: Response) => {
   }
 });
 
-
+// GET /events/:id/stats - Event RSVP and attendance statistics
 router.get("/events/:id/stats", async (req: Request, res: Response) => {
   try {
     const [rsvpCounts] = await db
