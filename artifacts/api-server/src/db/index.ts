@@ -7,17 +7,21 @@ const client = new Client({
   connectionString: process.env.DATABASE_URL,
 });
 
-async function connectDb() {
-  await client.connect();
-}
+let isConnected = false;
 
-connectDb();
+export async function connectDb() {
+  if (!isConnected) {
+    await client.connect();
+    isConnected = true;
+  }
+}
 
 export const db = drizzle(client as any, { schema: { messagesTable, roleEnum } });
 
 export async function runMigrations() {
   console.log("Running migrations...");
   try {
+    await connectDb();
     await migrate(db, { migrationsFolder: "./drizzle" });
     console.log("Migrations finished!");
   } catch (err: any) {
@@ -29,3 +33,4 @@ export async function runMigrations() {
     }
   }
 }
+

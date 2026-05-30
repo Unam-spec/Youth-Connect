@@ -101,6 +101,9 @@ importers:
       http-proxy-middleware:
         specifier: ^4.0.0
         version: 4.0.0
+      pg:
+        specifier: ^8.20.0
+        version: 8.21.0
       pino:
         specifier: ^9
         version: 9.14.0
@@ -129,6 +132,9 @@ importers:
       '@types/node':
         specifier: ^25.3.3
         version: 25.9.1
+      '@types/pg':
+        specifier: ^8.18.0
+        version: 8.20.0
       cross-env:
         specifier: ^7.0.3
         version: 7.0.3
@@ -6741,7 +6747,7 @@ snapshots:
 
   '@types/pg-pool@2.0.6':
     dependencies:
-      '@types/pg': 8.6.1
+      '@types/pg': 8.20.0
 
   '@types/pg@8.20.0':
     dependencies:
