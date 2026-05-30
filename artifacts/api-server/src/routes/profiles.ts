@@ -350,12 +350,7 @@ router.get("/profiles", requireLeaderSession("leader"), async (req: Request, res
       .limit(pageSize)
       .offset(offset);
 
-    return res.json({
-      data: profiles,
-      total,
-      page,
-      pageSize,
-    });
+    return res.json(profiles);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
