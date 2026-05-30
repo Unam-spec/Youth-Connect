@@ -26,6 +26,8 @@ export const GetMyProfileResponse = zod.object({
   gender: zod.enum(["male", "female", "other", "null"]).nullish(),
   age: zod.number().nullish(),
   heard_from: zod.string().nullish(),
+  school: zod.string().nullish(),
+  parent_phone: zod.string().nullish(),
   role: zod.enum(["super_admin", "leader", "member", "visitor"]),
   created_at: zod.coerce.date(),
 });
@@ -41,6 +43,8 @@ export const UpdateMyProfileBody = zod.object({
   age: zod.number().optional(),
   heard_from: zod.string().optional(),
   pin: zod.string().optional(),
+  school: zod.string().optional(),
+  parent_phone: zod.string().optional(),
 });
 
 export const UpdateMyProfileResponse = zod.object({
