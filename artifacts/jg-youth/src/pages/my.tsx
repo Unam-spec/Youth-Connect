@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { getLeaderSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,9 @@ export default function MyDashboard() {
   // Profile Picture state
   const [showAvatarDialog, setShowAvatarDialog] = useState(false);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const presets = [
     "linear-gradient(135deg, #FF5E3A 0%, #FF2A68 100%)", // Sunset
@@ -147,6 +150,54 @@ export default function MyDashboard() {
       toast({ title: "Failed to save profile", variant: "destructive" });
     } finally {
       setIsSavingProfile(false);
+    }
+  }
+
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 400 }, height: { ideal: 400 }, facingMode: "user" }
+      });
+      setCameraStream(stream);
+      setIsCameraActive(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(e => console.error("Error playing video:", e));
+        }
+      }, 100);
+    } catch (err) {
+      toast({
+        title: "Camera error",
+        description: "Could not access camera. Please ensure permissions are granted.",
+        variant: "destructive"
+      });
+    }
+  }
+
+  function stopCamera() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setIsCameraActive(false);
+  }
+
+  async function capturePhoto() {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement("canvas");
+    const size = Math.min(video.videoWidth, video.videoHeight) || 300;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (ctx) {
+      const sx = (video.videoWidth - size) / 2;
+      const sy = (video.videoHeight - size) / 2;
+      ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      stopCamera();
+      await saveAvatar(dataUrl);
     }
   }
 
@@ -517,12 +568,12 @@ export default function MyDashboard() {
       </Dialog>
 
       {/* Change Profile Picture Dialog */}
-      <Dialog open={showAvatarDialog} onOpenChange={setShowAvatarDialog}>
+      <Dialog open={showAvatarDialog} onOpenChange={(open) => { setShowAvatarDialog(open); if (!open) stopCamera(); }}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Update Profile Picture</DialogTitle>
             <DialogDescription>
-              Choose a stunning custom background gradient preset or upload your own photo.
+              Choose a stunning custom background gradient preset, upload your own photo, or take a live picture.
             </DialogDescription>
           </DialogHeader>
 
@@ -547,7 +598,58 @@ export default function MyDashboard() {
               </div>
             </div>
 
-            {/* Divider */}
+            {/* Divider 1 */}
+            <div className="relative flex items-center py-1">
+              <div className="flex-grow border-t border-border" />
+              <span className="flex-shrink mx-4 text-xs font-semibold text-muted-foreground uppercase tracking-widest bg-background">or</span>
+              <div className="flex-grow border-t border-border" />
+            </div>
+
+            {/* Live Camera Option */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Take Live Photo</label>
+              {isCameraActive ? (
+                <div className="flex flex-col items-center gap-3">
+                  <div className="relative w-full aspect-square max-w-[240px] rounded-2xl overflow-hidden bg-black border border-border">
+                    <video
+                      ref={videoRef}
+                      className="w-full h-full object-cover transform -scale-x-100"
+                      playsInline
+                      muted
+                    />
+                  </div>
+                  <div className="flex gap-2 w-full">
+                    <Button
+                      onClick={capturePhoto}
+                      disabled={isSavingAvatar}
+                      className="flex-1 rounded-xl h-11 bg-teal-500 hover:bg-teal-400 text-white font-semibold shadow-md border-0"
+                    >
+                      Capture Snapshot
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={stopCamera}
+                      disabled={isSavingAvatar}
+                      className="rounded-xl h-11 px-4 border-border/80"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={startCamera}
+                  disabled={isSavingAvatar}
+                  className="w-full rounded-xl hover:bg-muted/10 h-11 flex items-center justify-center gap-2 cursor-pointer border-border/80"
+                >
+                  <Camera className="w-4 h-4" />
+                  Use Device Camera
+                </Button>
+              )}
+            </div>
+
+            {/* Divider 2 */}
             <div className="relative flex items-center py-1">
               <div className="flex-grow border-t border-border" />
               <span className="flex-shrink mx-4 text-xs font-semibold text-muted-foreground uppercase tracking-widest bg-background">or</span>
@@ -569,10 +671,10 @@ export default function MyDashboard() {
                 <Button
                   asChild
                   variant="outline"
-                  className="flex-1 rounded-xl cursor-pointer hover:bg-muted/10 h-11"
+                  className="flex-1 rounded-xl cursor-pointer hover:bg-muted/10 h-11 border-border/80"
                   disabled={isSavingAvatar}
                 >
-                  <label htmlFor="avatar-upload" className="flex items-center justify-center gap-2 cursor-pointer">
+                  <label htmlFor="avatar-upload" className="flex items-center justify-center gap-2 cursor-pointer w-full h-full">
                     <Upload className="w-4 h-4" />
                     Choose Image File
                   </label>

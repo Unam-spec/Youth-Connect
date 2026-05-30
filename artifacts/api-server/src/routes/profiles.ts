@@ -441,6 +441,51 @@ router.patch("/profiles/:id/permissions", async (req: Request, res: Response) =>
   }
 });
 
+router.patch("/profiles/:id", async (req: Request, res: Response) => {
+  try {
+    const auth = getAuth(req);
+    const isLeaderSess = hasLeaderSession(req);
+    if (!auth?.userId && !isLeaderSess)
+      return res.status(401).json({ error: "Unauthorized" });
+    let requesterProfile: any = null;
+    if (auth?.userId) {
+      requesterProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.clerk_id, auth.userId),
+      });
+    } else {
+      const session = JSON.parse(req.headers["x-leader-session"] as string);
+      requesterProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, session.profile_id),
+      });
+    }
+    if (!requesterProfile || (requesterProfile.role !== "leader" && requesterProfile.role !== "super_admin"))
+      return res.status(403).json({ error: "Forbidden. Leaders and super admins only." });
+
+    const { full_name, phone, email, gender, age, school, parent_phone, avatar_url } = req.body;
+    const updateData: Record<string, any> = {};
+    if (full_name !== undefined) updateData.full_name = full_name;
+    if (phone !== undefined) updateData.phone = phone;
+    if (email !== undefined) updateData.email = email;
+    if (gender !== undefined) updateData.gender = gender;
+    if (age !== undefined) updateData.age = age === null ? null : parseInt(String(age), 10);
+    if (school !== undefined) updateData.school = school;
+    if (parent_phone !== undefined) updateData.parent_phone = parent_phone;
+    if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
+
+    const [updated] = await db
+      .update(profilesTable)
+      .set(updateData)
+      .where(eq(profilesTable.id, req.params.id as string))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Profile not found" });
+    return res.json(updated);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.delete("/profiles/:id", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);

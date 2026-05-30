@@ -139,6 +139,40 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const apiFetch = useApiFetch();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+
+  // Auto-restoration effect: rebuild session if Clerk is signed in but localStorage is missing
+  useEffect(() => {
+    if (isLoaded && isSignedIn && !session) {
+      (async () => {
+        try {
+          const token = await getToken();
+          const response = await fetch("/api/profiles/me", {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+          });
+          if (response.ok) {
+            const profile = await response.json();
+            if (profile.role === "super_admin" || profile.role === "leader") {
+              setLeaderSession({
+                role: profile.role,
+                profile_id: profile.id,
+                can_create_events: profile.role === "super_admin" ? true : profile.can_create_events,
+                can_view_kpis: profile.role === "super_admin" ? true : profile.can_view_kpis,
+                can_view_members: profile.role === "super_admin" ? true : profile.can_view_members,
+                can_view_attendance: profile.role === "super_admin" ? true : profile.can_view_attendance,
+              });
+              window.location.reload();
+            }
+          }
+        } catch (e) {
+          console.error("Failed to restore leader session automatically:", e);
+        }
+      })();
+    }
+  }, [isLoaded, isSignedIn, session, getToken]);
 
   // ── All useState first ───────────────────────────────────────────────────
   const [search, setSearch] = useState("");
@@ -167,6 +201,83 @@ export default function Dashboard() {
   const [leaderPinInput, setLeaderPinInput] = useState("");
   const [pendingCheckIns, setPendingCheckIns] = useState<PendingCheckIn[]>([]);
   const [isPendingLoading, setIsPendingLoading] = useState(false);
+
+  // Edit Profile modal states
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editProfileId, setEditProfileId] = useState<string | null>(null);
+  const [editFullName, setEditFullName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editSchool, setEditSchool] = useState("");
+  const [editParentPhone, setEditParentPhone] = useState("");
+  const [editAge, setEditAge] = useState(18);
+  const [editGender, setEditGender] = useState<"male" | "female" | "other">("other");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  function openEditDialog(profile: any) {
+    setEditProfileId(profile.id);
+    setEditFullName(profile.full_name ?? "");
+    setEditPhone(profile.phone ?? "");
+    setEditEmail(profile.email ?? "");
+    setEditSchool(profile.school ?? "");
+    setEditParentPhone(profile.parent_phone ?? "");
+    setEditAge(profile.age ?? 18);
+    setEditGender(profile.gender ?? "other");
+    setShowEditDialog(true);
+  }
+
+  async function handleSaveEdit() {
+    if (!editProfileId) return;
+    if (!editFullName.trim()) {
+      toast({ title: "Name required", variant: "destructive" });
+      return;
+    }
+    setIsSavingEdit(true);
+    try {
+      const response = await apiFetch(`/api/profiles/${editProfileId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          full_name: editFullName.trim(),
+          phone: editPhone.trim() || null,
+          email: editEmail.trim() || null,
+          school: editSchool.trim() || null,
+          parent_phone: editParentPhone.trim() || null,
+          age: editAge ? parseInt(String(editAge), 10) : null,
+          gender: editGender,
+        }),
+      });
+
+      if (!response.ok) throw new Error();
+
+      toast({ title: "Profile updated successfully" });
+      setShowEditDialog(false);
+      queryClient.invalidateQueries({ queryKey: getListProfilesQueryKey() });
+    } catch {
+      toast({ title: "Failed to update profile", variant: "destructive" });
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  const [isWipingData, setIsWipingData] = useState(false);
+  const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+
+  async function handleWipeData() {
+    setIsWipingData(true);
+    try {
+      const response = await apiFetch("/api/admin/reset-data", {
+        method: "POST",
+      });
+      if (!response.ok) throw new Error();
+      toast({ title: "Database Wiped Successfully", description: "All test data has been reset." });
+      setShowWipeConfirm(false);
+      window.location.reload();
+    } catch {
+      toast({ title: "Wipe Failed", description: "Could not reset the database.", variant: "destructive" });
+    } finally {
+      setIsWipingData(false);
+    }
+  }
   const pendingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
     null,
   );
@@ -349,8 +460,20 @@ export default function Dashboard() {
     [pendingCheckIns],
   );
 
-  // ── Guard: must come after ALL hooks ─────────────────────────────────────
-  if (!session) return <Redirect to="/leader-login" />;
+  // While Clerk is loading, or if signed in but session is not restored yet, show loading
+  if (!session) {
+    if (!isLoaded || (isSignedIn && !session)) {
+      return (
+        <Layout>
+          <div className="max-w-md mx-auto py-12 flex flex-col items-center justify-center gap-4">
+            <div className="w-8 h-8 animate-spin rounded-full border-4 border-t-teal-500 border-r-transparent border-b-transparent border-l-transparent" />
+            <p className="text-muted-foreground text-sm font-medium">Verifying leader credentials…</p>
+          </div>
+        </Layout>
+      );
+    }
+    return <Redirect to="/leader-login" />;
+  }
 
   // Derived
   const superAdminCount =
@@ -1177,15 +1300,29 @@ export default function Dashboard() {
                             <p className="font-semibold text-sm leading-tight">
                               {profile.full_name}
                             </p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {profile.phone || "No phone"}
-                            </p>
+                            <div className="text-xs text-muted-foreground mt-0.5 flex flex-col gap-0.5">
+                              <span>{profile.phone || "No phone"}</span>
+                              {profile.school && (
+                                <span className="text-[10px] text-teal-400 font-medium">School: {profile.school}</span>
+                              )}
+                              {profile.parent_phone && (
+                                <span className="text-[10px] text-amber-400 font-medium">Parent: {profile.parent_phone}</span>
+                              )}
+                            </div>
                             <div className="mt-2">
                               <RoleBadge role={profile.role} />
                             </div>
                           </div>
                         </div>
                         <div className="flex items-start gap-2 flex-wrap sm:flex-col sm:items-end sm:shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(profile)}
+                            className="h-7 text-xs px-3 border-teal-500/20 hover:border-teal-500 hover:text-teal-300 transition-colors"
+                          >
+                            Edit Details
+                          </Button>
                           {profile.role === "visitor" && (
                             <Button
                               id={`btn-promote-${profile.id}`}
@@ -1950,22 +2087,40 @@ export default function Dashboard() {
                           </div>
                         ))}
                     </div>
-                    <div className="border-t border-border/40 pt-4">
-                      <p className="text-sm font-semibold mb-1">Your PIN</p>
-                      <p className="text-xs text-muted-foreground mb-3">
-                        {hasPin
-                          ? "PIN is set — used for leader authentication."
-                          : "No PIN set yet. Set one to enable leader login."}
-                      </p>
-                      <Button
-                        id="btn-set-pin"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowPinDialog(true)}
-                        className="border-teal-500/30 hover:border-teal-500 hover:text-teal-300 transition-colors"
-                      >
-                        {hasPin ? "Change PIN" : "Set PIN"}
-                      </Button>
+                    <div className="border-t border-border/40 pt-4 flex flex-col gap-4">
+                      <div>
+                        <p className="text-sm font-semibold mb-1">Your PIN</p>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          {hasPin
+                            ? "PIN is set — used for leader authentication."
+                            : "No PIN set yet. Set one to enable leader login."}
+                        </p>
+                        <Button
+                          id="btn-set-pin"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowPinDialog(true)}
+                          className="border-teal-500/30 hover:border-teal-500 hover:text-teal-300 transition-colors"
+                        >
+                          {hasPin ? "Change PIN" : "Set PIN"}
+                        </Button>
+                      </div>
+
+                      <div className="border-t border-border/40 pt-4">
+                        <p className="text-sm font-semibold text-red-400 mb-1">Danger Zone</p>
+                        <p className="text-xs text-muted-foreground mb-3">
+                          Completely wipe all events, attendance records, RSVPs, check-ins, and non-admin members. This action is irreversible.
+                        </p>
+                        <Button
+                          id="btn-wipe-data"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => setShowWipeConfirm(true)}
+                          className="bg-red-950 hover:bg-red-900 border border-red-500/35 text-red-200"
+                        >
+                          Wipe All Test Data
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -2025,6 +2180,122 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Edit Profile Dialog (Leader profiles revamp) ── */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-lg rounded-2xl bg-slate-900 text-white border-slate-800">
+          <DialogHeader>
+            <DialogTitle className="text-white font-bold">Edit Profile Details</DialogTitle>
+            <DialogDescription className="text-slate-300">
+              Update member details directly. Ensure all details are accurate.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name" className="text-slate-200">Full Name *</Label>
+              <Input
+                id="edit-name"
+                value={editFullName}
+                onChange={(e) => setEditFullName(e.target.value)}
+                placeholder="John Doe"
+                className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-phone" className="text-slate-200">Phone Number</Label>
+                <Input
+                  id="edit-phone"
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  placeholder="082 123 4567"
+                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-email" className="text-slate-200">Email</Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  placeholder="john@example.com"
+                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-gender" className="text-slate-200">Gender</Label>
+                <select
+                  id="edit-gender"
+                  value={editGender}
+                  onChange={(e: any) => setEditGender(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-1 text-sm text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-500 rounded-xl"
+                >
+                  <option value="male" className="bg-slate-900 text-white">Male</option>
+                  <option value="female" className="bg-slate-900 text-white">Female</option>
+                  <option value="other" className="bg-slate-900 text-white">Other</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-age" className="text-slate-200">Age</Label>
+                <Input
+                  id="edit-age"
+                  type="number"
+                  value={editAge}
+                  onChange={(e) => setEditAge(parseInt(e.target.value) || 0)}
+                  className="bg-slate-950/50 border-slate-700 text-white focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-school" className="text-slate-200">School / High School</Label>
+                <Input
+                  id="edit-school"
+                  value={editSchool}
+                  onChange={(e) => setEditSchool(e.target.value)}
+                  placeholder="e.g. Waterberg High School"
+                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-parent-phone" className="text-slate-200">Parent / Guardian Phone</Label>
+                <Input
+                  id="edit-parent-phone"
+                  value={editParentPhone}
+                  onChange={(e) => setEditParentPhone(e.target.value)}
+                  placeholder="072 123 4567"
+                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowEditDialog(false)}
+              disabled={isSavingEdit}
+              className="rounded-xl border-slate-700 hover:bg-slate-800 text-slate-200"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={isSavingEdit}
+              className="rounded-xl bg-teal-500 hover:bg-teal-400 text-white font-semibold border-0"
+            >
+              {isSavingEdit ? "Saving…" : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog
         open={!!deleteEventId}
         onOpenChange={(open) => !open && setDeleteEventId(null)}
@@ -2041,6 +2312,31 @@ export default function Dashboard() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteEvent}>
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={showWipeConfirm}
+        onOpenChange={setShowWipeConfirm}
+      >
+        <AlertDialogContent className="bg-slate-900 text-white border-slate-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-400 font-bold">Wipe All Test Data</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-300">
+              Are you absolutely sure you want to delete all events, check-ins, RSVPs, attendance, and non-admin members?
+              This action cannot be undone and will completely wipe the database clean.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleWipeData}
+              disabled={isWipingData}
+              className="bg-red-650 hover:bg-red-500 text-white font-semibold border-0"
+            >
+              {isWipingData ? "Wiping Data..." : "Wipe Everything"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

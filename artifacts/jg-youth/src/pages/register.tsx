@@ -38,7 +38,7 @@ const registerSchema = z.object({
     .string()
     .min(10, "Valid phone number is required")
     .max(15, "Phone number is too long"),
-  email: z.string().email("Invalid email address"),
+  email: z.string().email("Invalid email address").optional().or(z.literal("")),
   gender: z.enum(["male", "female", "other"], {
     required_error: "Please select a gender",
   }),
@@ -48,6 +48,8 @@ const registerSchema = z.object({
     .min(10, "Age must be at least 10")
     .max(100, "Age must be at most 100"),
   how_did_you_hear: z.string().min(2, "Please tell us how you heard about us"),
+  school: z.string().min(2, "School name is required"),
+  parent_phone: z.string().min(10, "Parent/Guardian phone is required").max(15),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -66,6 +68,8 @@ export default function Register() {
       gender: "male",
       age: 18,
       how_did_you_hear: "",
+      school: "",
+      parent_phone: "",
     },
   });
 
@@ -81,22 +85,20 @@ export default function Register() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          // No Authorization header — public endpoint
         },
         body: JSON.stringify({
           full_name: data.full_name,
           phone_number: data.phone_number,
-          // Convert empty string to null before sending
           email: data.email === "" ? null : (data.email ?? null),
           gender: data.gender,
-          // Ensure age is sent as an integer
           age: parseInt(String(data.age), 10),
           how_did_you_hear: data.how_did_you_hear,
+          school: data.school,
+          parent_phone: data.parent_phone,
         }),
       });
 
       if (response.status === 201) {
-        // Store their details so we can pre-fill Clerk sign-up
         if (data.email) {
           sessionStorage.setItem("jg_pending_signup_email", data.email);
           sessionStorage.setItem("jg_pending_signup_name", data.full_name);
@@ -105,7 +107,6 @@ export default function Register() {
         return;
       }
 
-      // Surface the exact server error message so developers can debug
       const errorData = await response.json().catch(() => ({}));
       setServerError(
         errorData.error ||
@@ -127,30 +128,30 @@ export default function Register() {
     return (
       <Layout>
         <div className="max-w-md mx-auto pt-10">
-          <Card className="border-primary/20 shadow-xl overflow-hidden relative">
+          <Card className="border-slate-700/80 bg-slate-800/90 text-white shadow-xl overflow-hidden relative">
             <div className="absolute top-0 left-0 w-full h-2 bg-primary" />
             <CardHeader className="text-center pb-2 pt-8">
               <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>
               <CardTitle className="text-2xl">You're registered!</CardTitle>
-              <CardDescription className="text-base mt-2">
+              <CardDescription className="text-base mt-2 text-slate-300">
                 Registered! A leader will approve your check-in.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6 pb-8 space-y-4">
-              <div className="bg-muted p-4 rounded-lg text-sm text-center text-muted-foreground">
+              <div className="bg-slate-950/40 border border-slate-700/50 p-4 rounded-lg text-sm text-center text-slate-300">
                 Please wait while a leader reviews and approves your check-in
                 request. You'll be called up once approved.
               </div>
               <div className="flex flex-col gap-3 pt-2">
                 <Link href="/">
-                  <Button className="w-full" size="lg">
+                  <Button className="w-full bg-teal-500 hover:bg-teal-400 text-white border-0 rounded-xl" size="lg">
                     Return Home
                   </Button>
                 </Link>
               </div>
-              <p className="text-xs text-muted-foreground text-center pt-1">
+              <p className="text-xs text-slate-400 text-center pt-1">
                 Once a leader approves your membership request, you will receive an email with a link to create your login.
               </p>
             </CardContent>
@@ -169,7 +170,7 @@ export default function Register() {
             <Button
               variant="ghost"
               size="sm"
-              className="-ml-3 text-muted-foreground"
+              className="-ml-3 text-muted-foreground hover:bg-slate-800/50 hover:text-white"
             >
               <ChevronLeft className="w-4 h-4 mr-1" />
               Back
@@ -177,12 +178,12 @@ export default function Register() {
           </Link>
         </div>
 
-        <Card className="shadow-xl border-border/80 bg-card overflow-hidden">
+        <Card className="shadow-2xl border-slate-700 bg-slate-800/90 text-white overflow-hidden">
           {/* Colourful accent stripe at top */}
           <div className="h-1.5 w-full bg-gradient-to-r from-primary via-teal-400 to-primary/60" />
           <CardHeader className="pb-4 pt-6">
-            <CardTitle className="text-2xl text-foreground font-bold">First Timer Registration</CardTitle>
-            <CardDescription className="text-muted-foreground/90 text-sm leading-relaxed">
+            <CardTitle className="text-2xl text-white font-bold">First Timer Registration</CardTitle>
+            <CardDescription className="text-slate-300 text-sm leading-relaxed">
               Welcome! Please fill in your details so we can get to know you
               better.
             </CardDescription>
@@ -204,17 +205,21 @@ export default function Register() {
                 <div className="space-y-4">
                   {/* Full Name */}
                   <FormField
-                    control={form.control}
-                    name="full_name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="John Doe" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                     control={form.control}
+                     name="full_name"
+                     render={({ field }) => (
+                       <FormItem>
+                         <FormLabel className="text-slate-200">Full Name *</FormLabel>
+                         <FormControl>
+                           <Input
+                             placeholder="John Doe"
+                             className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                             {...field}
+                           />
+                         </FormControl>
+                         <FormMessage />
+                       </FormItem>
+                     )}
                   />
 
                   {/* Phone + Email */}
@@ -224,11 +229,12 @@ export default function Register() {
                       name="phone_number"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Phone Number *</FormLabel>
+                          <FormLabel className="text-slate-200">Phone Number *</FormLabel>
                           <FormControl>
                             <Input
                               type="tel"
                               placeholder="082 123 4567"
+                              className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
                               {...field}
                             />
                           </FormControl>
@@ -242,11 +248,12 @@ export default function Register() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Email *</FormLabel>
+                          <FormLabel className="text-slate-200">Email <span className="text-slate-400 text-xs font-normal">(optional)</span></FormLabel>
                           <FormControl>
                             <Input
                               type="email"
                               placeholder="john@example.com"
+                              className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
                               {...field}
                             />
                           </FormControl>
@@ -263,20 +270,20 @@ export default function Register() {
                       name="gender"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Gender *</FormLabel>
+                          <FormLabel className="text-slate-200">Gender *</FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             defaultValue={field.value}
                           >
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className="bg-slate-950/50 border-slate-700 text-white focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11">
                                 <SelectValue placeholder="Select gender" />
                               </SelectTrigger>
                             </FormControl>
-                            <SelectContent>
-                              <SelectItem value="male">Male</SelectItem>
-                              <SelectItem value="female">Female</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
+                            <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                              <SelectItem value="male" className="focus:bg-slate-800 focus:text-white">Male</SelectItem>
+                              <SelectItem value="female" className="focus:bg-slate-800 focus:text-white">Female</SelectItem>
+                              <SelectItem value="other" className="focus:bg-slate-800 focus:text-white">Other</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -289,12 +296,53 @@ export default function Register() {
                       name="age"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Age *</FormLabel>
+                          <FormLabel className="text-slate-200">Age *</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               min={10}
                               max={100}
+                              className="bg-slate-950/50 border-slate-700 text-white focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  {/* School + Parent Phone */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="school"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-slate-200">School / High School *</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="e.g. Waterberg High School"
+                              className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="parent_phone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-slate-200">Parent / Guardian Phone *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="tel"
+                              placeholder="072 123 4567"
+                              className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
                               {...field}
                             />
                           </FormControl>
@@ -310,10 +358,11 @@ export default function Register() {
                     name="how_did_you_hear"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>How did you hear about us? *</FormLabel>
+                        <FormLabel className="text-slate-200">How did you hear about us? *</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="Friend, Social Media, etc."
+                            className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
                             {...field}
                           />
                         </FormControl>
