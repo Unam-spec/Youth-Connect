@@ -5,16 +5,12 @@ import { DashCard, SectionTitle, SkeletonRows, EmptyState } from "./shared";
 interface PinManagementPanelProps {
   leaderPins: any[];
   isLeaderPinsLoading: boolean;
-  revealedPins: Record<string, boolean>;
-  togglePinReveal: (id: string) => void;
   setSettingPinFor: (leader: any) => void;
 }
 
 export function PinManagementPanel({
   leaderPins,
   isLeaderPinsLoading,
-  revealedPins,
-  togglePinReveal,
   setSettingPinFor,
 }: PinManagementPanelProps) {
   return (
@@ -43,29 +39,7 @@ export function PinManagementPanel({
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {l.pin_plain ? (
-                  <div className="flex items-center gap-2">
-                    <div className="font-mono bg-muted/50 px-2 py-1 rounded text-sm tracking-widest min-w-[60px] text-center">
-                      {revealedPins[l.id] ? l.pin_plain : "••••"}
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => togglePinReveal(l.id)}
-                      className="h-8 w-8 p-0 text-muted-foreground"
-                    >
-                      {revealedPins[l.id] ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </div>
-                ) : (
-                  <span className="text-xs text-amber-500 bg-amber-500/10 px-2 py-1 rounded">
-                    Not Set
-                  </span>
-                )}
+
                 <Button
                   variant="outline"
                   size="sm"

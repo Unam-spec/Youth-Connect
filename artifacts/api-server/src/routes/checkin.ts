@@ -267,7 +267,7 @@ router.get("/checkin/requests", requireLeaderSession("leader"), async (req, res)
 router.patch("/checkin/requests/:id/approve", requireLeaderSession("leader"), async (req, res) => {
   try {
     const request = await db.query.checkInRequestsTable.findFirst({
-      where: eq(checkInRequestsTable.id, req.params.id),
+      where: eq(checkInRequestsTable.id, req.params.id as string),
     });
 
     if (!request) {
@@ -289,7 +289,7 @@ router.patch("/checkin/requests/:id/approve", requireLeaderSession("leader"), as
 
     await db
       .delete(checkInRequestsTable)
-      .where(eq(checkInRequestsTable.id, req.params.id));
+      .where(eq(checkInRequestsTable.id, req.params.id as string));
 
     // Send check-in confirmation email via database pending_emails queue
     if (request.profile_id) {
@@ -338,7 +338,7 @@ router.patch("/checkin/requests/:id/approve", requireLeaderSession("leader"), as
 router.patch("/checkin/requests/:id/reject", requireLeaderSession("leader"), async (req, res) => {
   try {
     const request = await db.query.checkInRequestsTable.findFirst({
-      where: eq(checkInRequestsTable.id, req.params.id),
+      where: eq(checkInRequestsTable.id, req.params.id as string),
     });
 
     if (!request) {
@@ -353,7 +353,7 @@ router.patch("/checkin/requests/:id/reject", requireLeaderSession("leader"), asy
 
     await db
       .delete(checkInRequestsTable)
-      .where(eq(checkInRequestsTable.id, req.params.id));
+      .where(eq(checkInRequestsTable.id, req.params.id as string));
 
     return res.json({
       message: "Check-in request rejected.",
@@ -374,7 +374,7 @@ router.get("/checkin/stream/:requestId", async (req, res) => {
   res.write("retry: 5000\n"); // Tell client to retry in 5s if disconnected
   res.write("data: {\"status\":\"pending\"}\n\n");
 
-  const requestId = req.params.requestId;
+  const requestId = req.params.requestId as string;
 
   try {
     // 1. Resolve request to get profile_id / visitor_id

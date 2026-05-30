@@ -8,7 +8,7 @@ const ROLE_HIERARCHY: Record<string, number> = {
   super_admin: 2,
 };
 
-export function requireLeaderSession(minRole: "leader" | "super_admin" = "leader") {
+export function requireLeaderSession(minRole: "leader" | "super_admin" = "leader"): any {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       let profile: any = null;
@@ -41,7 +41,7 @@ export function requireLeaderSession(minRole: "leader" | "super_admin" = "leader
             return res.status(401).json({ error: "Unauthorized: Incomplete session payload" });
           }
 
-          if (Date.now() >= expires_at) {
+          if (new Date(expires_at) < new Date()) {
             return res.status(401).json({ error: "Unauthorized: Session expired" });
           }
 
@@ -78,8 +78,10 @@ export function requireLeaderSession(minRole: "leader" | "super_admin" = "leader
       req.leaderRole = profile.role;
 
       next();
+      return;
     } catch (err) {
       next(err);
+      return;
     }
   };
 }

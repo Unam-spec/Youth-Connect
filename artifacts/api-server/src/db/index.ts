@@ -38,8 +38,6 @@ ALTER TABLE "visitors" ADD COLUMN IF NOT EXISTS "whatsapp_opt_in" boolean NOT NU
 -- Ensure avatar_url column exists (added in v0.9)
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "avatar_url" text;
 
--- Ensure pin_plain column is dropped (removed in v1.0)
-ALTER TABLE "profiles" DROP COLUMN IF EXISTS "pin_plain";
 
 -- Ensure link verification columns exist
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "link_token" text;

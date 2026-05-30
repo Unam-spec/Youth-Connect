@@ -1,6 +1,7 @@
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { MessageSquare, Trash2 } from "lucide-react";
 import { RoleBadge } from "./shared";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessage {
   id: string;
@@ -11,32 +12,211 @@ interface ChatMessage {
   created_at: string;
 }
 
-interface ChannelPanelProps {
+interface ChatPanelProps {
   sessionRole: string;
   sessionProfileId: string;
-  chatMessages: ChatMessage[];
-  chatConnectionStatus: "connecting" | "connected" | "polling" | "error";
-  chatInput: string;
-  setChatInput: (input: string) => void;
-  isSendingChatMessage: boolean;
-  handleSendChatMessage: (e?: React.FormEvent) => void;
-  handleDeleteChatMessage: (id: string) => void;
+  activeTab: string;
+  isSignedIn: boolean;
+  getToken: () => Promise<string | null>;
 }
 
-export function ChannelPanel({
+export function ChatPanel({
   sessionRole,
   sessionProfileId,
-  chatMessages,
-  chatConnectionStatus,
-  chatInput,
-  setChatInput,
-  isSendingChatMessage,
-  handleSendChatMessage,
-  handleDeleteChatMessage,
-}: ChannelPanelProps) {
+  activeTab,
+  isSignedIn,
+  getToken,
+}: ChatPanelProps) {
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isSendingChatMessage, setIsSendingChatMessage] = useState(false);
+  const [chatConnectionStatus, setChatConnectionStatus] = useState<
+    "connecting" | "connected" | "polling" | "error"
+  >("connecting");
   const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
-  // Auto-scroll on messages change
+  useEffect(() => {
+    if (activeTab !== "channel") return;
+
+    let isMounted = true;
+    let eventSource: EventSource | null = null;
+    let pollingInterval: ReturnType<typeof setInterval> | null = null;
+
+    async function fetchHistory() {
+      try {
+        const token = isSignedIn ? await getToken() : "";
+        const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
+        const apiBase = import.meta.env.VITE_API_URL || "";
+        const response = await fetch(`${apiBase}/api/messages`, {
+          headers: {
+            "x-leader-session": leaderSessionStr,
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        });
+        if (response.ok && isMounted) {
+          const data = await response.json();
+          setChatMessages(data);
+          setTimeout(() => {
+            if (chatMessagesContainerRef.current) {
+              chatMessagesContainerRef.current.scrollTop =
+                chatMessagesContainerRef.current.scrollHeight;
+            }
+          }, 100);
+        }
+      } catch (err) {
+        console.error("Failed to fetch chat history:", err);
+      }
+    }
+
+    async function connectSSE() {
+      setChatConnectionStatus("connecting");
+      try {
+        const token = isSignedIn ? await getToken() : "";
+        const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
+        const apiBase = import.meta.env.VITE_API_URL || "";
+        const url = `${apiBase}/api/messages/stream?token=${encodeURIComponent(
+          token || ""
+        )}&leader_session=${encodeURIComponent(leaderSessionStr)}`;
+
+        eventSource = new EventSource(url);
+
+        eventSource.onopen = () => {
+          if (isMounted) setChatConnectionStatus("connected");
+        };
+
+        eventSource.onmessage = (event) => {
+          if (!isMounted) return;
+          try {
+            const newMsg = JSON.parse(event.data);
+            setChatMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              const next = [...prev, newMsg];
+              setTimeout(() => {
+                if (chatMessagesContainerRef.current) {
+                  chatMessagesContainerRef.current.scrollTop =
+                    chatMessagesContainerRef.current.scrollHeight;
+                }
+              }, 50);
+              return next;
+            });
+          } catch (err) {
+            console.error("Failed to parse incoming message:", err);
+          }
+        };
+
+        eventSource.addEventListener("delete", (event: any) => {
+          if (!isMounted) return;
+          try {
+            const { id } = JSON.parse(event.data);
+            setChatMessages((prev) => prev.filter((m) => m.id !== id));
+          } catch (err) {
+            console.error("Failed to parse delete event:", err);
+          }
+        });
+
+        eventSource.onerror = () => {
+          if (!isMounted) return;
+          console.warn("SSE connection error — falling back to polling");
+          cleanupSSE();
+          startPolling();
+        };
+      } catch (err) {
+        console.error("Failed to initialize SSE:", err);
+        startPolling();
+      }
+    }
+
+    function startPolling() {
+      if (!isMounted) return;
+      setChatConnectionStatus("polling");
+      fetchHistory();
+      pollingInterval = setInterval(fetchHistory, 5000);
+    }
+
+    function cleanupSSE() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+    }
+
+    fetchHistory().then(() => {
+      if (isMounted) connectSSE();
+    });
+
+    return () => {
+      isMounted = false;
+      cleanupSSE();
+      if (pollingInterval) clearInterval(pollingInterval);
+    };
+  }, [activeTab, isSignedIn, getToken]);
+
+  async function handleSendChatMessage(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!chatInput.trim() || isSendingChatMessage) return;
+
+    const content = chatInput.trim();
+    setChatInput("");
+    setIsSendingChatMessage(true);
+
+    try {
+      const token = isSignedIn ? await getToken() : "";
+      const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
+      const apiBase = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${apiBase}/api/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-leader-session": leaderSessionStr,
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) throw new Error("Failed to send message");
+
+      setTimeout(() => {
+        if (chatMessagesContainerRef.current) {
+          chatMessagesContainerRef.current.scrollTop =
+            chatMessagesContainerRef.current.scrollHeight;
+        }
+      }, 50);
+    } catch {
+      toast({
+        title: "Message failed",
+        description: "Unable to send chat message. Please try again.",
+        variant: "destructive",
+      });
+      setChatInput(content);
+    } finally {
+      setIsSendingChatMessage(false);
+    }
+  }
+
+  async function handleDeleteChatMessage(messageId: string) {
+    try {
+      const token = isSignedIn ? await getToken() : "";
+      const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
+      const apiBase = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${apiBase}/api/messages/${messageId}`, {
+        method: "DELETE",
+        headers: {
+          "x-leader-session": leaderSessionStr,
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) throw new Error();
+      toast({ title: "Message deleted" });
+    } catch {
+      toast({
+        title: "Failed to delete message",
+        variant: "destructive",
+      });
+    }
+  }
+
   useEffect(() => {
     if (chatMessagesContainerRef.current) {
       chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
@@ -45,7 +225,6 @@ export function ChannelPanel({
 
   return (
     <div className="border border-border/50 rounded-2xl bg-card/40 backdrop-blur-sm overflow-hidden flex flex-col h-[650px] shadow-2xl relative">
-      {/* Header */}
       <div className="p-4 border-b border-border/50 flex items-center justify-between bg-muted/10">
         <div className="flex items-center gap-2.5">
           <div className="h-9 w-9 rounded-full bg-teal-500/10 flex items-center justify-center border border-teal-500/20 shadow-inner">
@@ -56,8 +235,6 @@ export function ChannelPanel({
             <p className="text-[10px] text-muted-foreground mt-0.5">Private channel for leaders & admins</p>
           </div>
         </div>
-
-        {/* Real-time Status Indicator */}
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/40 border border-slate-800/80 text-[10px] font-semibold tracking-wider uppercase">
           <span className="relative flex h-2 w-2">
             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -82,8 +259,6 @@ export function ChannelPanel({
           </span>
         </div>
       </div>
-
-      {/* Message Board */}
       <div
         ref={chatMessagesContainerRef}
         className="flex-grow overflow-y-auto p-4 space-y-4 bg-slate-950/20 scrollbar-thin scrollbar-thumb-slate-800"
@@ -98,7 +273,6 @@ export function ChannelPanel({
                   hour: "2-digit",
                   minute: "2-digit",
                 });
-
             return (
               <div
                 key={msg.id}
@@ -106,16 +280,12 @@ export function ChannelPanel({
                   isMe ? "ml-auto flex-row-reverse" : "mr-auto"
                 }`}
               >
-                {/* Sender Initial Bubble */}
                 {!isMe && (
                   <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-teal-300 bg-teal-500/10 border border-teal-500/20 shrink-0">
                     {msg.sender_name?.charAt(0)?.toUpperCase() ?? "?"}
                   </div>
                 )}
-
-                {/* Message Bubble Container */}
                 <div className="space-y-1">
-                  {/* Message Bubble */}
                   <div
                     className={`rounded-2xl px-4 py-2.5 text-sm shadow-md border ${
                       isMe
@@ -125,8 +295,6 @@ export function ChannelPanel({
                   >
                     <p className="leading-relaxed break-words whitespace-pre-wrap">{msg.content}</p>
                   </div>
-
-                  {/* Info Row (Sender name, role, time) */}
                   <div
                     className={`flex items-center gap-1.5 text-[10px] text-muted-foreground px-1 ${
                       isMe ? "justify-end" : "justify-start"
@@ -139,8 +307,6 @@ export function ChannelPanel({
                     )}
                     <RoleBadge role={msg.sender_role} />
                     <span>{timeStr}</span>
-
-                    {/* Super Admin Moderation Delete Action */}
                     {sessionRole === "super_admin" && (
                       <button
                         onClick={() => handleDeleteChatMessage(msg.id)}
@@ -165,8 +331,6 @@ export function ChannelPanel({
           </div>
         )}
       </div>
-
-      {/* Input Bar */}
       <form
         onSubmit={handleSendChatMessage}
         className="p-3 border-t border-border/50 bg-muted/10 flex items-center gap-2.5"

@@ -14,6 +14,7 @@ import {
   eventsTable,
   pendingEmailsTable,
 } from "@workspace/db";
+import { z } from "zod";
 import { messagesTable } from "../db/schema/messages";
 import {
   RegisterVisitorBody,
@@ -222,7 +223,7 @@ router.post("/profiles/verify-link", async (req: Request, res: Response) => {
     });
 
     if (!profile) {
-      return res.status(404).json({ error: "Invalid verification link token" });
+      return res.status(400).json({ error: "Invalid verification link token" });
     }
 
     if (profile.link_token_used) {
@@ -258,7 +259,7 @@ router.post("/profiles/verify-link", async (req: Request, res: Response) => {
       });
     }
 
-    return res.json({ success: true, profile: updated });
+    return res.status(200).json({ success: true });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });

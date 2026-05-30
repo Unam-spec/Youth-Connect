@@ -85,11 +85,11 @@ router.patch("/leaders/:profileId", requireLeaderSession("super_admin"), async (
     
     const [updated] = await db.update(leaderPermissionsTable)
       .set(parsed.data)
-      .where(eq(leaderPermissionsTable.profile_id, req.params.profileId))
+      .where(eq(leaderPermissionsTable.profile_id, req.params.profileId as string))
       .returning();
       
     if (!updated) return res.status(404).json({ error: "Leader not found" });
-    const profile = await db.query.profilesTable.findFirst({ where: eq(profilesTable.id, req.params.profileId) });
+    const profile = await db.query.profilesTable.findFirst({ where: eq(profilesTable.id, req.params.profileId as string) });
     return res.json({ ...updated, profile });
   } catch (err) {
     req.log.error(err);
@@ -103,12 +103,12 @@ router.post("/leaders/:profileId/demote", requireLeaderSession("super_admin"), a
     const [updated] = await db
       .update(profilesTable)
       .set({ role: "member", pin_hash: null, session_token: null })
-      .where(eq(profilesTable.id, req.params.profileId))
+      .where(eq(profilesTable.id, req.params.profileId as string))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
 
     await db.delete(leaderPermissionsTable)
-      .where(eq(leaderPermissionsTable.profile_id, req.params.profileId));
+      .where(eq(leaderPermissionsTable.profile_id, req.params.profileId as string));
 
     return res.json({ success: true, profile: updated });
   } catch (err) {
@@ -123,7 +123,7 @@ router.post("/leaders/:profileId/demote-to-leader", requireLeaderSession("super_
     const [updated] = await db
       .update(profilesTable)
       .set({ role: "leader", session_token: null })
-      .where(eq(profilesTable.id, req.params.profileId))
+      .where(eq(profilesTable.id, req.params.profileId as string))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
 
@@ -138,7 +138,7 @@ router.post("/leaders/:profileId/demote-to-leader", requireLeaderSession("super_
 router.delete("/leaders/:profileId/account", requireLeaderSession("super_admin"), async (req, res) => {
   try {
     const target = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.id, req.params.profileId),
+      where: eq(profilesTable.id, req.params.profileId as string),
     });
     if (!target) return res.status(404).json({ error: "Profile not found" });
 
@@ -154,8 +154,8 @@ router.delete("/leaders/:profileId/account", requireLeaderSession("super_admin")
       }
     }
 
-    await db.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.profileId));
-    await db.delete(profilesTable).where(eq(profilesTable.id, req.params.profileId));
+    await db.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.profileId as string));
+    await db.delete(profilesTable).where(eq(profilesTable.id, req.params.profileId as string));
 
     return res.status(204).send();
   } catch (err) {
@@ -167,10 +167,10 @@ router.delete("/leaders/:profileId/account", requireLeaderSession("super_admin")
 // DELETE /leaders/:profileId - Remove leader permissions (protected: super_admin only)
 router.delete("/leaders/:profileId", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    await db.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.profileId));
+    await db.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.profileId as string));
     await db.update(profilesTable)
       .set({ role: "member", pin_hash: null, session_token: null })
-      .where(eq(profilesTable.id, req.params.profileId));
+      .where(eq(profilesTable.id, req.params.profileId as string));
     return res.status(204).send();
   } catch (err) {
     req.log.error(err);
@@ -213,7 +213,6 @@ router.post("/leaders/verify-pin", async (req, res) => {
       profile_id: profile.id,
       session_token: sessionToken,
       expires_at: expiresAt,
-      role: profile.role,
       can_create_events: profile.role === "super_admin" ? true : profile.can_create_events,
       can_view_kpis: profile.role === "super_admin" ? true : profile.can_view_kpis,
       can_view_members: profile.role === "super_admin" ? true : profile.can_view_members,
@@ -248,7 +247,7 @@ router.get("/leaders/pins", requireLeaderSession("super_admin"), async (req, res
 router.post("/leaders/:id/reset-pin", requireLeaderSession("super_admin"), async (req, res) => {
   try {
     const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.id, req.params.id),
+      where: eq(profilesTable.id, req.params.id as string),
     });
     if (!profile) return res.status(404).json({ error: "Leader not found" });
 
@@ -302,9 +301,13 @@ router.post("/leaders/logout", requireLeaderSession("leader"), async (req, res) 
 // POST /leaders/:id/revoke-session - Revoke leader session (protected: super_admin only)
 router.post("/leaders/:id/revoke-session", requireLeaderSession("super_admin"), async (req, res) => {
   try {
+    if (req.params.id === req.leaderId) {
+      return res.status(403).json({ error: "Cannot revoke your own session" });
+    }
+    
     await db.update(profilesTable)
       .set({ session_token: null })
-      .where(eq(profilesTable.id, req.params.id));
+      .where(eq(profilesTable.id, req.params.id as string));
     return res.json({ success: true });
   } catch (err) {
     req.log.error(err);

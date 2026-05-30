@@ -80,7 +80,7 @@ router.post("/membership-requests/:id/approve", requireLeaderSession("leader"), 
     const [updated] = await db
       .update(membershipRequestsTable)
       .set({ status: "approved", reviewed_by: req.leaderId! })
-      .where(eq(membershipRequestsTable.id, req.params.id))
+      .where(eq(membershipRequestsTable.id, req.params.id as string))
       .returning();
     if (!updated) {
       return res.status(404).json({ error: "Request not found" });
@@ -132,7 +132,7 @@ router.post("/membership-requests/:id/reject", requireLeaderSession("leader"), a
     const [updated] = await db
       .update(membershipRequestsTable)
       .set({ status: "rejected", reviewed_by: req.leaderId! })
-      .where(eq(membershipRequestsTable.id, req.params.id))
+      .where(eq(membershipRequestsTable.id, req.params.id as string))
       .returning();
     if (!updated) {
       return res.status(404).json({ error: "Request not found" });

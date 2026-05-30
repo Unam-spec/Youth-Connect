@@ -189,9 +189,9 @@ export default function Register() {
               <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl">Registration Received</CardTitle>
+              <CardTitle className="text-2xl">You're in!</CardTitle>
               <CardDescription className="text-base mt-2 text-slate-350">
-                God bless you! Your registration has been received. A leader will be in touch soon.
+                A leader will review your registration and you'll receive an email once approved. See you on Friday.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6 pb-8">
@@ -327,17 +327,22 @@ export default function Register() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-slate-200">Gender *</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value}>
-                            <FormControl>
-                              <SelectTrigger className="bg-slate-950/50 border-slate-700 text-white focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11">
-                                <SelectValue placeholder="Select gender" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent className="bg-slate-900 border-slate-800 text-white">
-                              <SelectItem value="male">Male</SelectItem>
-                              <SelectItem value="female">Female</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <div className="flex gap-4 pt-1">
+                              {["male", "female", "prefer_not_to_say"].map((option) => (
+                                <label key={option} className="flex items-center gap-2">
+                                  <input 
+                                    type="radio" 
+                                    value={option}
+                                    checked={field.value === option}
+                                    onChange={(e) => field.onChange(e.target.value)}
+                                    className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-slate-700 bg-slate-950/50"
+                                  />
+                                  <span className="text-sm text-slate-200 capitalize">{option.replace(/_/g, " ")}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -487,6 +492,7 @@ export default function Register() {
 
                 {/* Step 3: Parent & Contact Info */}
                 <div className={step === 3 ? "space-y-4 animate-in fade-in slide-in-from-right-4 duration-300" : "hidden"}>
+                  <p className="text-sm text-slate-300 pb-2">We ask for a parent or guardian contact for members under 18.</p>
                   <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-5 space-y-4 shadow-sm backdrop-blur-xs">
                     <div className="flex items-center gap-2 text-teal-400 font-semibold text-sm border-b border-slate-850 pb-2">
                       <User className="w-4 h-4" />
@@ -547,7 +553,7 @@ export default function Register() {
                         </FormControl>
                         <div className="space-y-1 leading-none">
                           <FormLabel className="text-sm font-semibold text-slate-200 cursor-pointer">
-                            Join JG Youth WhatsApp Group
+                            Join our WhatsApp group for updates, reminders and community
                           </FormLabel>
                           <p className="text-xs text-slate-400 mt-1">
                             Receive session announcements, schedules, and event invitations directly on WhatsApp.

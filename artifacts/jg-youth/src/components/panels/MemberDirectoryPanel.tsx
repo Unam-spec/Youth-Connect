@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Users, Star, MapPin, User, Search, RefreshCw, AlertCircle } from "lucide-react";
+import { Users, Star, MapPin, User, Search, RefreshCw, AlertCircle, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useListProfiles, getListProfilesQueryKey } from "@workspace/api-client-react";
@@ -129,11 +129,11 @@ export function MemberDirectoryPanel({
                     <RoleBadge role={profile.role} />
                     {profile.whatsapp_opt_in ? (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        WA ✓
+                        WA <Check className="w-2.5 h-2.5 ml-0.5" />
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-500/10 text-slate-450 border border-slate-500/10">
-                        WA –
+                        WA <X className="w-2.5 h-2.5 ml-0.5" />
                       </span>
                     )}
                   </div>

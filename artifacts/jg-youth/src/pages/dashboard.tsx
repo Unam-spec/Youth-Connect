@@ -91,7 +91,9 @@ import { RSVPPanel } from "@/components/panels/RSVPPanel";
 import { LeaderManagementPanel } from "@/components/panels/LeaderManagementPanel";
 import { PinManagementPanel } from "@/components/panels/PinManagementPanel";
 import { AdminSlotsPanel } from "@/components/panels/AdminSlotsPanel";
-import { ChannelPanel } from "@/components/panels/ChannelPanel";
+import { ChatPanel } from "@/components/panels/ChatPanel";
+import { DeleteConfirmPanel } from "@/components/panels/DeleteConfirmPanel";
+import { DialogManager } from "@/components/panels/DialogManager";
 import { KpiCard } from "@/components/panels/shared";
 import { Activity, Settings } from "lucide-react";
 
@@ -150,7 +152,6 @@ interface LeaderPin {
   id: string;
   full_name: string;
   phone: string | null;
-  pin_plain: string | null;
 }
 
 export default function Dashboard() {
@@ -215,7 +216,7 @@ export default function Dashboard() {
   const [isRsvpsLoading, setIsRsvpsLoading] = useState(false);
   const [leaderPins, setLeaderPins] = useState<LeaderPin[]>([]);
   const [isLeaderPinsLoading, setIsLeaderPinsLoading] = useState(false);
-  const [revealedPins, setRevealedPins] = useState<Record<string, boolean>>({});
+
   const [settingPinFor, setSettingPinFor] = useState<LeaderPin | null>(null);
   const [leaderPinInput, setLeaderPinInput] = useState("");
   const [pendingCheckIns, setPendingCheckIns] = useState<PendingCheckIn[]>([]);
@@ -238,201 +239,7 @@ export default function Dashboard() {
 
   const [activeTab, setActiveTab] = useState("attendance");
 
-  // Chat Channel states & types
-  interface ChatMessage {
-    id: string;
-    sender_id: string;
-    sender_name: string;
-    sender_role: "super_admin" | "leader" | "member" | "visitor";
-    content: string;
-    created_at: string;
-  }
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [isSendingChatMessage, setIsSendingChatMessage] = useState(false);
-  const [chatConnectionStatus, setChatConnectionStatus] = useState<"connecting" | "connected" | "polling" | "error">("connecting");
-  const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Chat Channel Real-time & Polling Logic
-  useEffect(() => {
-    if (activeTab !== "channel") return;
-
-    let isMounted = true;
-    let eventSource: EventSource | null = null;
-    let pollingInterval: ReturnType<typeof setInterval> | null = null;
-
-    async function fetchHistory() {
-      try {
-        const token = isSignedIn ? await getToken() : "";
-        const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
-        const apiBase = import.meta.env.VITE_API_URL || "";
-        const response = await fetch(`${apiBase}/api/messages`, {
-          headers: {
-            "x-leader-session": leaderSessionStr,
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
-        });
-        if (response.ok && isMounted) {
-          const data = await response.json();
-          setChatMessages(data);
-          // Scroll to bottom on load
-          setTimeout(() => {
-            if (chatMessagesContainerRef.current) {
-              chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
-            }
-          }, 100);
-        }
-      } catch (err) {
-        console.error("Failed to fetch chat history:", err);
-      }
-    }
-
-    async function connectSSE() {
-      setChatConnectionStatus("connecting");
-      try {
-        const token = isSignedIn ? await getToken() : "";
-        const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
-        const apiBase = import.meta.env.VITE_API_URL || "";
-        const url = `${apiBase}/api/messages/stream?token=${encodeURIComponent(token || "")}&leader_session=${encodeURIComponent(leaderSessionStr)}`;
-        
-        eventSource = new EventSource(url);
-
-        eventSource.onopen = () => {
-          if (isMounted) setChatConnectionStatus("connected");
-        };
-
-        eventSource.onmessage = (event) => {
-          if (!isMounted) return;
-          try {
-            const newMsg = JSON.parse(event.data);
-            setChatMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev;
-              const next = [...prev, newMsg];
-              // Scroll to bottom on new message
-              setTimeout(() => {
-                if (chatMessagesContainerRef.current) {
-                  chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
-                }
-              }, 50);
-              return next;
-            });
-          } catch (err) {
-            console.error("Failed to parse incoming message:", err);
-          }
-        };
-
-        eventSource.addEventListener("delete", (event: any) => {
-          if (!isMounted) return;
-          try {
-            const { id } = JSON.parse(event.data);
-            setChatMessages((prev) => prev.filter((m) => m.id !== id));
-          } catch (err) {
-            console.error("Failed to parse delete event:", err);
-          }
-        });
-
-        eventSource.onerror = () => {
-          if (!isMounted) return;
-          console.warn("SSE connection error — falling back to polling");
-          cleanupSSE();
-          startPolling();
-        };
-      } catch (err) {
-        console.error("Failed to initialize SSE:", err);
-        startPolling();
-      }
-    }
-
-    function startPolling() {
-      if (!isMounted) return;
-      setChatConnectionStatus("polling");
-      fetchHistory();
-      pollingInterval = setInterval(fetchHistory, 5000);
-    }
-
-    function cleanupSSE() {
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-      }
-    }
-
-    // Load history and connect
-    fetchHistory().then(() => {
-      if (isMounted) connectSSE();
-    });
-
-    return () => {
-      isMounted = false;
-      cleanupSSE();
-      if (pollingInterval) clearInterval(pollingInterval);
-    };
-  }, [activeTab, isSignedIn, getToken]);
-
-  async function handleSendChatMessage(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    if (!chatInput.trim() || isSendingChatMessage) return;
-
-    const content = chatInput.trim();
-    setChatInput("");
-    setIsSendingChatMessage(true);
-
-    try {
-      const token = isSignedIn ? await getToken() : "";
-      const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
-      const apiBase = import.meta.env.VITE_API_URL || "";
-      const response = await fetch(`${apiBase}/api/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-leader-session": leaderSessionStr,
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-        body: JSON.stringify({ content }),
-      });
-
-      if (!response.ok) throw new Error("Failed to send message");
-
-      // Scroll to bottom
-      setTimeout(() => {
-        if (chatMessagesContainerRef.current) {
-          chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
-        }
-      }, 50);
-    } catch {
-      toast({
-        title: "Message failed",
-        description: "Unable to send chat message. Please try again.",
-        variant: "destructive",
-      });
-      setChatInput(content); // restore input
-    } finally {
-      setIsSendingChatMessage(false);
-    }
-  }
-
-  async function handleDeleteChatMessage(messageId: string) {
-    try {
-      const token = isSignedIn ? await getToken() : "";
-      const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
-      const apiBase = import.meta.env.VITE_API_URL || "";
-      const response = await fetch(`${apiBase}/api/messages/${messageId}`, {
-        method: "DELETE",
-        headers: {
-          "x-leader-session": leaderSessionStr,
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
-
-      if (!response.ok) throw new Error();
-      toast({ title: "Message deleted" });
-    } catch {
-      toast({
-        title: "Failed to delete message",
-        variant: "destructive",
-      });
-    }
-  }
 
   function openEditDialog(profile: any) {
     setEditProfileId(profile.id);
@@ -1129,9 +936,7 @@ export default function Dashboard() {
     }
   }
 
-  function togglePinReveal(id: string) {
-    setRevealedPins((prev) => ({ ...prev, [id]: !prev[id] }));
-  }
+
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -1301,16 +1106,12 @@ export default function Dashboard() {
               handleApproveCheckIn={handleApproveCheckIn}
               handleRejectCheckIn={handleRejectCheckIn}
             />
-            <ChannelPanel
+            <ChatPanel
               sessionRole={session.role}
               sessionProfileId={session.profile_id ?? ""}
-              chatMessages={chatMessages}
-              chatConnectionStatus={chatConnectionStatus}
-              chatInput={chatInput}
-              setChatInput={setChatInput}
-              isSendingChatMessage={isSendingChatMessage}
-              handleSendChatMessage={handleSendChatMessage}
-              handleDeleteChatMessage={handleDeleteChatMessage}
+              activeTab={activeTab}
+              isSignedIn={!!isSignedIn}
+              getToken={getToken}
             />
           </TabsContent>
 
@@ -1368,8 +1169,6 @@ export default function Dashboard() {
                 <PinManagementPanel
                   leaderPins={leaderPins}
                   isLeaderPinsLoading={isLeaderPinsLoading}
-                  revealedPins={revealedPins}
-                  togglePinReveal={togglePinReveal}
                   setSettingPinFor={setSettingPinFor}
                 />
                 <LeaderManagementPanel
@@ -1383,416 +1182,63 @@ export default function Dashboard() {
       </div>
 
       {/* ── Dialogs ── */}
-      <Dialog
-        open={showSessionQrCodeDialog}
-        onOpenChange={setShowSessionQrCodeDialog}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Scan for Session Check-in</DialogTitle>
-            <DialogDescription>
-              Members and visitors scan this to check in tonight.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center p-4">
-            {qrCodeUrl ? (
-              <QRCodeSVG value={qrCodeUrl} size={256} level="H" includeMargin />
-            ) : (
-              <p>Generating…</p>
-            )}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setShowSessionQrCodeDialog(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Edit Profile Dialog (Leader profiles revamp) ── */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-lg rounded-2xl bg-slate-900 text-white border-slate-800">
-          <DialogHeader>
-            <DialogTitle className="text-white font-bold">Edit Profile Details</DialogTitle>
-            <DialogDescription className="text-slate-300">
-              Update member details directly. Ensure all details are accurate.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="space-y-1.5">
-              <Label htmlFor="edit-name" className="text-slate-200">Full Name *</Label>
-              <Input
-                id="edit-name"
-                value={editFullName}
-                onChange={(e) => setEditFullName(e.target.value)}
-                placeholder="John Doe"
-                className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-phone" className="text-slate-200">Phone Number</Label>
-                <Input
-                  id="edit-phone"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  placeholder="082 123 4567"
-                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-email" className="text-slate-200">Email</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  placeholder="john@example.com"
-                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-gender" className="text-slate-200">Gender</Label>
-                <select
-                  id="edit-gender"
-                  value={editGender}
-                  onChange={(e: any) => setEditGender(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-1 text-sm text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-500 rounded-xl"
-                >
-                  <option value="male" className="bg-slate-900 text-white">Male</option>
-                  <option value="female" className="bg-slate-900 text-white">Female</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-age" className="text-slate-200">Age</Label>
-                <Input
-                  id="edit-age"
-                  type="number"
-                  value={editAge}
-                  onChange={(e) => setEditAge(parseInt(e.target.value) || 0)}
-                  className="bg-slate-950/50 border-slate-700 text-white focus:border-teal-500 focus:ring-teal-500 rounded-xl"
-                />
-              </div>
-            </div>
-
-            {/* School / University Autocomplete Combobox */}
-            <div className="space-y-1.5 relative">
-              <Label htmlFor="edit-school" className="text-slate-200">School / University</Label>
-              <div className="relative">
-                <Input
-                  id="edit-school"
-                  value={editSchool}
-                  onFocus={() => setEditShowSchoolDropdown(true)}
-                  onBlur={() => setTimeout(() => setEditShowSchoolDropdown(false), 200)}
-                  onChange={(e) => {
-                    setEditSchool(e.target.value);
-                    setEditShowSchoolDropdown(true);
-                  }}
-                  placeholder="Start typing school or university..."
-                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl pr-10"
-                />
-                <div className="absolute right-3 top-2.5 text-slate-400">
-                  <GraduationCap className="w-4 h-4" />
-                </div>
-              </div>
-              {editShowSchoolDropdown && (
-                <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
-                  {[
-                    "University of Namibia (UNAM)",
-                    "Namibia University of Science and Technology (NUST)",
-                    "International University of Management (IUM)",
-                    "Waterberg High School",
-                    "Windhoek High School",
-                    "None / Finished Schooling"
-                  ].filter(s => s.toLowerCase().includes(editSchool.toLowerCase())).map((schoolName) => (
-                    <div
-                      key={schoolName}
-                      onClick={() => {
-                        setEditSchool(schoolName);
-                        setEditShowSchoolDropdown(false);
-                      }}
-                      className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
-                    >
-                      <span className="flex items-center gap-2">
-                        <BookOpen className="w-3.5 h-3.5" />
-                        {schoolName}
-                      </span>
-                      {editSchool === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
-                    </div>
-                  ))}
-                  {editSchool && ![
-                    "University of Namibia (UNAM)",
-                    "Namibia University of Science and Technology (NUST)",
-                    "International University of Management (IUM)",
-                    "Waterberg High School",
-                    "Windhoek High School",
-                    "None / Finished Schooling"
-                  ].includes(editSchool) && (
-                    <div
-                      onClick={() => setEditShowSchoolDropdown(false)}
-                      className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Use Custom: "{editSchool}"
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Parent / Guardian Isolated Details */}
-            <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-3 shadow-xs">
-              <div className="flex items-center gap-2 text-teal-400 font-semibold text-xs border-b border-slate-800/60 pb-1.5">
-                <User className="w-3.5 h-3.5" />
-                Parent / Guardian Details
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="edit-parent-name" className="text-xs text-slate-300">Parent/Guardian Name</Label>
-                  <Input
-                    id="edit-parent-name"
-                    value={editParentName}
-                    onChange={(e) => setEditParentName(e.target.value)}
-                    placeholder="Mary Doe"
-                    className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-9 text-sm"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="edit-parent-phone" className="text-xs text-slate-300">Parent/Guardian Phone</Label>
-                  <Input
-                    id="edit-parent-phone"
-                    value={editParentPhone}
-                    onChange={(e) => setEditParentPhone(e.target.value)}
-                    placeholder="081 123 4567"
-                    className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-9 text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* WhatsApp Group Opt-in checkbox */}
-            <div className="flex items-start space-x-3 space-y-0 rounded-xl border border-slate-850 bg-slate-950/30 p-3 shadow-xs">
-              <input
-                type="checkbox"
-                id="edit-whatsapp-opt-in"
-                checked={editWhatsappOptIn}
-                onChange={(e) => setEditWhatsappOptIn(e.target.checked)}
-                className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-700 bg-slate-950/50 cursor-pointer mt-0.5"
-              />
-              <div className="space-y-1 leading-none cursor-pointer" onClick={() => setEditWhatsappOptIn(!editWhatsappOptIn)}>
-                <Label htmlFor="edit-whatsapp-opt-in" className="text-xs font-semibold text-slate-200 cursor-pointer">
-                  Join the Youth Connect WhatsApp Group
-                </Label>
-                <p className="text-[10px] text-slate-400 mt-0.5">
-                  Get session details and announcements directly on WhatsApp.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowEditDialog(false)}
-              disabled={isSavingEdit}
-              className="rounded-xl border-slate-700 hover:bg-slate-800 text-slate-200"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveEdit}
-              disabled={isSavingEdit}
-              className="rounded-xl bg-teal-500 hover:bg-teal-400 text-white font-semibold border-0"
-            >
-              {isSavingEdit ? "Saving…" : "Save Changes"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={!!deleteEventId}
-        onOpenChange={(open) => !open && setDeleteEventId(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Event</AlertDialogTitle>
-            <AlertDialogDescription>
-              Delete "{deleteEventName}"? This removes all RSVPs and cannot be
-              undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteEvent}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={showWipeConfirm}
-        onOpenChange={setShowWipeConfirm}
-      >
-        <AlertDialogContent className="bg-slate-900 text-white border-slate-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-400 font-bold">Wipe All Test Data</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-300">
-              Are you absolutely sure you want to delete all events, check-ins, RSVPs, attendance, and non-admin members?
-              This action cannot be undone and will completely wipe the database clean.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleWipeData}
-              disabled={isWipingData}
-              className="bg-red-650 hover:bg-red-500 text-white font-semibold border-0"
-            >
-              {isWipingData ? "Wiping Data..." : "Wipe Everything"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={!!roleConfirm}
-        onOpenChange={(open) => !open && setRoleConfirm(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Change Role</AlertDialogTitle>
-            <AlertDialogDescription>
-              Promote <strong>{roleConfirm?.profile?.full_name}</strong> to{" "}
-              <strong>{roleConfirm?.targetRole.replace("_", " ")}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmRoleChange}>
-              Confirm
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={!!deleteMemberId}
-        onOpenChange={(open) => !open && setDeleteMemberId(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Member</AlertDialogTitle>
-            <AlertDialogDescription>
-              Delete "{deleteMemberName}"? This will permanently remove this
-              member from the system and cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteMember}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* ── Set PIN for a specific leader (super admin only) ── */}
-      <Dialog
-        open={!!settingPinFor}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSettingPinFor(null);
-            setLeaderPinInput("");
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Set PIN for {settingPinFor?.full_name}</DialogTitle>
-            <DialogDescription>
-              Enter a 4-digit PIN. This will be used when this leader logs in.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              id="leader-pin-input"
-              type="password"
-              placeholder="Enter 4-digit PIN"
-              maxLength={4}
-              value={leaderPinInput}
-              onChange={(e) =>
-                setLeaderPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))
-              }
-              className="text-center text-2xl tracking-widest"
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSettingPinFor(null);
-                setLeaderPinInput("");
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSetLeaderPin}
-              disabled={leaderPinInput.length !== 4}
-              className="bg-teal-500 hover:bg-teal-400 text-white border-0"
-            >
-              Set PIN
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{hasPin ? "Change PIN" : "Set PIN"}</DialogTitle>
-            <DialogDescription>
-              {hasPin
-                ? "Update your 4-digit leader PIN."
-                : "Create a 4-digit PIN for leader authentication."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Input
-              id="pin-input"
-              type="password"
-              placeholder="Enter 4-digit PIN"
-              maxLength={4}
-              value={pin}
-              onChange={(e) =>
-                setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
-              }
-              className="text-center text-2xl tracking-widest"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPinDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              id="btn-save-pin"
-              onClick={handleSavePin}
-              disabled={pin.length !== 4}
-              className="bg-teal-500 hover:bg-teal-400 text-white border-0"
-            >
-              {hasPin ? "Update PIN" : "Set PIN"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmPanel
+        deleteEventId={deleteEventId}
+        setDeleteEventId={setDeleteEventId}
+        deleteEventName={deleteEventName}
+        handleDeleteEvent={handleDeleteEvent}
+        deleteMemberId={deleteMemberId}
+        setDeleteMemberId={setDeleteMemberId}
+        deleteMemberName={deleteMemberName}
+        handleDeleteMember={handleDeleteMember}
+        roleConfirm={roleConfirm}
+        setRoleConfirm={setRoleConfirm}
+        handleConfirmRoleChange={handleConfirmRoleChange}
+        showWipeConfirm={showWipeConfirm}
+        setShowWipeConfirm={setShowWipeConfirm}
+        isWipingData={isWipingData}
+        handleWipeData={handleWipeData}
+      />
+      <DialogManager
+        showSessionQrCodeDialog={showSessionQrCodeDialog}
+        setShowSessionQrCodeDialog={setShowSessionQrCodeDialog}
+        qrCodeUrl={qrCodeUrl}
+        showEditDialog={showEditDialog}
+        setShowEditDialog={setShowEditDialog}
+        editFullName={editFullName}
+        setEditFullName={setEditFullName}
+        editPhone={editPhone}
+        setEditPhone={setEditPhone}
+        editEmail={editEmail}
+        setEditEmail={setEditEmail}
+        editGender={editGender}
+        setEditGender={setEditGender}
+        editAge={editAge}
+        setEditAge={setEditAge}
+        editSchool={editSchool}
+        setEditSchool={setEditSchool}
+        editShowSchoolDropdown={editShowSchoolDropdown}
+        setEditShowSchoolDropdown={setEditShowSchoolDropdown}
+        editParentName={editParentName}
+        setEditParentName={setEditParentName}
+        editParentPhone={editParentPhone}
+        setEditParentPhone={setEditParentPhone}
+        editWhatsappOptIn={editWhatsappOptIn}
+        setEditWhatsappOptIn={setEditWhatsappOptIn}
+        isSavingEdit={isSavingEdit}
+        handleSaveEdit={handleSaveEdit}
+        settingPinFor={settingPinFor}
+        setSettingPinFor={setSettingPinFor}
+        leaderPinInput={leaderPinInput}
+        setLeaderPinInput={setLeaderPinInput}
+        handleSetLeaderPin={handleSetLeaderPin}
+        showPinDialog={showPinDialog}
+        setShowPinDialog={setShowPinDialog}
+        hasPin={hasPin}
+        pin={pin}
+        setPin={setPin}
+        handleSavePin={handleSavePin}
+      />
     </Layout>
   );
 }
