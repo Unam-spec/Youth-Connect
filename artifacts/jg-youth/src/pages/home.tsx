@@ -1,20 +1,20 @@
 import { useState } from "react";
 import { useUser } from "@clerk/react";
 import { Link, useLocation } from "wouter";
-import { Layout } from "@components/layout";
-import { Button } from "@components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@components/ui/card";
+import { Layout } from "@/components/layout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@components/ui/dialog";
+} from "@/components/ui/dialog";
 import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
 import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, Users, UserCheck } from "lucide-react";
-import { Skeleton } from "@components/ui/skeleton";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
 
 function PublicHome() {
