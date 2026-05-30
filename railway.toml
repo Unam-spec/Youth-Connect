@@ -1,8 +1,8 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm install --legacy-peer-deps --ignore-scripts && npm run build --workspace=artifacts/api-server"
+buildCommand = "pnpm run build --filter=@workspace/api-server"
 
 [deploy]
-startCommand = "npm run start --workspace=artifacts/api-server"
+startCommand = "pnpm run start --filter=@workspace/api-server"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
