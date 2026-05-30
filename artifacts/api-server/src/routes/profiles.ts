@@ -13,6 +13,7 @@ import {
   checkInRequestsTable,
   eventsTable,
 } from "@workspace/db";
+import { messagesTable } from "../db/schema/messages";
 import {
   RegisterVisitorBody,
   UpdateMyProfileBody,
@@ -520,7 +521,27 @@ router.delete("/profiles/:id", async (req: Request, res: Response) => {
         });
     }
 
+    // Delete from Clerk if they have a clerk_id
+    if (profileToDelete.clerk_id && process.env.CLERK_SECRET_KEY) {
+      try {
+        await fetch(`https://api.clerk.com/v1/users/${profileToDelete.clerk_id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+        });
+        req.log.info(`Deleted Clerk user: ${profileToDelete.clerk_id}`);
+      } catch (clerkErr) {
+        req.log.warn({ clerkErr }, "Failed to delete Clerk user — continuing with DB delete");
+      }
+    }
+
     await db.transaction(async (tx: any) => {
+      // 0. Delete associated messages
+      const messageConditions = [eq(messagesTable.sender_id, req.params.id as string)];
+      if (profileToDelete.clerk_id) {
+        messageConditions.push(eq(messagesTable.sender_id, profileToDelete.clerk_id));
+      }
+      await tx.delete(messagesTable).where(or(...messageConditions));
+
       // 1. Delete associated leader permissions
       await tx.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.id as string));
       // 2. Delete associated RSVPs

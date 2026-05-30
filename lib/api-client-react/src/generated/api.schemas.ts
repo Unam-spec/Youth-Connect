@@ -52,6 +52,9 @@ export interface Profile {
   /** @nullable */
   parent_phone?: string | null;
   /** @nullable */
+  parent_name?: string | null;
+  whatsapp_opt_in?: boolean;
+  /** @nullable */
   avatar_url?: string | null;
   role: ProfileRole;
   created_at: string;
@@ -63,7 +66,6 @@ export type ProfileUpdateGender = typeof ProfileUpdateGender[keyof typeof Profil
 export const ProfileUpdateGender = {
   male: 'male',
   female: 'female',
-  other: 'other',
 } as const;
 
 export interface ProfileUpdate {
@@ -75,6 +77,8 @@ export interface ProfileUpdate {
   heard_from?: string;
   school?: string;
   parent_phone?: string;
+  parent_name?: string;
+  whatsapp_opt_in?: boolean;
   avatar_url?: string;
 }
 
@@ -84,7 +88,6 @@ export type VisitorRegistrationGender = typeof VisitorRegistrationGender[keyof t
 export const VisitorRegistrationGender = {
   male: 'male',
   female: 'female',
-  other: 'other',
 } as const;
 
 export interface VisitorRegistration {
@@ -95,6 +98,10 @@ export interface VisitorRegistration {
   gender: VisitorRegistrationGender;
   age: number;
   heard_from: string;
+  school?: string;
+  parent_phone?: string;
+  parent_name?: string;
+  whatsapp_opt_in?: boolean;
   /** @nullable */
   clerk_id?: string | null;
 }

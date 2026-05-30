@@ -26,7 +26,7 @@ import {
 } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload } from "lucide-react";
+import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload, Check, BookOpen } from "lucide-react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -81,8 +81,23 @@ export default function MyDashboard() {
   const [promptPhone, setPromptPhone] = useState("");
   const [promptName, setPromptName] = useState("");
   const [promptSchool, setPromptSchool] = useState("");
+  const [promptParentName, setPromptParentName] = useState("");
   const [promptParentPhone, setPromptParentPhone] = useState("");
+  const [promptWhatsappOptIn, setPromptWhatsappOptIn] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowSchoolDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Profile Picture state
   const [showAvatarDialog, setShowAvatarDialog] = useState(false);
@@ -105,11 +120,11 @@ export default function MyDashboard() {
   // Active tab state — so RSVP switches tab
   const [eventsTab, setEventsTab] = useState<"upcoming" | "my-rsvps">("upcoming");
 
-  // Show prompt if profile loaded and missing phone/name OR missing school/parent_phone
+  // Show prompt if profile loaded and missing phone/name OR missing school/parent details
   const profileLoaded = !isProfileLoading && !!profile;
   const needsPhone = profileLoaded && !profile!.phone;
   const needsName = profileLoaded && (!profile!.full_name || profile!.full_name === "New Member");
-  const needsSchoolOrParent = profileLoaded && (!profile!.school || !profile!.parent_phone);
+  const needsSchoolOrParent = profileLoaded && (!profile!.school || !profile!.parent_phone || !(profile as any).parent_name);
   
   // Prompt existing members if missing school/parent_phone, unless they dismissed it in this session
   const shouldPrompt = needsPhone || needsName || (needsSchoolOrParent && !localStorage.getItem("dismissed_school_prompt"));
@@ -120,7 +135,9 @@ export default function MyDashboard() {
     setPromptPhone(profile!.phone ?? "");
     setPromptName(profile!.full_name === "New Member" ? "" : (profile!.full_name ?? ""));
     setPromptSchool((profile as any).school ?? "");
+    setPromptParentName((profile as any).parent_name ?? "");
     setPromptParentPhone((profile as any).parent_phone ?? "");
+    setPromptWhatsappOptIn(!!(profile as any).whatsapp_opt_in);
   }
 
   async function handleSaveProfile() {
@@ -139,7 +156,9 @@ export default function MyDashboard() {
           phone: promptPhone.trim(),
           full_name: promptName.trim(),
           school: promptSchool.trim() || "",
+          parent_name: promptParentName.trim() || "",
           parent_phone: promptParentPhone.trim() || "",
+          whatsapp_opt_in: promptWhatsappOptIn,
         },
       });
       queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
@@ -523,24 +542,119 @@ export default function MyDashboard() {
                 onChange={(e) => setPromptPhone(e.target.value)}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="prompt-school">School / High School <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-              <Input
-                id="prompt-school"
-                placeholder="e.g. Waterberg High School"
-                value={promptSchool}
-                onChange={(e) => setPromptSchool(e.target.value)}
-              />
+            {/* Autocomplete School / University dropdown */}
+            <div className="space-y-1.5 relative" ref={dropdownRef}>
+              <Label htmlFor="prompt-school">School / University <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <div className="relative">
+                <Input
+                  id="prompt-school"
+                  placeholder="Start typing school or university..."
+                  value={promptSchool}
+                  onFocus={() => setShowSchoolDropdown(true)}
+                  onChange={(e) => {
+                    setPromptSchool(e.target.value);
+                    setShowSchoolDropdown(true);
+                  }}
+                  className="pr-10"
+                />
+                <div className="absolute right-3 top-2.5 text-slate-400">
+                  <GraduationCap className="w-4 h-4" />
+                </div>
+              </div>
+              {showSchoolDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
+                  {presets.map(() => null) /* Quick dummy to reuse styles or define them natively */}
+                  {[
+                    "University of Namibia (UNAM)",
+                    "Namibia University of Science and Technology (NUST)",
+                    "International University of Management (IUM)",
+                    "Waterberg High School",
+                    "Windhoek High School",
+                    "None / Finished Schooling"
+                  ].filter(s => s.toLowerCase().includes(promptSchool.toLowerCase())).map((schoolName) => (
+                    <div
+                      key={schoolName}
+                      onClick={() => {
+                        setPromptSchool(schoolName);
+                        setShowSchoolDropdown(false);
+                      }}
+                      className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                    >
+                      <span className="flex items-center gap-2">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        {schoolName}
+                      </span>
+                      {promptSchool === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                    </div>
+                  ))}
+                  {promptSchool && ![
+                    "University of Namibia (UNAM)",
+                    "Namibia University of Science and Technology (NUST)",
+                    "International University of Management (IUM)",
+                    "Waterberg High School",
+                    "Windhoek High School",
+                    "None / Finished Schooling"
+                  ].includes(promptSchool) && (
+                    <div
+                      onClick={() => setShowSchoolDropdown(false)}
+                      className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Use Custom: "{promptSchool}"
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="prompt-parent-phone">Parent / Guardian Phone <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-              <Input
-                id="prompt-parent-phone"
-                type="tel"
-                placeholder="072 000 0000"
-                value={promptParentPhone}
-                onChange={(e) => setPromptParentPhone(e.target.value)}
+
+            {/* Parent / Guardian Isolated Details */}
+            <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-3 shadow-xs">
+              <div className="flex items-center gap-2 text-teal-400 font-semibold text-xs border-b border-slate-800/60 pb-1.5">
+                <User className="w-3.5 h-3.5" />
+                Parent / Guardian Details
+              </div>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label htmlFor="prompt-parent-name" className="text-xs text-slate-300">Parent/Guardian Name <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="prompt-parent-name"
+                    placeholder="Mary Doe"
+                    value={promptParentName}
+                    onChange={(e) => setPromptParentName(e.target.value)}
+                    className="h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="prompt-parent-phone" className="text-xs text-slate-300">Parent/Guardian Phone <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="prompt-parent-phone"
+                    type="tel"
+                    placeholder="e.g. 081 123 4567"
+                    value={promptParentPhone}
+                    onChange={(e) => setPromptParentPhone(e.target.value)}
+                    className="h-9 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* WhatsApp Group Opt-in checkbox */}
+            <div className="flex items-start space-x-3 space-y-0 rounded-xl border border-slate-850 bg-slate-950/30 p-3 shadow-xs">
+              <input
+                type="checkbox"
+                id="prompt-whatsapp-opt-in"
+                checked={promptWhatsappOptIn}
+                onChange={(e) => setPromptWhatsappOptIn(e.target.checked)}
+                className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-700 bg-slate-950/50 cursor-pointer mt-0.5"
               />
+              <div className="space-y-1 leading-none cursor-pointer" onClick={() => setPromptWhatsappOptIn(!promptWhatsappOptIn)}>
+                <Label htmlFor="prompt-whatsapp-opt-in" className="text-xs font-semibold text-slate-200 cursor-pointer">
+                  Join the Youth Connect WhatsApp Group
+                </Label>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Get sessions details and announcements directly on WhatsApp.
+                </p>
+              </div>
             </div>
           </div>
           <DialogFooter className="flex gap-2">
@@ -613,9 +727,10 @@ export default function MyDashboard() {
                   <div className="relative w-full aspect-square max-w-[240px] rounded-2xl overflow-hidden bg-black border border-border">
                     <video
                       ref={videoRef}
-                      className="w-full h-full object-cover transform -scale-x-100"
+                      className="w-full h-full object-cover transform -scale-x-100 animate-fade-in"
                       playsInline
                       muted
+                      autoPlay
                     />
                   </div>
                   <div className="flex gap-2 w-full">

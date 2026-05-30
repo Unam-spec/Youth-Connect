@@ -16,5 +16,7 @@ export interface ProfileUpdate {
   heard_from?: string;
   school?: string;
   parent_phone?: string;
+  parent_name?: string;
+  whatsapp_opt_in?: boolean;
   avatar_url?: string;
 }

@@ -817,6 +817,10 @@ components:
           type: ["string", "null"]
         parent_phone:
           type: ["string", "null"]
+        parent_name:
+          type: ["string", "null"]
+        whatsapp_opt_in:
+          type: boolean
         avatar_url:
           type: ["string", "null"]
         role:
@@ -837,7 +841,7 @@ components:
           type: string
         gender:
           type: string
-          enum: [male, female, other]
+          enum: [male, female]
         age:
           type: integer
         heard_from:
@@ -846,6 +850,10 @@ components:
           type: string
         parent_phone:
           type: string
+        parent_name:
+          type: string
+        whatsapp_opt_in:
+          type: boolean
         avatar_url:
           type: string
 
@@ -861,11 +869,19 @@ components:
           type: ["string", "null"]
         gender:
           type: string
-          enum: [male, female, other]
+          enum: [male, female]
         age:
           type: integer
         heard_from:
           type: string
+        school:
+          type: string
+        parent_phone:
+          type: string
+        parent_name:
+          type: string
+        whatsapp_opt_in:
+          type: boolean
         clerk_id:
           type: ["string", "null"]
 

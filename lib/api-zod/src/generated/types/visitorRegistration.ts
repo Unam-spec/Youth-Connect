@@ -15,6 +15,10 @@ export interface VisitorRegistration {
   gender: VisitorRegistrationGender;
   age: number;
   heard_from: string;
+  school?: string;
+  parent_phone?: string;
+  parent_name?: string;
+  whatsapp_opt_in?: boolean;
   /** @nullable */
   clerk_id?: string | null;
 }

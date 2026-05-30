@@ -12,5 +12,4 @@ export type ProfileUpdateGender = typeof ProfileUpdateGender[keyof typeof Profil
 export const ProfileUpdateGender = {
   male: 'male',
   female: 'female',
-  other: 'other',
 } as const;

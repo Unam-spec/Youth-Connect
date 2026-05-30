@@ -28,6 +28,12 @@ ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "can_view_attendance" boolean NO
 -- Ensure school / parent_phone columns exist (added in v0.8)
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "school" text;
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "parent_phone" text;
+ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "parent_name" text;
+ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "whatsapp_opt_in" boolean NOT NULL DEFAULT false;
+
+-- Ensure visitors table columns exist
+ALTER TABLE "visitors" ADD COLUMN IF NOT EXISTS "parent_name" text;
+ALTER TABLE "visitors" ADD COLUMN IF NOT EXISTS "whatsapp_opt_in" boolean NOT NULL DEFAULT false;
 
 -- Ensure avatar_url column exists (added in v0.9)
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "avatar_url" text;

@@ -75,6 +75,12 @@ import {
   Star,
   SendHorizontal,
   MessageSquare,
+  BookOpen,
+  Check,
+  GraduationCap,
+  MapPin,
+  User,
+  Phone
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
@@ -211,9 +217,12 @@ export default function Dashboard() {
   const [editPhone, setEditPhone] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editSchool, setEditSchool] = useState("");
+  const [editParentName, setEditParentName] = useState("");
   const [editParentPhone, setEditParentPhone] = useState("");
+  const [editWhatsappOptIn, setEditWhatsappOptIn] = useState(false);
   const [editAge, setEditAge] = useState(18);
-  const [editGender, setEditGender] = useState<"male" | "female" | "other">("other");
+  const [editGender, setEditGender] = useState<"male" | "female">("male");
+  const [editShowSchoolDropdown, setEditShowSchoolDropdown] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
   const [activeTab, setActiveTab] = useState("attendance");
@@ -245,7 +254,8 @@ export default function Dashboard() {
       try {
         const token = isSignedIn ? await getToken() : "";
         const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
-        const response = await fetch("/api/messages", {
+        const apiBase = import.meta.env.VITE_API_URL || "";
+        const response = await fetch(`${apiBase}/api/messages`, {
           headers: {
             "x-leader-session": leaderSessionStr,
             ...(token && { Authorization: `Bearer ${token}` }),
@@ -271,7 +281,8 @@ export default function Dashboard() {
       try {
         const token = isSignedIn ? await getToken() : "";
         const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
-        const url = `/api/messages/stream?token=${encodeURIComponent(token || "")}&leader_session=${encodeURIComponent(leaderSessionStr)}`;
+        const apiBase = import.meta.env.VITE_API_URL || "";
+        const url = `${apiBase}/api/messages/stream?token=${encodeURIComponent(token || "")}&leader_session=${encodeURIComponent(leaderSessionStr)}`;
         
         eventSource = new EventSource(url);
 
@@ -358,7 +369,8 @@ export default function Dashboard() {
     try {
       const token = isSignedIn ? await getToken() : "";
       const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
-      const response = await fetch("/api/messages", {
+      const apiBase = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${apiBase}/api/messages`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -392,7 +404,8 @@ export default function Dashboard() {
     try {
       const token = isSignedIn ? await getToken() : "";
       const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
-      const response = await fetch(`/api/messages/${messageId}`, {
+      const apiBase = import.meta.env.VITE_API_URL || "";
+      const response = await fetch(`${apiBase}/api/messages/${messageId}`, {
         method: "DELETE",
         headers: {
           "x-leader-session": leaderSessionStr,
@@ -416,9 +429,11 @@ export default function Dashboard() {
     setEditPhone(profile.phone ?? "");
     setEditEmail(profile.email ?? "");
     setEditSchool(profile.school ?? "");
+    setEditParentName(profile.parent_name ?? "");
     setEditParentPhone(profile.parent_phone ?? "");
+    setEditWhatsappOptIn(!!profile.whatsapp_opt_in);
     setEditAge(profile.age ?? 18);
-    setEditGender(profile.gender ?? "other");
+    setEditGender(profile.gender === "female" ? "female" : "male");
     setShowEditDialog(true);
   }
 
@@ -437,7 +452,9 @@ export default function Dashboard() {
           phone: editPhone.trim() || null,
           email: editEmail.trim() || null,
           school: editSchool.trim() || null,
+          parent_name: editParentName.trim() || null,
           parent_phone: editParentPhone.trim() || null,
+          whatsapp_opt_in: editWhatsappOptIn,
           age: editAge ? parseInt(String(editAge), 10) : null,
           gender: editGender,
         }),
@@ -1500,14 +1517,40 @@ export default function Dashboard() {
                             <div className="text-xs text-muted-foreground mt-0.5 flex flex-col gap-0.5">
                               <span>{profile.phone || "No phone"}</span>
                               {profile.school && (
-                                <span className="text-[10px] text-teal-400 font-medium">School: {profile.school}</span>
+                                <span className="text-[10px] text-teal-400 font-medium flex items-center gap-1">
+                                  School: {profile.school}
+                                  <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(profile.school)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex text-teal-300 hover:text-teal-100 transition-colors ml-0.5"
+                                    title="View on Google Maps"
+                                  >
+                                    <MapPin className="w-3 h-3" />
+                                  </a>
+                                </span>
                               )}
-                              {profile.parent_phone && (
-                                <span className="text-[10px] text-amber-400 font-medium">Parent: {profile.parent_phone}</span>
+                              {(profile.parent_name || profile.parent_phone) && (
+                                <span className="text-[10px] text-amber-400 font-medium flex flex-col gap-0.5 bg-slate-950/20 border border-slate-850 p-1.5 rounded-lg mt-1 w-full max-w-[200px]">
+                                  <span className="font-semibold text-amber-300 flex items-center gap-1 border-b border-slate-900 pb-0.5">
+                                    <User className="w-2.5 h-2.5" /> Parent / Guardian
+                                  </span>
+                                  {profile.parent_name && <span>Name: {profile.parent_name}</span>}
+                                  {profile.parent_phone && <span>Phone: {profile.parent_phone}</span>}
+                                </span>
                               )}
                             </div>
-                            <div className="mt-2">
+                            <div className="mt-2 flex items-center gap-1.5">
                               <RoleBadge role={profile.role} />
+                              {profile.whatsapp_opt_in ? (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-xs">
+                                  <Check className="w-2.5 h-2.5" /> WhatsApp Yes
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-500/10 text-slate-400 border border-slate-500/10">
+                                  WhatsApp No
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2561,7 +2604,6 @@ export default function Dashboard() {
                 >
                   <option value="male" className="bg-slate-900 text-white">Male</option>
                   <option value="female" className="bg-slate-900 text-white">Female</option>
-                  <option value="other" className="bg-slate-900 text-white">Other</option>
                 </select>
               </div>
               <div className="space-y-1.5">
@@ -2576,26 +2618,117 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-school" className="text-slate-200">School / High School</Label>
+            {/* School / University Autocomplete Combobox */}
+            <div className="space-y-1.5 relative">
+              <Label htmlFor="edit-school" className="text-slate-200">School / University</Label>
+              <div className="relative">
                 <Input
                   id="edit-school"
                   value={editSchool}
-                  onChange={(e) => setEditSchool(e.target.value)}
-                  placeholder="e.g. Waterberg High School"
-                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                  onFocus={() => setEditShowSchoolDropdown(true)}
+                  onBlur={() => setTimeout(() => setEditShowSchoolDropdown(false), 200)}
+                  onChange={(e) => {
+                    setEditSchool(e.target.value);
+                    setEditShowSchoolDropdown(true);
+                  }}
+                  placeholder="Start typing school or university..."
+                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl pr-10"
                 />
+                <div className="absolute right-3 top-2.5 text-slate-400">
+                  <GraduationCap className="w-4 h-4" />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="edit-parent-phone" className="text-slate-200">Parent / Guardian Phone</Label>
-                <Input
-                  id="edit-parent-phone"
-                  value={editParentPhone}
-                  onChange={(e) => setEditParentPhone(e.target.value)}
-                  placeholder="072 123 4567"
-                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
-                />
+              {editShowSchoolDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
+                  {[
+                    "University of Namibia (UNAM)",
+                    "Namibia University of Science and Technology (NUST)",
+                    "International University of Management (IUM)",
+                    "Waterberg High School",
+                    "Windhoek High School",
+                    "None / Finished Schooling"
+                  ].filter(s => s.toLowerCase().includes(editSchool.toLowerCase())).map((schoolName) => (
+                    <div
+                      key={schoolName}
+                      onClick={() => {
+                        setEditSchool(schoolName);
+                        setEditShowSchoolDropdown(false);
+                      }}
+                      className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                    >
+                      <span className="flex items-center gap-2">
+                        <BookOpen className="w-3.5 h-3.5" />
+                        {schoolName}
+                      </span>
+                      {editSchool === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                    </div>
+                  ))}
+                  {editSchool && ![
+                    "University of Namibia (UNAM)",
+                    "Namibia University of Science and Technology (NUST)",
+                    "International University of Management (IUM)",
+                    "Waterberg High School",
+                    "Windhoek High School",
+                    "None / Finished Schooling"
+                  ].includes(editSchool) && (
+                    <div
+                      onClick={() => setEditShowSchoolDropdown(false)}
+                      className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      Use Custom: "{editSchool}"
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Parent / Guardian Isolated Details */}
+            <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-3 shadow-xs">
+              <div className="flex items-center gap-2 text-teal-400 font-semibold text-xs border-b border-slate-800/60 pb-1.5">
+                <User className="w-3.5 h-3.5" />
+                Parent / Guardian Details
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-parent-name" className="text-xs text-slate-300">Parent/Guardian Name</Label>
+                  <Input
+                    id="edit-parent-name"
+                    value={editParentName}
+                    onChange={(e) => setEditParentName(e.target.value)}
+                    placeholder="Mary Doe"
+                    className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-9 text-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-parent-phone" className="text-xs text-slate-300">Parent/Guardian Phone</Label>
+                  <Input
+                    id="edit-parent-phone"
+                    value={editParentPhone}
+                    onChange={(e) => setEditParentPhone(e.target.value)}
+                    placeholder="081 123 4567"
+                    className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-9 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* WhatsApp Group Opt-in checkbox */}
+            <div className="flex items-start space-x-3 space-y-0 rounded-xl border border-slate-850 bg-slate-950/30 p-3 shadow-xs">
+              <input
+                type="checkbox"
+                id="edit-whatsapp-opt-in"
+                checked={editWhatsappOptIn}
+                onChange={(e) => setEditWhatsappOptIn(e.target.checked)}
+                className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-700 bg-slate-950/50 cursor-pointer mt-0.5"
+              />
+              <div className="space-y-1 leading-none cursor-pointer" onClick={() => setEditWhatsappOptIn(!editWhatsappOptIn)}>
+                <Label htmlFor="edit-whatsapp-opt-in" className="text-xs font-semibold text-slate-200 cursor-pointer">
+                  Join the Youth Connect WhatsApp Group
+                </Label>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Get session details and announcements directly on WhatsApp.
+                </p>
               </div>
             </div>
           </div>

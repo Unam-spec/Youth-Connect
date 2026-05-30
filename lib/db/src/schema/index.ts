@@ -67,6 +67,8 @@ export const profilesTable = pgTable("profiles", {
   can_view_attendance: boolean("can_view_attendance").notNull().default(true),
   school: text("school"),
   parent_phone: text("parent_phone"),
+  parent_name: text("parent_name"),
+  whatsapp_opt_in: boolean("whatsapp_opt_in").notNull().default(false),
   avatar_url: text("avatar_url"),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -172,6 +174,8 @@ export const visitorsTable = pgTable("visitors", {
   how_did_you_hear: text("how_did_you_hear").notNull(),
   school: text("school"),
   parent_phone: text("parent_phone"),
+  parent_name: text("parent_name"),
+  whatsapp_opt_in: boolean("whatsapp_opt_in").notNull().default(false),
   session_date: date("session_date").notNull(),
   status: checkInRequestStatusEnum("status").notNull().default("pending"),
   created_at: timestamp("created_at", { withTimezone: true })

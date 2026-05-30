@@ -272,6 +272,14 @@ export default function CheckIn() {
     setScannerError("");
 
     try {
+      // Pre-request camera permission natively to force iOS/Chrome prompts
+      try {
+        const preStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        preStream.getTracks().forEach((track) => track.stop());
+      } catch (mediaErr) {
+        console.warn("Natively requesting media permission failed, proceeding to Html5Qrcode:", mediaErr);
+      }
+
       const html5QrCode = new Html5Qrcode("qr-reader");
       qrReaderRef.current = html5QrCode;
 

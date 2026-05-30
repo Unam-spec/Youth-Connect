@@ -12,5 +12,4 @@ export type VisitorRegistrationGender = typeof VisitorRegistrationGender[keyof t
 export const VisitorRegistrationGender = {
   male: 'male',
   female: 'female',
-  other: 'other',
 } as const;

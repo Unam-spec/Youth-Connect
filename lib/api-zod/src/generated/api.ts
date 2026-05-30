@@ -30,6 +30,8 @@ export const GetMyProfileResponse = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -43,11 +45,13 @@ export const UpdateMyProfileBody = zod.object({
   "full_name": zod.string().optional(),
   "phone": zod.string().optional(),
   "email": zod.string().optional(),
-  "gender": zod.enum(['male', 'female', 'other']).optional(),
+  "gender": zod.enum(['male', 'female']).optional(),
   "age": zod.number().optional(),
   "heard_from": zod.string().optional(),
   "school": zod.string().optional(),
   "parent_phone": zod.string().optional(),
+  "parent_name": zod.string().optional(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().optional()
 })
 
@@ -62,6 +66,8 @@ export const UpdateMyProfileResponse = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -75,9 +81,13 @@ export const RegisterVisitorBody = zod.object({
   "full_name": zod.string(),
   "phone": zod.string(),
   "email": zod.string().nullish(),
-  "gender": zod.enum(['male', 'female', 'other']),
+  "gender": zod.enum(['male', 'female']),
   "age": zod.number(),
   "heard_from": zod.string(),
+  "school": zod.string().optional(),
+  "parent_phone": zod.string().optional(),
+  "parent_name": zod.string().optional(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "clerk_id": zod.string().nullish()
 })
 
@@ -106,6 +116,8 @@ export const ListProfilesResponseItem = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -131,6 +143,8 @@ export const GetProfileResponse = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -155,6 +169,8 @@ export const PromoteToMemberResponse = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -179,6 +195,8 @@ export const RevokeMembershipResponse = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -359,6 +377,8 @@ export const ListAttendanceResponseItem = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -398,6 +418,8 @@ export const GetTodayAttendanceResponseItem = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -547,6 +569,8 @@ export const ListMembershipRequestsResponseItem = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -588,6 +612,8 @@ export const ApproveMembershipRequestResponse = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -620,6 +646,8 @@ export const RejectMembershipRequestResponse = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -647,6 +675,8 @@ export const ListLeadersResponseItem = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -704,6 +734,8 @@ export const UpdateLeaderPermissionsResponse = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -729,6 +761,8 @@ export const RevokeLeaderAccessResponse = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()
@@ -785,6 +819,8 @@ export const SearchForCheckInResponseItem = zod.object({
   "heard_from": zod.string().nullish(),
   "school": zod.string().nullish(),
   "parent_phone": zod.string().nullish(),
+  "parent_name": zod.string().nullish(),
+  "whatsapp_opt_in": zod.boolean().optional(),
   "avatar_url": zod.string().nullish(),
   "role": zod.enum(['super_admin', 'leader', 'member', 'visitor']),
   "created_at": zod.coerce.date()

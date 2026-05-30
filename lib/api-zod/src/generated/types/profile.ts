@@ -28,6 +28,9 @@ export interface Profile {
   /** @nullable */
   parent_phone?: string | null;
   /** @nullable */
+  parent_name?: string | null;
+  whatsapp_opt_in?: boolean;
+  /** @nullable */
   avatar_url?: string | null;
   role: ProfileRole;
   created_at: Date;

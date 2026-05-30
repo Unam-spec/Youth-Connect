@@ -20,7 +20,7 @@ const router = Router();
  */
 router.post("/register", async (req, res) => {
   try {
-    const { full_name, phone_number, email, gender, age, how_did_you_hear, school, parent_phone } =
+    const { full_name, phone_number, email, gender, age, how_did_you_hear, school, parent_phone, parent_name, whatsapp_opt_in } =
       req.body;
 
     // ── Required field validation ──────────────────────────────────────────────
@@ -78,6 +78,8 @@ router.post("/register", async (req, res) => {
         how_did_you_hear: how_did_you_hear.trim(),
         school: school && typeof school === 'string' && school.trim() ? school.trim() : null,
         parent_phone: parent_phone && typeof parent_phone === 'string' && parent_phone.trim() ? parent_phone.trim() : null,
+        parent_name: parent_name && typeof parent_name === 'string' && parent_name.trim() ? parent_name.trim() : null,
+        whatsapp_opt_in: !!whatsapp_opt_in,
         session_date: today,
         status: "pending",
       })
