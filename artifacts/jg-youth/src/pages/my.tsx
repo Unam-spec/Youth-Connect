@@ -178,6 +178,8 @@ export default function MyDashboard() {
                     </button>
                   )}
                   {profile.email && <p>Email: {profile.email}</p>}
+                  {(profile as any).school && <p>🎓 School: {(profile as any).school}</p>}
+                  {(profile as any).parent_phone && <p>👨‍👩‍👧 Parent/Guardian: {(profile as any).parent_phone}</p>}
                 </div>
               </CardContent>
             </Card>
