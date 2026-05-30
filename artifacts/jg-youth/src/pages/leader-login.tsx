@@ -91,6 +91,10 @@ export default function LeaderLogin() {
           setLeaderSession({
             role: profile.role,
             profile_id: profile.id, // fix: was profile.profile_id, correct field is id
+            can_create_events: true,
+            can_view_kpis: true,
+            can_view_members: true,
+            can_view_attendance: true,
           });
           setMode("redirecting");
           setLocation("/dashboard");

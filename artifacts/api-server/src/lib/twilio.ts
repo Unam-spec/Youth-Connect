@@ -9,9 +9,15 @@
  *   TWILIO_SENDGRID_FROM     — verified sender email address
  */
 
-const SENDGRID_API_KEY = process.env.TWILIO_SENDGRID_API_KEY ?? "";
+const SENDGRID_API_KEY =
+  process.env.TWILIO_SENDGRID_API_KEY ??
+  process.env.SENDGRID_API_KEY ??
+  "";
 const FROM_EMAIL =
-  process.env.TWILIO_SENDGRID_FROM ?? "noreply@jeremiahgenerationyouth.org";
+  process.env.TWILIO_SENDGRID_FROM ??
+  process.env.SENDGRID_FROM ??
+  process.env.FROM_EMAIL ??
+  "noreply@jeremiahgenerationyouth.org";
 
 export interface EmailPayload {
   to: string;

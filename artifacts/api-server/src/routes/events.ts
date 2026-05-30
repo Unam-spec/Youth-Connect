@@ -98,9 +98,14 @@ router.post("/events", async (req: Request, res: Response) => {
         .from(profilesTable)
         .where(inArray(profilesTable.role, ["member", "leader", "super_admin"]));
 
-      const eventDate = new Date(event.date).toLocaleDateString("en-ZA", {
-        weekday: "long", year: "numeric", month: "long", day: "numeric",
-      });
+      let eventDate = "";
+      try {
+        eventDate = new Date(event.date).toLocaleDateString("en-ZA", {
+          weekday: "long", year: "numeric", month: "long", day: "numeric",
+        });
+      } catch {
+        eventDate = String(event.date);
+      }
 
       await Promise.allSettled(
         recipients

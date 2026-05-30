@@ -430,9 +430,14 @@ router.patch("/checkin/requests/:id/approve", async (req, res) => {
         where: eq(profilesTable.id, request.profile_id),
       });
       if (profile?.email) {
-        const sessionDate = new Date(request.session_date).toLocaleDateString("en-ZA", {
-          weekday: "long", year: "numeric", month: "long", day: "numeric",
-        });
+        let sessionDate = "";
+        try {
+          sessionDate = new Date(request.session_date).toLocaleDateString("en-ZA", {
+            weekday: "long", year: "numeric", month: "long", day: "numeric",
+          });
+        } catch {
+          sessionDate = String(request.session_date);
+        }
         await sendEmail({
           to: profile.email,
           subject: "You are checked in — Jeremiah Generation Youth",
