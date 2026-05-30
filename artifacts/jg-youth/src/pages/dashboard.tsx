@@ -121,6 +121,10 @@ interface PendingCheckIn {
   type: "member" | "visitor";
   role: string;
   requested_at: string;
+  age?: number | null;
+  school?: string | null;
+  parent_phone?: string | null;
+  how_did_you_hear?: string | null;
 }
 
 interface LeaderPin {
