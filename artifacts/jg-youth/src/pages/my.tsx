@@ -26,7 +26,7 @@ import {
 } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { CalendarIcon, Clock, MapPin, CheckCircle, XCircle, QrCode } from "lucide-react";
+import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload } from "lucide-react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -80,22 +80,44 @@ export default function MyDashboard() {
   const [showProfilePrompt, setShowProfilePrompt] = useState(false);
   const [promptPhone, setPromptPhone] = useState("");
   const [promptName, setPromptName] = useState("");
+  const [promptSchool, setPromptSchool] = useState("");
+  const [promptParentPhone, setPromptParentPhone] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Profile Picture state
+  const [showAvatarDialog, setShowAvatarDialog] = useState(false);
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+
+  const presets = [
+    "linear-gradient(135deg, #FF5E3A 0%, #FF2A68 100%)", // Sunset
+    "linear-gradient(135deg, #007AFF 0%, #00C6FF 100%)", // Ocean
+    "linear-gradient(135deg, #30D158 0%, #8E2DE2 100%)", // Neon
+    "linear-gradient(135deg, #BF5AF2 0%, #5AC8FA 100%)", // Lavender
+    "linear-gradient(135deg, #FFD60A 0%, #FF9500 100%)", // Fire
+    "linear-gradient(135deg, #FF2D55 0%, #FF9500 100%)", // Coral
+    "linear-gradient(135deg, #1D976C 0%, #93F9B9 100%)", // Emerald
+    "linear-gradient(135deg, #111827 0%, #4B5563 100%)", // Slate
+  ];
 
   // Active tab state — so RSVP switches tab
   const [eventsTab, setEventsTab] = useState<"upcoming" | "my-rsvps">("upcoming");
 
-  // Show prompt if profile loaded and missing phone or has default name
+  // Show prompt if profile loaded and missing phone/name OR missing school/parent_phone
   const profileLoaded = !isProfileLoading && !!profile;
   const needsPhone = profileLoaded && !profile!.phone;
   const needsName = profileLoaded && (!profile!.full_name || profile!.full_name === "New Member");
-  const shouldPrompt = needsPhone || needsName;
+  const needsSchoolOrParent = profileLoaded && (!profile!.school || !profile!.parent_phone);
+  
+  // Prompt existing members if missing school/parent_phone, unless they dismissed it in this session
+  const shouldPrompt = needsPhone || needsName || (needsSchoolOrParent && !localStorage.getItem("dismissed_school_prompt"));
 
   // Open prompt once when profile loads and is incomplete
   if (profileLoaded && shouldPrompt && !showProfilePrompt && promptPhone === "" && promptName === "") {
     setShowProfilePrompt(true);
     setPromptPhone(profile!.phone ?? "");
     setPromptName(profile!.full_name === "New Member" ? "" : (profile!.full_name ?? ""));
+    setPromptSchool((profile as any).school ?? "");
+    setPromptParentPhone((profile as any).parent_phone ?? "");
   }
 
   async function handleSaveProfile() {
@@ -109,14 +131,56 @@ export default function MyDashboard() {
     }
     setIsSavingProfile(true);
     try {
-      await updateProfile.mutateAsync({ data: { phone: promptPhone.trim(), full_name: promptName.trim() } });
+      await updateProfile.mutateAsync({
+        data: {
+          phone: promptPhone.trim(),
+          full_name: promptName.trim(),
+          school: promptSchool.trim() || "",
+          parent_phone: promptParentPhone.trim() || "",
+        },
+      });
       queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
       toast({ title: "Profile updated" });
       setShowProfilePrompt(false);
+      localStorage.setItem("dismissed_school_prompt", "true");
     } catch {
       toast({ title: "Failed to save profile", variant: "destructive" });
     } finally {
       setIsSavingProfile(false);
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast({ title: "File too large", description: "Please upload an image smaller than 2MB.", variant: "destructive" });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
+        await saveAvatar(base64String);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  async function saveAvatar(avatarUrl: string) {
+    setIsSavingAvatar(true);
+    try {
+      await updateProfile.mutateAsync({
+        data: {
+          avatar_url: avatarUrl,
+        },
+      });
+      queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
+      toast({ title: "Profile picture updated" });
+      setShowAvatarDialog(false);
+    } catch {
+      toast({ title: "Failed to update profile picture", variant: "destructive" });
+    } finally {
+      setIsSavingAvatar(false);
     }
   }
 
@@ -149,37 +213,93 @@ export default function MyDashboard() {
         {/* Profile card */}
         <section>
           {isProfileLoading ? (
-            <Skeleton className="h-36 w-full max-w-md rounded-2xl" />
+            <Skeleton className="h-44 w-full max-w-md rounded-2xl" />
           ) : profile ? (
-            <Card className="max-w-md border-primary/20 bg-card/50 backdrop-blur rounded-2xl">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-2xl">{profile.full_name}</CardTitle>
-                <CardDescription className="capitalize flex items-center gap-2 mt-1">
-                  <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {profile.role}
-                  </span>
-                  {profile.role === "visitor" && (
-                    <Link href="/become-member" className="text-xs text-primary hover:underline">
-                      Become a Member
-                    </Link>
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground space-y-1 mt-2">
-                  {profile.phone ? (
-                    <p>Phone: {profile.phone}</p>
-                  ) : (
-                    <button
-                      onClick={() => setShowProfilePrompt(true)}
-                      className="text-primary text-xs underline underline-offset-2"
-                    >
-                      + Add phone number
-                    </button>
-                  )}
-                  {profile.email && <p>Email: {profile.email}</p>}
-                  {(profile as any).school && <p>🎓 School: {(profile as any).school}</p>}
-                  {(profile as any).parent_phone && <p>👨‍👩‍👧 Parent/Guardian: {(profile as any).parent_phone}</p>}
+            <Card className="max-w-md border-primary/20 bg-card/50 backdrop-blur rounded-2xl overflow-hidden shadow-lg hover:border-primary/45 transition-colors duration-300">
+              <div className="h-24 bg-gradient-to-r from-primary/30 to-teal-500/20 relative">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
+              </div>
+              <CardContent className="pt-0 relative px-6 pb-6">
+                <div className="flex justify-between items-end -mt-10 mb-4">
+                  <div className="relative group cursor-pointer" onClick={() => setShowAvatarDialog(true)}>
+                    <div className="h-20 w-20 rounded-full border-4 border-background overflow-hidden bg-muted flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-200">
+                      {profile.avatar_url ? (
+                        profile.avatar_url.startsWith("gradient:") ? (
+                          <div
+                            className="h-full w-full"
+                            style={{ background: profile.avatar_url.replace("gradient:", "") }}
+                          />
+                        ) : (
+                          <img
+                            src={profile.avatar_url}
+                            alt={profile.full_name}
+                            className="h-full w-full object-cover"
+                          />
+                        )
+                      ) : (
+                        <div className="h-full w-full bg-gradient-to-br from-primary/40 to-teal-500/30 flex items-center justify-center text-xl font-bold text-white uppercase">
+                          {profile.full_name?.charAt(0)?.toUpperCase() ?? <User className="w-6 h-6" />}
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                      <Camera className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowProfilePrompt(true)}
+                    className="text-xs text-primary hover:underline font-semibold border border-primary/25 px-3 py-1.5 rounded-full bg-background/80 backdrop-blur shadow-sm hover:bg-primary/5 transition-all"
+                  >
+                    Edit Profile
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-xl font-bold tracking-tight">{profile.full_name}</h3>
+                    <div className="capitalize flex items-center gap-2 mt-1">
+                      <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">
+                        {profile.role.replace("_", " ").replace("-", " ")}
+                      </span>
+                      {profile.role === "visitor" && (
+                        <Link href="/become-member" className="text-xs text-primary hover:underline font-medium">
+                          Become a Member
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-muted-foreground space-y-2.5 pt-3.5 border-t border-border/40">
+                    {profile.phone ? (
+                      <p className="flex items-center gap-2 text-foreground/80">
+                        <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        {profile.phone}
+                      </p>
+                    ) : (
+                      <p className="flex items-center gap-2 text-destructive font-medium">
+                        <Phone className="h-4 w-4 shrink-0" />
+                        Missing phone number
+                      </p>
+                    )}
+                    {profile.email && (
+                      <p className="flex items-center gap-2 text-foreground/80">
+                        <span className="text-xs text-muted-foreground w-4 text-center font-bold shrink-0">@</span>
+                        {profile.email}
+                      </p>
+                    )}
+                    {(profile as any).school && (
+                      <p className="flex items-center gap-2 text-foreground/80">
+                        <GraduationCap className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        {(profile as any).school}
+                      </p>
+                    )}
+                    {(profile as any).parent_phone && (
+                      <p className="flex items-center gap-2 text-foreground/80 text-xs">
+                        <span className="font-semibold text-muted-foreground">Parent Phone:</span>
+                        {(profile as any).parent_phone}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -324,7 +444,7 @@ export default function MyDashboard() {
       </div>
 
       {/* Phone + name prompt dialog */}
-      <Dialog open={showProfilePrompt} onOpenChange={(open) => { if (!open && !needsPhone && !needsName) setShowProfilePrompt(false); }}>
+      <Dialog open={showProfilePrompt} onOpenChange={(open) => { if (!open && !needsPhone && !needsName) { setShowProfilePrompt(false); localStorage.setItem("dismissed_school_prompt", "true"); } }}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Complete your profile</DialogTitle>
@@ -352,16 +472,126 @@ export default function MyDashboard() {
                 onChange={(e) => setPromptPhone(e.target.value)}
               />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="prompt-school">School / High School <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Input
+                id="prompt-school"
+                placeholder="e.g. Waterberg High School"
+                value={promptSchool}
+                onChange={(e) => setPromptSchool(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="prompt-parent-phone">Parent / Guardian Phone <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+              <Input
+                id="prompt-parent-phone"
+                type="tel"
+                placeholder="072 000 0000"
+                value={promptParentPhone}
+                onChange={(e) => setPromptParentPhone(e.target.value)}
+              />
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex gap-2">
+            {needsSchoolOrParent && !needsPhone && !needsName && (
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowProfilePrompt(false);
+                  localStorage.setItem("dismissed_school_prompt", "true");
+                }}
+                className="flex-1 rounded-xl"
+              >
+                Skip for now
+              </Button>
+            )}
             <Button
               onClick={handleSaveProfile}
               disabled={isSavingProfile}
-              className="w-full"
+              className="flex-1 rounded-xl bg-gradient-to-r from-primary to-teal-500 border-0"
             >
               {isSavingProfile ? "Saving…" : "Save Profile"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Profile Picture Dialog */}
+      <Dialog open={showAvatarDialog} onOpenChange={setShowAvatarDialog}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Update Profile Picture</DialogTitle>
+            <DialogDescription>
+              Choose a stunning custom background gradient preset or upload your own photo.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 py-4">
+            {/* Presets Grid */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Select Preset Gradient</label>
+              <div className="grid grid-cols-4 gap-3">
+                {presets.map((gradient, index) => (
+                  <button
+                    key={index}
+                    onClick={() => saveAvatar(`gradient:${gradient}`)}
+                    disabled={isSavingAvatar}
+                    style={{ background: gradient }}
+                    className="h-12 w-full rounded-xl shadow-sm border border-black/10 hover:scale-105 duration-200 transition-transform cursor-pointer relative flex items-center justify-center group"
+                  >
+                    {profile?.avatar_url === `gradient:${gradient}` && (
+                      <CheckCircle className="w-5 h-5 text-white drop-shadow-md" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="relative flex items-center py-1">
+              <div className="flex-grow border-t border-border" />
+              <span className="flex-shrink mx-4 text-xs font-semibold text-muted-foreground uppercase tracking-widest bg-background">or</span>
+              <div className="flex-grow border-t border-border" />
+            </div>
+
+            {/* Custom Photo Upload */}
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Upload Custom Photo</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  id="avatar-upload"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  disabled={isSavingAvatar}
+                  className="hidden"
+                />
+                <Button
+                  asChild
+                  variant="outline"
+                  className="flex-1 rounded-xl cursor-pointer hover:bg-muted/10 h-11"
+                  disabled={isSavingAvatar}
+                >
+                  <label htmlFor="avatar-upload" className="flex items-center justify-center gap-2 cursor-pointer">
+                    <Upload className="w-4 h-4" />
+                    Choose Image File
+                  </label>
+                </Button>
+                {profile?.avatar_url && !profile.avatar_url.startsWith("gradient:") && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="rounded-xl h-11 px-4"
+                    onClick={() => saveAvatar("")}
+                    disabled={isSavingAvatar}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <p className="text-2xs text-muted-foreground mt-1">Supports PNG, JPG, or WEBP up to 2MB. Image will be saved directly in your profile.</p>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </Layout>

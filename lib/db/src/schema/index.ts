@@ -67,6 +67,7 @@ export const profilesTable = pgTable("profiles", {
   can_view_attendance: boolean("can_view_attendance").notNull().default(true),
   school: text("school"),
   parent_phone: text("parent_phone"),
+  avatar_url: text("avatar_url"),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

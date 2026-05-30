@@ -3,7 +3,16 @@ import { resolveAuth, isPrivilegedAuth } from "../lib/permissions";
 import { getAuth } from "@clerk/express";
 import { eq, ilike, or, and } from "drizzle-orm";
 import bcrypt from "bcrypt";
-import { db, profilesTable } from "@workspace/db";
+import {
+  db,
+  profilesTable,
+  leaderPermissionsTable,
+  rsvpsTable,
+  attendanceTable,
+  membershipRequestsTable,
+  checkInRequestsTable,
+  eventsTable,
+} from "@workspace/db";
 import {
   RegisterVisitorBody,
   UpdateMyProfileBody,
@@ -251,6 +260,9 @@ router.get("/profiles", async (req, res) => {
         full_name: profilesTable.full_name,
         role: profilesTable.role,
         phone: profilesTable.phone,
+        school: profilesTable.school,
+        parent_phone: profilesTable.parent_phone,
+        avatar_url: profilesTable.avatar_url,
         created_at: profilesTable.created_at,
         can_create_events: profilesTable.can_create_events,
         can_view_kpis: profilesTable.can_view_kpis,
@@ -463,7 +475,26 @@ router.delete("/profiles/:id", async (req, res) => {
         });
     }
 
-    await db.delete(profilesTable).where(eq(profilesTable.id, req.params.id));
+    await db.transaction(async (tx) => {
+      // 1. Delete associated leader permissions
+      await tx.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.id));
+      // 2. Delete associated RSVPs
+      await tx.delete(rsvpsTable).where(eq(rsvpsTable.profile_id, req.params.id));
+      // 3. Delete associated attendance
+      await tx.delete(attendanceTable).where(eq(attendanceTable.profile_id, req.params.id));
+      // 4. Delete associated membership requests
+      await tx.delete(membershipRequestsTable).where(eq(membershipRequestsTable.profile_id, req.params.id));
+      // 5. Nullify reviewed_by in other membership requests
+      await tx.update(membershipRequestsTable).set({ reviewed_by: null }).where(eq(membershipRequestsTable.reviewed_by, req.params.id));
+      // 6. Delete associated check-in requests
+      await tx.delete(checkInRequestsTable).where(eq(checkInRequestsTable.profile_id, req.params.id));
+      // 7. Nullify reviewed_by in check-in requests
+      await tx.update(checkInRequestsTable).set({ reviewed_by: null }).where(eq(checkInRequestsTable.reviewed_by, req.params.id));
+      // 8. Nullify created_by in events
+      await tx.update(eventsTable).set({ created_by: null }).where(eq(eventsTable.created_by, req.params.id));
+      // 9. Delete the profile itself
+      await tx.delete(profilesTable).where(eq(profilesTable.id, req.params.id));
+    });
     return res.json({ message: "Profile deleted successfully" });
   } catch (err) {
     req.log.error(err);

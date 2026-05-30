@@ -1140,7 +1140,7 @@ export default function Dashboard() {
                       >
                         <div className="flex items-start gap-3">
                           <div
-                            className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 text-sm font-bold ${
+                            className={`h-10 w-10 rounded-full overflow-hidden flex items-center justify-center shrink-0 text-sm font-bold ${
                               profile.role === "super_admin"
                                 ? "bg-purple-500/20 text-purple-300"
                                 : profile.role === "leader"
@@ -1150,7 +1150,22 @@ export default function Dashboard() {
                                     : "bg-muted text-muted-foreground"
                             }`}
                           >
-                            {profile.full_name?.charAt(0)?.toUpperCase() ?? "?"}
+                            {profile.avatar_url ? (
+                              profile.avatar_url.startsWith("gradient:") ? (
+                                <div
+                                  className="h-full w-full"
+                                  style={{ background: profile.avatar_url.replace("gradient:", "") }}
+                                />
+                              ) : (
+                                <img
+                                  src={profile.avatar_url}
+                                  alt={profile.full_name}
+                                  className="h-full w-full object-cover"
+                                />
+                              )
+                            ) : (
+                              profile.full_name?.charAt(0)?.toUpperCase() ?? "?"
+                            )}
                           </div>
                           <div>
                             <p className="font-semibold text-sm leading-tight">
@@ -1893,9 +1908,23 @@ export default function Dashboard() {
                             className="flex items-center justify-between rounded-xl border border-purple-500/20 bg-purple-500/5 p-4"
                           >
                             <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-purple-500/20 flex items-center justify-center text-sm font-bold text-purple-300">
-                                {admin.full_name?.charAt(0)?.toUpperCase() ??
-                                  "?"}
+                              <div className="h-9 w-9 rounded-full overflow-hidden bg-purple-500/20 flex items-center justify-center text-sm font-bold text-purple-300">
+                                {admin.avatar_url ? (
+                                  admin.avatar_url.startsWith("gradient:") ? (
+                                    <div
+                                      className="h-full w-full"
+                                      style={{ background: admin.avatar_url.replace("gradient:", "") }}
+                                    />
+                                  ) : (
+                                    <img
+                                      src={admin.avatar_url}
+                                      alt={admin.full_name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  )
+                                ) : (
+                                  admin.full_name?.charAt(0)?.toUpperCase() ?? "?"
+                                )}
                               </div>
                               <div>
                                 <p className="font-medium text-sm">

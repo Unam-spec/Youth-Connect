@@ -235,6 +235,8 @@ router.delete("/events/:id", async (req, res) => {
     await db.transaction(async (tx) => {
       // Delete associated RSVPs
       await tx.delete(rsvpsTable).where(eq(rsvpsTable.event_id, eventId));
+      // Delete associated attendance
+      await tx.delete(attendanceTable).where(eq(attendanceTable.event_id, eventId));
       // Delete the event
       await tx.delete(eventsTable).where(eq(eventsTable.id, eventId));
     });
