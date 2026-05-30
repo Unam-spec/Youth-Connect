@@ -25,10 +25,12 @@ export async function runMigrations() {
     await migrate(db, { migrationsFolder: "./drizzle" });
     console.log("Migrations finished!");
   } catch (err: any) {
-    // 42710 = duplicate_object (type/table already exists) — safe to ignore on redeploy
-    if (err?.cause?.code === "42710" || err?.code === "42710") {
-      console.log("Migration objects already exist, skipping.");
+    // 42710 = duplicate_object (enum already exists), 42P07 = duplicate_table (table already exists) — safe to ignore on redeploy
+    const code = err?.cause?.code || err?.code;
+    if (code === "42710" || code === "42P07") {
+      console.log("Migration objects (enum or table) already exist, skipping.");
     } else {
+      console.error("Migration failed with error:", err);
       throw err;
     }
   }
