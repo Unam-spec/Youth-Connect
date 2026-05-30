@@ -1,11 +1,11 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "pnpm"]
+nixPkgs = ["nodejs_20", "nodePackages.pnpm"]
 
 [phases.install]
-cmds = ["pnpm install --ignore-scripts"]
+cmds = ["pnpm install --no-frozen-lockfile --ignore-scripts"]
 
 [phases.build]
-cmds = ["pnpm run build --filter=@workspace/api-server"]
+cmds = ["pnpm --filter @workspace/api-server build"]
 
 [start]
-cmd = "pnpm run start --filter=@workspace/api-server"
+cmd = "pnpm --filter @workspace/api-server start"
