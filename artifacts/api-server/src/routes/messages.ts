@@ -109,6 +109,7 @@ messagesRouter.get("/messages/stream", resolveLeaderOrSuperAdmin, (req, res) => 
     "Cache-Control": "no-cache",
     "Connection": "keep-alive",
   });
+  res.flushHeaders();
 
   const clientId = Math.random().toString(36).substring(2);
   clients.push({ id: clientId, res });

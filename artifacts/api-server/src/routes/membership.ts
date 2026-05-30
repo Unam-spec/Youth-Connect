@@ -135,7 +135,7 @@ router.post("/membership-requests/:id/approve", async (req, res) => {
         : `Create your login account to access all member features: ${signUpUrl}`;
       const ctaHtml = hasClerkAccount
         ? `<p>Log in to see upcoming events, RSVP, and check in on Fridays.</p>`
-        : `<p><a href="${signUpUrl}" style="background:#2A9D8F;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;margin-top:8px">Create Your Login Account</a></p><p style="font-size:12px;color:#888;margin-top:4px">Or copy this link: ${signUpUrl}</p>`;
+        : `<p><a href="${signUpUrl}" style="background:#2A9D8F;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;margin-top:8px">Create Your Login</a></p><p style="font-size:12px;color:#888;margin-top:4px">Or copy this link: ${signUpUrl}</p>`;
       await sendEmail({
         to: member.email,
         subject: "Your membership has been approved — Jeremiah Generation Youth",

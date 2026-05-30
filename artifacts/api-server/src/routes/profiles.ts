@@ -309,11 +309,20 @@ router.post("/profiles/:id/promote", async (req: Request, res: Response) => {
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
     if (updated.email) {
+      const hasClerkAccount = !!updated.clerk_id;
+      const signUpUrl = `${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/sign-up`;
+      const ctaText = hasClerkAccount
+        ? "Log in to see upcoming events, RSVP, and check in on Fridays."
+        : `Create your login account to access all member features: ${signUpUrl}`;
+      const ctaHtml = hasClerkAccount
+        ? `<p>Log in to see upcoming events, RSVP, and check in on Fridays.</p>`
+        : `<p><a href="${signUpUrl}" style="background:#2A9D8F;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;margin-top:8px">Create Your Login</a></p><p style="font-size:12px;color:#888;margin-top:4px">Or copy this link: ${signUpUrl}</p>`;
+
       await sendEmail({
         to: updated.email,
         subject: "Welcome — you are now a member of Jeremiah Generation Youth",
-        text: `Hi ${updated.full_name},\n\nYou have been approved as a full member of Jeremiah Generation Youth.\n\nLog in to see upcoming events, RSVP, and check in on Fridays.\n\nSee you on Friday,\nJeremiah Generation Youth`,
-        html: `<p>Hi <strong>${updated.full_name}</strong>,</p><p>You have been approved as a full member of Jeremiah Generation Youth.</p><p>Log in to see upcoming events, RSVP, and check in on Fridays.</p><p>Jeremiah Generation Youth</p>`,
+        text: `Hi ${updated.full_name},\n\nYou have been approved as a full member of Jeremiah Generation Youth.\n\n${ctaText}\n\nSee you on Friday,\nJeremiah Generation Youth`,
+        html: `<p>Hi <strong>${updated.full_name}</strong>,</p><p>You have been approved as a full member of Jeremiah Generation Youth.</p>${ctaHtml}<p>Jeremiah Generation Youth</p>`,
       });
     }
     return res.json(updated);
@@ -462,7 +471,7 @@ router.patch("/profiles/:id", async (req: Request, res: Response) => {
     if (!requesterProfile || (requesterProfile.role !== "leader" && requesterProfile.role !== "super_admin"))
       return res.status(403).json({ error: "Forbidden. Leaders and super admins only." });
 
-    const { full_name, phone, email, gender, age, school, parent_phone, avatar_url } = req.body;
+    const { full_name, phone, email, gender, age, school, parent_phone, parent_name, whatsapp_opt_in, avatar_url } = req.body;
     const updateData: Record<string, any> = {};
     if (full_name !== undefined) updateData.full_name = full_name;
     if (phone !== undefined) updateData.phone = phone;
@@ -471,6 +480,8 @@ router.patch("/profiles/:id", async (req: Request, res: Response) => {
     if (age !== undefined) updateData.age = age === null ? null : parseInt(String(age), 10);
     if (school !== undefined) updateData.school = school;
     if (parent_phone !== undefined) updateData.parent_phone = parent_phone;
+    if (parent_name !== undefined) updateData.parent_name = parent_name;
+    if (whatsapp_opt_in !== undefined) updateData.whatsapp_opt_in = whatsapp_opt_in;
     if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
 
     const [updated] = await db

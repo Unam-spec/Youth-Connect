@@ -1543,12 +1543,12 @@ export default function Dashboard() {
                             <div className="mt-2 flex items-center gap-1.5">
                               <RoleBadge role={profile.role} />
                               {profile.whatsapp_opt_in ? (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-xs">
-                                  <Check className="w-2.5 h-2.5" /> WhatsApp Yes
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-xs">
+                                  WA ✓
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-500/10 text-slate-400 border border-slate-500/10">
-                                  WhatsApp No
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-500/10 text-slate-450 border border-slate-500/10">
+                                  WA –
                                 </span>
                               )}
                             </div>

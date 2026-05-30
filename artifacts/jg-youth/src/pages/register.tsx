@@ -27,7 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2, ChevronLeft, GraduationCap, Check, BookOpen, User, Phone, ChevronDown } from "lucide-react";
+import { AlertCircle, CheckCircle2, ChevronLeft, GraduationCap, Check, BookOpen, User, Phone, ChevronDown, XCircle } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 
 // ─── Client-side validation schema ────────────────────────────────────────────
@@ -38,7 +38,7 @@ const registerSchema = z.object({
     .string()
     .min(10, "Valid phone number is required")
     .max(15, "Phone number is too long"),
-  email: z.string().email("Invalid email address").optional().or(z.literal("")),
+  email: z.string().email("Invalid email address").min(1, "Email is required"),
   gender: z.enum(["male", "female"], {
     required_error: "Please select a gender",
   }),
@@ -56,14 +56,38 @@ const registerSchema = z.object({
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-const SEEDED_SCHOOLS = [
-  "University of Namibia (UNAM)",
-  "Namibia University of Science and Technology (NUST)",
-  "International University of Management (IUM)",
-  "Waterberg High School",
-  "Windhoek High School",
-  "None / Finished Schooling"
+const WATERBERG_SCHOOLS = [
+  "Paresis Secondary",
+  "Otjiwarongo Secondary",
+  "Waterberg High",
+  "Edugate Academy"
 ];
+
+const SA_UNIVERSITIES = [
+  "UP",
+  "UCT",
+  "Wits",
+  "Stellenbosch",
+  "UJ",
+  "UNISA",
+  "DUT",
+  "UKZN",
+  "NWU",
+  "UFS",
+  "WSU",
+  "MUT",
+  "CUT",
+  "UFH",
+  "UWC",
+  "RU",
+  "SMU",
+  "VUT",
+  "TUT",
+  "CPUT",
+  "NMU"
+];
+
+const NONE_SCHOOL = "None / Completed Schooling";
 
 export default function Register() {
   const [isSuccess, setIsSuccess] = useState(false);
@@ -164,16 +188,12 @@ export default function Register() {
               <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl">You're registered!</CardTitle>
-              <CardDescription className="text-base mt-2 text-slate-300">
-                Registered! A leader will approve your check-in.
+              <CardTitle className="text-2xl">Registration Received</CardTitle>
+              <CardDescription className="text-base mt-2 text-slate-350">
+                God bless you! Your registration has been received. A leader will be in touch soon.
               </CardDescription>
             </CardHeader>
-            <CardContent className="pt-6 pb-8 space-y-4">
-              <div className="bg-slate-950/40 border border-slate-700/50 p-4 rounded-lg text-sm text-center text-slate-300">
-                Please wait while a leader reviews and approves your check-in
-                request. You'll be called up once approved.
-              </div>
+            <CardContent className="pt-6 pb-8">
               <div className="flex flex-col gap-3 pt-2">
                 <Link href="/">
                   <Button className="w-full bg-teal-500 hover:bg-teal-400 text-white border-0 rounded-xl" size="lg">
@@ -181,9 +201,6 @@ export default function Register() {
                   </Button>
                 </Link>
               </div>
-              <p className="text-xs text-slate-400 text-center pt-1">
-                Once a leader approves your membership request, you will receive an email with a link to create your login.
-              </p>
             </CardContent>
           </Card>
         </div>
@@ -278,7 +295,7 @@ export default function Register() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-200">Email <span className="text-slate-400 text-xs font-normal">(optional)</span></FormLabel>
+                          <FormLabel className="text-slate-200">Email *</FormLabel>
                           <FormControl>
                             <Input
                               type="email"
@@ -345,60 +362,131 @@ export default function Register() {
                   <FormField
                     control={form.control}
                     name="school"
-                    render={({ field }) => (
-                      <FormItem className="relative">
-                        <FormLabel className="text-slate-200">School / University *</FormLabel>
-                        <div className="relative" ref={dropdownRef}>
-                          <FormControl>
-                            <Input
-                              value={field.value || schoolQuery}
-                              onChange={(e) => {
-                                field.onChange(e.target.value);
-                                setSchoolQuery(e.target.value);
-                                setShowSchoolDropdown(true);
-                              }}
-                              onFocus={() => setShowSchoolDropdown(true)}
-                              placeholder="Start typing school or university..."
-                              className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11 pr-10"
-                            />
-                          </FormControl>
-                          <div className="absolute right-3 top-3 text-slate-400">
-                            <GraduationCap className="w-5 h-5" />
-                          </div>
-                          {showSchoolDropdown && (
-                            <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-md">
-                              {SEEDED_SCHOOLS.filter(s => s.toLowerCase().includes((field.value || schoolQuery || "").toLowerCase())).map((schoolName) => (
-                                <div
-                                  key={schoolName}
-                                  onClick={() => {
-                                    field.onChange(schoolName);
-                                    setSchoolQuery(schoolName);
-                                    setShowSchoolDropdown(false);
-                                  }}
-                                  className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
-                                >
-                                  <span className="flex items-center gap-2">
-                                    <BookOpen className="w-3.5 h-3.5" />
-                                    {schoolName}
-                                  </span>
-                                  {field.value === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
-                                </div>
-                              ))}
-                              {(field.value || schoolQuery) && !SEEDED_SCHOOLS.includes(field.value || schoolQuery) && (
-                                <div
-                                  onClick={() => setShowSchoolDropdown(false)}
-                                  className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2"
-                                >
-                                  <Check className="w-3.5 h-3.5" />
-                                  Use Custom: "{field.value || schoolQuery}"
-                                </div>
-                              )}
+                    render={({ field }) => {
+                      const query = (field.value || "").toLowerCase();
+                      const filteredWaterberg = WATERBERG_SCHOOLS.filter(s => s.toLowerCase().includes(query));
+                      const filteredUni = SA_UNIVERSITIES.filter(s => s.toLowerCase().includes(query));
+                      const showNone = NONE_SCHOOL.toLowerCase().includes(query);
+
+                      return (
+                        <FormItem className="relative">
+                          <FormLabel className="text-slate-200">School / University *</FormLabel>
+                          <div className="relative" ref={dropdownRef}>
+                            <FormControl>
+                              <Input
+                                value={field.value || schoolQuery}
+                                onChange={(e) => {
+                                  field.onChange(e.target.value);
+                                  setSchoolQuery(e.target.value);
+                                  setShowSchoolDropdown(true);
+                                }}
+                                onFocus={() => setShowSchoolDropdown(true)}
+                                placeholder="Start typing school or university..."
+                                className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11 pr-10"
+                              />
+                            </FormControl>
+                            <div className="absolute right-3 top-3 text-slate-400">
+                              <GraduationCap className="w-5 h-5" />
                             </div>
-                          )}
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                            {showSchoolDropdown && (
+                              <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-md">
+                                {/* Waterberg District schools */}
+                                {filteredWaterberg.length > 0 && (
+                                  <>
+                                    <div className="px-3 py-1.5 text-2xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">
+                                      Waterberg Schools
+                                    </div>
+                                    {filteredWaterberg.map((schoolName) => (
+                                      <div
+                                        key={schoolName}
+                                        onClick={() => {
+                                          field.onChange(schoolName);
+                                          setSchoolQuery(schoolName);
+                                          setShowSchoolDropdown(false);
+                                        }}
+                                        className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                                      >
+                                        <span className="flex items-center gap-2">
+                                          <BookOpen className="w-3.5 h-3.5 text-teal-550/60" />
+                                          {schoolName}
+                                        </span>
+                                        {field.value === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                                      </div>
+                                    ))}
+                                  </>
+                                )}
+
+                                {/* Divider */}
+                                {filteredWaterberg.length > 0 && filteredUni.length > 0 && (
+                                  <div className="h-px bg-slate-800 my-1" />
+                                )}
+
+                                {/* South African universities */}
+                                {filteredUni.length > 0 && (
+                                  <>
+                                    <div className="px-3 py-1.5 text-2xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">
+                                      South African Universities
+                                    </div>
+                                    {filteredUni.map((schoolName) => (
+                                      <div
+                                        key={schoolName}
+                                        onClick={() => {
+                                          field.onChange(schoolName);
+                                          setSchoolQuery(schoolName);
+                                          setShowSchoolDropdown(false);
+                                        }}
+                                        className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                                      >
+                                        <span className="flex items-center gap-2">
+                                          <GraduationCap className="w-3.5 h-3.5 text-teal-550/60" />
+                                          {schoolName}
+                                        </span>
+                                        {field.value === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                                      </div>
+                                    ))}
+                                  </>
+                                )}
+
+                                {/* Divider */}
+                                {((filteredWaterberg.length > 0 || filteredUni.length > 0) && showNone) && (
+                                  <div className="h-px bg-slate-800 my-1" />
+                                )}
+
+                                {/* None Option */}
+                                {showNone && (
+                                  <div
+                                    onClick={() => {
+                                      field.onChange(NONE_SCHOOL);
+                                      setSchoolQuery(NONE_SCHOOL);
+                                      setShowSchoolDropdown(false);
+                                    }}
+                                    className="px-4 py-2 text-sm text-slate-300 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                                  >
+                                    <span className="flex items-center gap-2 font-medium">
+                                      <XCircle className="w-3.5 h-3.5 text-slate-500/65" />
+                                      {NONE_SCHOOL}
+                                    </span>
+                                    {field.value === NONE_SCHOOL && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                                  </div>
+                                )}
+
+                                {/* Free text entry option */}
+                                {field.value && ![...WATERBERG_SCHOOLS, ...SA_UNIVERSITIES, NONE_SCHOOL].includes(field.value) && (
+                                  <div
+                                    onClick={() => setShowSchoolDropdown(false)}
+                                    className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2 border-t border-slate-800 mt-1"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    Use Custom School: "{field.value}"
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
                   />
 
                   {/* Isolated Parent / Guardian Details Card */}
@@ -462,7 +550,7 @@ export default function Register() {
                         </FormControl>
                         <div className="space-y-1 leading-none">
                           <FormLabel className="text-sm font-semibold text-slate-200 cursor-pointer">
-                            Join the Youth Connect WhatsApp Group
+                            Join JG Youth WhatsApp Group
                           </FormLabel>
                           <p className="text-xs text-slate-400 mt-1">
                             Receive session announcements, schedules, and event invitations directly on WhatsApp.

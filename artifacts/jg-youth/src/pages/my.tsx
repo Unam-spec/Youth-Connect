@@ -81,6 +81,7 @@ export default function MyDashboard() {
   const [promptPhone, setPromptPhone] = useState("");
   const [promptName, setPromptName] = useState("");
   const [promptSchool, setPromptSchool] = useState("");
+  const [promptGender, setPromptGender] = useState<"male" | "female">("male");
   const [promptParentName, setPromptParentName] = useState("");
   const [promptParentPhone, setPromptParentPhone] = useState("");
   const [promptWhatsappOptIn, setPromptWhatsappOptIn] = useState(false);
@@ -135,6 +136,7 @@ export default function MyDashboard() {
     setPromptPhone(profile!.phone ?? "");
     setPromptName(profile!.full_name === "New Member" ? "" : (profile!.full_name ?? ""));
     setPromptSchool((profile as any).school ?? "");
+    setPromptGender(profile!.gender === "female" ? "female" : "male");
     setPromptParentName((profile as any).parent_name ?? "");
     setPromptParentPhone((profile as any).parent_phone ?? "");
     setPromptWhatsappOptIn(!!(profile as any).whatsapp_opt_in);
@@ -156,6 +158,7 @@ export default function MyDashboard() {
           phone: promptPhone.trim(),
           full_name: promptName.trim(),
           school: promptSchool.trim() || "",
+          gender: promptGender,
           parent_name: promptParentName.trim() || "",
           parent_phone: promptParentPhone.trim() || "",
           whatsapp_opt_in: promptWhatsappOptIn,
@@ -521,8 +524,7 @@ export default function MyDashboard() {
             <DialogDescription>
               Your full name and phone number are required so leaders can identify you at sessions.
             </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
+          </DialogHeader>          <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="prompt-name">Full Name <span className="text-destructive">*</span></Label>
               <Input
@@ -541,6 +543,19 @@ export default function MyDashboard() {
                 value={promptPhone}
                 onChange={(e) => setPromptPhone(e.target.value)}
               />
+            </div>
+            {/* Gender Field (Male / Female Only) */}
+            <div className="space-y-1.5">
+              <Label htmlFor="prompt-gender">Gender <span className="text-destructive">*</span></Label>
+              <select
+                id="prompt-gender"
+                value={promptGender}
+                onChange={(e) => setPromptGender(e.target.value as "male" | "female")}
+                className="w-full bg-slate-900 border border-slate-700 rounded-xl h-10 px-3 text-sm text-white focus:border-teal-500 focus:ring-teal-500 cursor-pointer"
+              >
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+              </select>
             </div>
             {/* Autocomplete School / University dropdown */}
             <div className="space-y-1.5 relative" ref={dropdownRef}>
@@ -561,50 +576,112 @@ export default function MyDashboard() {
                   <GraduationCap className="w-4 h-4" />
                 </div>
               </div>
-              {showSchoolDropdown && (
-                <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
-                  {presets.map(() => null) /* Quick dummy to reuse styles or define them natively */}
-                  {[
-                    "University of Namibia (UNAM)",
-                    "Namibia University of Science and Technology (NUST)",
-                    "International University of Management (IUM)",
-                    "Waterberg High School",
-                    "Windhoek High School",
-                    "None / Finished Schooling"
-                  ].filter(s => s.toLowerCase().includes(promptSchool.toLowerCase())).map((schoolName) => (
-                    <div
-                      key={schoolName}
-                      onClick={() => {
-                        setPromptSchool(schoolName);
-                        setShowSchoolDropdown(false);
-                      }}
-                      className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
-                    >
-                      <span className="flex items-center gap-2">
-                        <BookOpen className="w-3.5 h-3.5" />
-                        {schoolName}
-                      </span>
-                      {promptSchool === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
-                    </div>
-                  ))}
-                  {promptSchool && ![
-                    "University of Namibia (UNAM)",
-                    "Namibia University of Science and Technology (NUST)",
-                    "International University of Management (IUM)",
-                    "Waterberg High School",
-                    "Windhoek High School",
-                    "None / Finished Schooling"
-                  ].includes(promptSchool) && (
-                    <div
-                      onClick={() => setShowSchoolDropdown(false)}
-                      className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Use Custom: "{promptSchool}"
-                    </div>
-                  )}
-                </div>
-              )}
+              {showSchoolDropdown && (() => {
+                const query = promptSchool.toLowerCase();
+                const filteredWaterberg = [
+                  "Paresis Secondary",
+                  "Otjiwarongo Secondary",
+                  "Waterberg High",
+                  "Edugate Academy"
+                ].filter(s => s.toLowerCase().includes(query));
+                const filteredUni = [
+                  "UP", "UCT", "Wits", "Stellenbosch", "UJ", "UNISA", "DUT", "UKZN", "NWU", "UFS", "WSU", "MUT", "CUT", "UFH", "UWC", "RU", "SMU", "VUT", "TUT", "CPUT", "NMU"
+                ].filter(s => s.toLowerCase().includes(query));
+                const showNone = "None / Completed Schooling".toLowerCase().includes(query);
+
+                return (
+                  <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
+                    {filteredWaterberg.length > 0 && (
+                      <>
+                        <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">
+                          Waterberg Schools
+                        </div>
+                        {filteredWaterberg.map((schoolName) => (
+                          <div
+                            key={schoolName}
+                            onClick={() => {
+                              setPromptSchool(schoolName);
+                              setShowSchoolDropdown(false);
+                            }}
+                            className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                          >
+                            <span className="flex items-center gap-2">
+                              <BookOpen className="w-3.5 h-3.5 text-teal-500/60" />
+                              {schoolName}
+                            </span>
+                            {promptSchool === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                          </div>
+                        ))}
+                      </>
+                    )}
+
+                    {filteredWaterberg.length > 0 && filteredUni.length > 0 && (
+                      <div className="h-px bg-slate-800 my-1" />
+                    )}
+
+                    {filteredUni.length > 0 && (
+                      <>
+                        <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">
+                          South African Universities
+                        </div>
+                        {filteredUni.map((schoolName) => (
+                          <div
+                            key={schoolName}
+                            onClick={() => {
+                              setPromptSchool(schoolName);
+                              setShowSchoolDropdown(false);
+                            }}
+                            className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                          >
+                            <span className="flex items-center gap-2">
+                              <GraduationCap className="w-3.5 h-3.5 text-teal-550/60" />
+                              {schoolName}
+                            </span>
+                            {promptSchool === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                          </div>
+                        ))}
+                      </>
+                    )}
+
+                    {((filteredWaterberg.length > 0 || filteredUni.length > 0) && showNone) && (
+                      <div className="h-px bg-slate-800 my-1" />
+                    )}
+
+                    {showNone && (
+                      <div
+                        onClick={() => {
+                          setPromptSchool("None / Completed Schooling");
+                          setShowSchoolDropdown(false);
+                        }}
+                        className="px-4 py-2 text-sm text-slate-300 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                      >
+                        <span className="flex items-center gap-2 font-medium">
+                          <XCircle className="w-3.5 h-3.5 text-slate-500/65" />
+                          None / Completed Schooling
+                        </span>
+                        {promptSchool === "None / Completed Schooling" && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                      </div>
+                    )}
+
+                    {promptSchool && ![
+                      "Paresis Secondary",
+                      "Otjiwarongo Secondary",
+                      "Waterberg High",
+                      "Edugate Academy",
+                      "UP", "UCT", "Wits", "Stellenbosch", "UJ", "UNISA", "DUT", "UKZN", "NWU", "UFS", "WSU", "MUT", "CUT", "UFH", "UWC", "RU", "SMU", "VUT", "TUT", "CPUT", "NMU",
+                      "None / Completed Schooling"
+                    ].includes(promptSchool) && (
+                      <div
+                        onClick={() => setShowSchoolDropdown(false)}
+                        className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                        Use Custom: "{promptSchool}"
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Parent / Guardian Isolated Details */}
@@ -649,7 +726,7 @@ export default function MyDashboard() {
               />
               <div className="space-y-1 leading-none cursor-pointer" onClick={() => setPromptWhatsappOptIn(!promptWhatsappOptIn)}>
                 <Label htmlFor="prompt-whatsapp-opt-in" className="text-xs font-semibold text-slate-200 cursor-pointer">
-                  Join the Youth Connect WhatsApp Group
+                  Join JG Youth WhatsApp Group
                 </Label>
                 <p className="text-[10px] text-slate-400 mt-0.5">
                   Get sessions details and announcements directly on WhatsApp.

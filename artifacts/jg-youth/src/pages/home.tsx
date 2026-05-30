@@ -178,7 +178,7 @@ function PublicHome() {
             </Button>
             <Button
               variant="outline"
-              className="w-full h-12 rounded-xl"
+              className="w-full h-12 rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700 hover:text-white font-semibold shadow-xs"
               onClick={() => { setShowLoginChoice(false); setLocation("/register"); }}
             >
               <Users className="w-4 h-4 mr-2" />
