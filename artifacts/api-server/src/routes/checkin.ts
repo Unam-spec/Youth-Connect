@@ -326,6 +326,10 @@ router.get("/checkin/requests", async (req, res) => {
         // Visitor fields (null for member requests)
         visitor_name: visitorsTable.full_name,
         visitor_phone: visitorsTable.phone_number,
+        visitor_age: visitorsTable.age,
+        visitor_school: visitorsTable.school,
+        visitor_parent_phone: visitorsTable.parent_phone,
+        visitor_how_did_you_hear: visitorsTable.how_did_you_hear,
       })
       .from(checkInRequestsTable)
       .leftJoin(
@@ -358,6 +362,10 @@ router.get("/checkin/requests", async (req, res) => {
           : (row.member_name ?? "Unknown member"),
       phone: row.type === "visitor" ? row.visitor_phone : row.member_phone,
       role: row.type === "visitor" ? "visitor" : (row.member_role ?? "member"),
+      age: row.type === "visitor" ? (row.visitor_age ?? null) : null,
+      school: row.type === "visitor" ? (row.visitor_school ?? null) : null,
+      parent_phone: row.type === "visitor" ? (row.visitor_parent_phone ?? null) : null,
+      how_did_you_hear: row.type === "visitor" ? (row.visitor_how_did_you_hear ?? null) : null,
     }));
 
     return res.json(requests);
