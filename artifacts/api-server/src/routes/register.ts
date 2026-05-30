@@ -20,7 +20,7 @@ const router = Router();
  */
 router.post("/register", async (req, res) => {
   try {
-    const { full_name, phone_number, email, gender, age, how_did_you_hear } =
+    const { full_name, phone_number, email, gender, age, how_did_you_hear, school, parent_phone } =
       req.body;
 
     // ── Required field validation ──────────────────────────────────────────────
@@ -76,6 +76,8 @@ router.post("/register", async (req, res) => {
         gender: gender as "male" | "female" | "other",
         age: ageInt,
         how_did_you_hear: how_did_you_hear.trim(),
+        school: school && typeof school === 'string' && school.trim() ? school.trim() : null,
+        parent_phone: parent_phone && typeof parent_phone === 'string' && parent_phone.trim() ? parent_phone.trim() : null,
         session_date: today,
         status: "pending",
       })
