@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { resolveAuth, isPrivilegedAuth } from "../lib/permissions";
 import { getAuth } from "@clerk/express";
 import { eq, ilike, or, and } from "drizzle-orm";
@@ -34,7 +34,7 @@ function hasLeaderSession(req: any): boolean {
 
 const router = Router();
 
-router.get("/profiles/me", async (req, res) => {
+router.get("/profiles/me", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     const clerkId = auth?.userId;
@@ -110,7 +110,7 @@ router.get("/profiles/me", async (req, res) => {
   }
 });
 
-router.patch("/profiles/me", async (req, res) => {
+router.patch("/profiles/me", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     const clerkId = auth?.userId;
@@ -134,7 +134,7 @@ router.patch("/profiles/me", async (req, res) => {
   }
 });
 
-router.get("/profiles/me/pin", async (req, res) => {
+router.get("/profiles/me/pin", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     const clerkId = auth?.userId;
@@ -149,7 +149,7 @@ router.get("/profiles/me/pin", async (req, res) => {
       return res.json({ hasPIN: !!profile.pin_hash });
     }
     const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, clerkId),
+      where: eq(profilesTable.clerk_id, clerkId as string),
     });
     if (!profile) return res.status(404).json({ error: "Profile not found" });
     return res.json({ hasPIN: !!profile.pin_hash });
@@ -159,7 +159,7 @@ router.get("/profiles/me/pin", async (req, res) => {
   }
 });
 
-router.patch("/profiles/me/pin", async (req, res) => {
+router.patch("/profiles/me/pin", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     const clerkId = auth?.userId;
@@ -182,7 +182,7 @@ router.patch("/profiles/me/pin", async (req, res) => {
     const [updated] = await db
       .update(profilesTable)
       .set({ pin_hash: pinHash, pin_plain: pin })
-      .where(eq(profilesTable.clerk_id, clerkId))
+      .where(eq(profilesTable.clerk_id, clerkId as string))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
     return res.json({ success: true });
@@ -192,7 +192,7 @@ router.patch("/profiles/me/pin", async (req, res) => {
   }
 });
 
-router.post("/profiles/register", async (req, res) => {
+router.post("/profiles/register", async (req: Request, res: Response) => {
   try {
     const parsed = RegisterVisitorBody.safeParse(req.body);
     if (!parsed.success)
@@ -215,7 +215,7 @@ router.post("/profiles/register", async (req, res) => {
   }
 });
 
-router.get("/profiles", async (req, res) => {
+router.get("/profiles", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     const isLeaderSess = hasLeaderSession(req);
@@ -281,13 +281,13 @@ router.get("/profiles", async (req, res) => {
 });
 
 // Allow leader session to access /profiles/:id (for my.tsx PIN-auth path)
-router.get("/profiles/:id", async (req, res) => {
+router.get("/profiles/:id", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     if (!auth?.userId && !hasLeaderSession(req))
       return res.status(401).json({ error: "Unauthorized" });
     const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.id, req.params.id),
+      where: eq(profilesTable.id, req.params.id as string),
     });
     if (!profile) return res.status(404).json({ error: "Profile not found" });
     return res.json(profile);
@@ -297,14 +297,14 @@ router.get("/profiles/:id", async (req, res) => {
   }
 });
 
-router.post("/profiles/:id/promote", async (req, res) => {
+router.post("/profiles/:id/promote", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
     const [updated] = await db
       .update(profilesTable)
       .set({ role: "member" })
-      .where(eq(profilesTable.id, req.params.id))
+      .where(eq(profilesTable.id, req.params.id as string))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
     if (updated.email) {
@@ -322,14 +322,14 @@ router.post("/profiles/:id/promote", async (req, res) => {
   }
 });
 
-router.post("/profiles/:id/revoke-membership", async (req, res) => {
+router.post("/profiles/:id/revoke-membership", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
     const [updated] = await db
       .update(profilesTable)
       .set({ role: "visitor" })
-      .where(eq(profilesTable.id, req.params.id))
+      .where(eq(profilesTable.id, req.params.id as string))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
     return res.json(updated);
@@ -339,7 +339,7 @@ router.post("/profiles/:id/revoke-membership", async (req, res) => {
   }
 });
 
-router.patch("/profiles/:id/role", async (req, res) => {
+router.patch("/profiles/:id/role", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
@@ -352,7 +352,7 @@ router.patch("/profiles/:id/role", async (req, res) => {
     if (!["leader", "super_admin"].includes(role))
       return res.status(400).json({ error: "Invalid role" });
     const profileToUpdate = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.id, req.params.id),
+      where: eq(profilesTable.id, req.params.id as string),
     });
     if (!profileToUpdate)
       return res.status(404).json({ error: "Profile not found" });
@@ -366,7 +366,7 @@ router.patch("/profiles/:id/role", async (req, res) => {
     const [updated] = await db
       .update(profilesTable)
       .set({ role })
-      .where(eq(profilesTable.id, req.params.id))
+      .where(eq(profilesTable.id, req.params.id as string))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
     if (role === "leader") {
@@ -374,7 +374,7 @@ router.patch("/profiles/:id/role", async (req, res) => {
       await db
         .insert(leaderPermissionsTable)
         .values({
-          profile_id: req.params.id,
+          profile_id: req.params.id as string,
           can_create_events: false,
           can_manage_members: false,
           can_view_kpis: false,
@@ -389,7 +389,7 @@ router.patch("/profiles/:id/role", async (req, res) => {
   }
 });
 
-router.patch("/profiles/:id/permissions", async (req, res) => {
+router.patch("/profiles/:id/permissions", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     const isLeaderSess = hasLeaderSession(req);
@@ -431,7 +431,7 @@ router.patch("/profiles/:id/permissions", async (req, res) => {
         ...(can_view_members !== undefined && { can_view_members }),
         ...(can_view_attendance !== undefined && { can_view_attendance }),
       })
-      .where(eq(profilesTable.id, req.params.id))
+      .where(eq(profilesTable.id, req.params.id as string))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
     return res.json(updated);
@@ -441,7 +441,7 @@ router.patch("/profiles/:id/permissions", async (req, res) => {
   }
 });
 
-router.delete("/profiles/:id", async (req, res) => {
+router.delete("/profiles/:id", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     const isLeaderSess = hasLeaderSession(req);
@@ -462,7 +462,7 @@ router.delete("/profiles/:id", async (req, res) => {
       return res.status(403).json({ error: "Forbidden. Super admins only." });
 
     const profileToDelete = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.id, req.params.id),
+      where: eq(profilesTable.id, req.params.id as string),
     });
     if (!profileToDelete)
       return res.status(404).json({ error: "Profile not found" });
@@ -475,25 +475,25 @@ router.delete("/profiles/:id", async (req, res) => {
         });
     }
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: any) => {
       // 1. Delete associated leader permissions
-      await tx.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.id));
+      await tx.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.id as string));
       // 2. Delete associated RSVPs
-      await tx.delete(rsvpsTable).where(eq(rsvpsTable.profile_id, req.params.id));
+      await tx.delete(rsvpsTable).where(eq(rsvpsTable.profile_id, req.params.id as string));
       // 3. Delete associated attendance
-      await tx.delete(attendanceTable).where(eq(attendanceTable.profile_id, req.params.id));
+      await tx.delete(attendanceTable).where(eq(attendanceTable.profile_id, req.params.id as string));
       // 4. Delete associated membership requests
-      await tx.delete(membershipRequestsTable).where(eq(membershipRequestsTable.profile_id, req.params.id));
+      await tx.delete(membershipRequestsTable).where(eq(membershipRequestsTable.profile_id, req.params.id as string));
       // 5. Nullify reviewed_by in other membership requests
-      await tx.update(membershipRequestsTable).set({ reviewed_by: null }).where(eq(membershipRequestsTable.reviewed_by, req.params.id));
+      await tx.update(membershipRequestsTable).set({ reviewed_by: null }).where(eq(membershipRequestsTable.reviewed_by, req.params.id as string));
       // 6. Delete associated check-in requests
-      await tx.delete(checkInRequestsTable).where(eq(checkInRequestsTable.profile_id, req.params.id));
+      await tx.delete(checkInRequestsTable).where(eq(checkInRequestsTable.profile_id, req.params.id as string));
       // 7. Nullify reviewed_by in check-in requests
-      await tx.update(checkInRequestsTable).set({ reviewed_by: null }).where(eq(checkInRequestsTable.reviewed_by, req.params.id));
+      await tx.update(checkInRequestsTable).set({ reviewed_by: null }).where(eq(checkInRequestsTable.reviewed_by, req.params.id as string));
       // 8. Nullify created_by in events
-      await tx.update(eventsTable).set({ created_by: null }).where(eq(eventsTable.created_by, req.params.id));
+      await tx.update(eventsTable).set({ created_by: null }).where(eq(eventsTable.created_by, req.params.id as string));
       // 9. Delete the profile itself
-      await tx.delete(profilesTable).where(eq(profilesTable.id, req.params.id));
+      await tx.delete(profilesTable).where(eq(profilesTable.id, req.params.id as string));
     });
     return res.json({ message: "Profile deleted successfully" });
   } catch (err) {

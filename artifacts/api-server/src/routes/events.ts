@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import { getAuth } from "@clerk/express";
 import { eq, and, gte, sql, count } from "drizzle-orm";
 import {
@@ -13,7 +13,7 @@ import { sendEmail } from "../lib/twilio";
 
 const router = Router();
 
-router.get("/events", async (req, res) => {
+router.get("/events", async (req: Request, res: Response) => {
   try {
     const publicOnly = req.query.public_only === "true";
     const upcoming = req.query.upcoming === "true";
@@ -34,7 +34,7 @@ router.get("/events", async (req, res) => {
       .orderBy(eventsTable.date);
 
     const eventsWithCounts = await Promise.all(
-      events.map(async (event) => {
+      events.map(async (event: any) => {
         const [rsvpResult] = await db
           .select({ count: count() })
           .from(rsvpsTable)
@@ -57,7 +57,7 @@ router.get("/events", async (req, res) => {
   }
 });
 
-router.post("/events", async (req, res) => {
+router.post("/events", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) {
@@ -102,11 +102,10 @@ router.post("/events", async (req, res) => {
         weekday: "long", year: "numeric", month: "long", day: "numeric",
       });
 
-      // Send in parallel, non-blocking — failures are swallowed by sendEmail
       await Promise.allSettled(
         recipients
-          .filter(r => !!r.email)
-          .map(r =>
+          .filter((r: any) => !!r.email)
+          .map((r: any) =>
             sendEmail({
               to: r.email!,
               subject: `New event: ${event.title} — Jeremiah Generation Youth`,
@@ -130,8 +129,8 @@ router.post("/events", async (req, res) => {
       if (isTomorrow) {
         await Promise.allSettled(
           recipients
-            .filter(r => !!r.email)
-            .map(r =>
+            .filter((r: any) => !!r.email)
+            .map((r: any) =>
               sendEmail({
                 to: r.email!,
                 subject: `Reminder: ${event.title} is tomorrow — Jeremiah Generation Youth`,
@@ -152,10 +151,10 @@ router.post("/events", async (req, res) => {
   }
 });
 
-router.get("/events/:id", async (req, res) => {
+router.get("/events/:id", async (req: Request, res: Response) => {
   try {
     const event = await db.query.eventsTable.findFirst({
-      where: eq(eventsTable.id, req.params.id),
+      where: eq(eventsTable.id, req.params.id as string),
     });
     if (!event) {
       return res.status(404).json({ error: "Event not found" });
@@ -179,7 +178,7 @@ router.get("/events/:id", async (req, res) => {
   }
 });
 
-router.patch("/events/:id", async (req, res) => {
+router.patch("/events/:id", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) {
@@ -199,7 +198,7 @@ router.patch("/events/:id", async (req, res) => {
     const [updated] = await db
       .update(eventsTable)
       .set(updateData as any)
-      .where(eq(eventsTable.id, req.params.id))
+      .where(eq(eventsTable.id, req.params.id as string))
       .returning();
     if (!updated) {
       return res.status(404).json({ error: "Event not found" });
@@ -211,7 +210,7 @@ router.patch("/events/:id", async (req, res) => {
   }
 });
 
-router.delete("/events/:id", async (req, res) => {
+router.delete("/events/:id", async (req: Request, res: Response) => {
   try {
     const auth = getAuth(req);
     if (!auth?.userId) {
@@ -230,9 +229,9 @@ router.delete("/events/:id", async (req, res) => {
       return res.status(403).json({ error: "Forbidden" });
     }
 
-    const eventId = req.params.id;
+    const eventId = req.params.id as string;
 
-    await db.transaction(async (tx) => {
+    await db.transaction(async (tx: any) => {
       // Delete associated RSVPs
       await tx.delete(rsvpsTable).where(eq(rsvpsTable.event_id, eventId));
       // Delete associated attendance
@@ -248,7 +247,7 @@ router.delete("/events/:id", async (req, res) => {
   }
 });
 
-router.get("/events/:id/stats", async (req, res) => {
+router.get("/events/:id/stats", async (req: Request, res: Response) => {
   try {
     const [rsvpCounts] = await db
       .select({
@@ -258,13 +257,13 @@ router.get("/events/:id/stats", async (req, res) => {
         maybe: sql<number>`count(*) filter (where status = 'maybe')`,
       })
       .from(rsvpsTable)
-      .where(eq(rsvpsTable.event_id, req.params.id));
+      .where(eq(rsvpsTable.event_id, req.params.id as string));
     const [attendResult] = await db
       .select({ count: count() })
       .from(attendanceTable)
-      .where(eq(attendanceTable.event_id, req.params.id));
+      .where(eq(attendanceTable.event_id, req.params.id as string));
     return res.json({
-      event_id: req.params.id,
+      event_id: req.params.id as string,
       rsvp_count: Number(rsvpCounts?.total ?? 0),
       going_count: Number(rsvpCounts?.going ?? 0),
       not_going_count: Number(rsvpCounts?.not_going ?? 0),

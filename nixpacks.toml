@@ -1,11 +1,11 @@
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+nixPkgs = ["nodejs_20", "pnpm"]
 
 [phases.install]
-cmds = ["npm install --legacy-peer-deps --ignore-scripts"]
+cmds = ["pnpm install --ignore-scripts"]
 
 [phases.build]
-cmds = ["npm run build --workspace=artifacts/api-server"]
+cmds = ["pnpm run build --filter=@workspace/api-server"]
 
 [start]
-cmd = "npm run start --workspace=artifacts/api-server"
+cmd = "pnpm run start --filter=@workspace/api-server"

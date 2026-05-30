@@ -11,22 +11,24 @@ const checkLeaderOrSuperAdmin = (
   req: Request,
   res: Response,
   next: NextFunction,
-) => {
+): void => {
   const { sessionClaims } = getAuth(req);
   if (
     !sessionClaims ||
     !["leader", "super_admin"].includes(sessionClaims.role as string)
   ) {
-    return res.status(403).json({ message: "Forbidden" });
+    res.status(403).json({ message: "Forbidden" });
+    return;
   }
   next();
 };
 
 // Middleware to check for super_admin role
-const checkSuperAdmin = (req: Request, res: Response, next: NextFunction) => {
+const checkSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
   const { sessionClaims } = getAuth(req);
   if (!sessionClaims || sessionClaims.role !== "super_admin") {
-    return res.status(403).json({ message: "Forbidden" });
+    res.status(403).json({ message: "Forbidden" });
+    return;
   }
   next();
 };

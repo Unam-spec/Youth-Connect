@@ -813,6 +813,12 @@ components:
           type: ["integer", "null"]
         heard_from:
           type: ["string", "null"]
+        school:
+          type: ["string", "null"]
+        parent_phone:
+          type: ["string", "null"]
+        avatar_url:
+          type: ["string", "null"]
         role:
           type: string
           enum: [super_admin, leader, member, visitor]
@@ -835,6 +841,12 @@ components:
         age:
           type: integer
         heard_from:
+          type: string
+        school:
+          type: string
+        parent_phone:
+          type: string
+        avatar_url:
           type: string
 
     VisitorRegistration:
@@ -1139,6 +1151,14 @@ components:
           enum: [super_admin, leader]
         profile_id:
           type: string
+        can_create_events:
+          type: boolean
+        can_view_kpis:
+          type: boolean
+        can_view_members:
+          type: boolean
+        can_view_attendance:
+          type: boolean
 
     PinUpdate:
       type: object

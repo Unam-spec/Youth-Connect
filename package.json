@@ -3,10 +3,10 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "dev": "concurrently \"npm run dev --workspace=artifacts/api-server\" \"npm run dev --workspace=artifacts/jg-youth\"",
-    "build": "npm run typecheck && npm run build --workspaces --if-present",
+    "dev": "concurrently \"pnpm --filter=@workspace/api-server dev\" \"pnpm --filter=@workspace/jg-youth dev\"",
+    "build": "pnpm run typecheck && pnpm --recursive --if-present run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "npm run typecheck:libs && npm run typecheck --workspaces --if-present"
+    "typecheck": "pnpm run typecheck:libs && pnpm --recursive --if-present run typecheck"
   },
   "private": true,
   "devDependencies": {
@@ -31,5 +31,11 @@
     "lib/*",
     "lib/integrations/*",
     "scripts"
-  ]
+  ],
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "esbuild"
+    ]
+  }
 }

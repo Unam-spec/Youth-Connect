@@ -13,7 +13,7 @@ async function connectDb() {
 
 connectDb();
 
-export const db = drizzle(client, { schema: { messagesTable, roleEnum } });
+export const db = drizzle(client as any, { schema: { messagesTable, roleEnum } });
 
 export async function runMigrations() {
   console.log("Running migrations...");

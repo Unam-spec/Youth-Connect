@@ -1,0 +1,9 @@
+packages:
+  - 'artifacts/*'
+  - 'lib/*'
+  - 'lib/integrations/*'
+  - 'scripts'
+allowBuilds:
+  '@clerk/shared': set this to true or false
+  bcrypt: true
+  esbuild: true

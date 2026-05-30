@@ -40,7 +40,7 @@ export default function MyDashboard() {
   const [isLeaderProfileLoading, setIsLeaderProfileLoading] = useState(false);
 
   useEffect(() => {
-    if (leaderSession?.profile_id && !window.__clerkIsSignedIn) {
+    if (leaderSession?.profile_id && !(window as any).__clerkIsSignedIn) {
       setIsLeaderProfileLoading(true);
       const sessionStr = localStorage.getItem("jg_leader_session");
       fetch(`/api/profiles/${leaderSession.profile_id}`, {
