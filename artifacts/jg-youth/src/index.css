@@ -63,6 +63,13 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --color-stone-50: oklch(98.5% 0.001 75);
+  --color-stone-100: oklch(97% 0.003 75);
+  --color-stone-200: oklch(92.9% 0.006 75);
+  --color-stone-500: oklch(55.4% 0.018 60);
+  --color-stone-700: oklch(37.2% 0.022 60);
+  --color-stone-800: oklch(27.9% 0.024 60);
+  --color-stone-900: oklch(20.8% 0.026 60);
 }
 
 :root {

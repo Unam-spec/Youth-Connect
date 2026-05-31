@@ -323,7 +323,7 @@ export function ChatPanel({
           })
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center py-10 opacity-70">
-            <div className="h-16 w-16 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center mb-3">
+            <div className="h-16 w-16 rounded-full bg-stone-900 border border-slate-800 flex items-center justify-center mb-3">
               <MessageSquare className="h-8 w-8 text-teal-500/30" />
             </div>
             <p className="text-sm font-semibold text-slate-300">Co-ordination Channel is empty</p>

@@ -73,7 +73,7 @@ export function DeleteConfirmPanel({
         open={showWipeConfirm}
         onOpenChange={setShowWipeConfirm}
       >
-        <AlertDialogContent className="bg-slate-900 text-white border-slate-800">
+        <AlertDialogContent className="bg-stone-900 text-white border-slate-800">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-red-400 font-bold">Wipe All Test Data</AlertDialogTitle>
             <AlertDialogDescription className="text-slate-300">

@@ -16,6 +16,12 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
+window.addEventListener("unhandledrejection", (event) => {
+  if (event.reason?.message?.includes("No session was found")) {
+    event.preventDefault();
+    window.location.replace("/sign-in");
+  }
+});
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary fallback={<p>Something went wrong.</p>}>
     <App />

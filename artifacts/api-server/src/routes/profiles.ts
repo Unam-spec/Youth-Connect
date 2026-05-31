@@ -549,67 +549,44 @@ router.patch("/profiles/:id", requireLeaderSession("leader"), async (req: Reques
   }
 });
 
-// DELETE /profiles/:id - Hard deletes profile (protected: super_admin only)
-router.delete("/profiles/:id", requireLeaderSession("super_admin"), async (req: Request, res: Response) => {
+// DELETE /profiles/:id - Hard deletes profile
+router.delete("/:id", requireLeaderOrAdmin, async (req, res) => {
   try {
-    const profileToDelete = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.id, req.params.id as string),
-    });
-    if (!profileToDelete)
+    const { data: profile, error: fetchError } = await supabase
+      .from("profiles")
+      .select("clerk_id")
+      .eq("id", req.params.id)
+      .single();
+
+    if (fetchError || !profile) {
       return res.status(404).json({ error: "Profile not found" });
-
-    if (profileToDelete.role === "super_admin") {
-      return res
-        .status(400)
-        .json({
-          error: "Cannot delete super admins. Revoke their role first.",
-        });
     }
 
-    // Delete from Clerk if they have a clerk_id
-    if (profileToDelete.clerk_id && process.env.CLERK_SECRET_KEY) {
+    const { error: deleteError } = await supabase
+      .from("profiles")
+      .delete()
+      .eq("id", req.params.id);
+
+    if (deleteError) throw deleteError;
+
+    if (profile.clerk_id) {
       try {
-        await fetch(`https://api.clerk.com/v1/users/${profileToDelete.clerk_id}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
-        });
-        req.log.info(`Deleted Clerk user: ${profileToDelete.clerk_id}`);
+        await clerkClient.users.deleteUser(profile.clerk_id);
       } catch (clerkErr) {
-        req.log.warn({ clerkErr }, "Failed to delete Clerk user — continuing with DB delete");
+        Sentry.captureException(clerkErr, {
+          extra: {
+            orphanedClerkId: profile.clerk_id,
+            profileId: req.params.id,
+            context: "post-delete-clerk-sync",
+          },
+        });
       }
     }
 
-    await db.transaction(async (tx: any) => {
-      // 0. Delete associated messages
-      const messageConditions = [eq(messagesTable.sender_id, req.params.id as string)];
-      if (profileToDelete.clerk_id) {
-        messageConditions.push(eq(messagesTable.sender_id, profileToDelete.clerk_id));
-      }
-      await tx.delete(messagesTable).where(or(...messageConditions));
-
-      // 1. Delete associated leader permissions
-      await tx.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.id as string));
-      // 2. Delete associated RSVPs
-      await tx.delete(rsvpsTable).where(eq(rsvpsTable.profile_id, req.params.id as string));
-      // 3. Delete associated attendance
-      await tx.delete(attendanceTable).where(eq(attendanceTable.profile_id, req.params.id as string));
-      // 4. Delete associated membership requests
-      await tx.delete(membershipRequestsTable).where(eq(membershipRequestsTable.profile_id, req.params.id as string));
-      // 5. Nullify reviewed_by in other membership requests
-      await tx.update(membershipRequestsTable).set({ reviewed_by: null }).where(eq(membershipRequestsTable.reviewed_by, req.params.id as string));
-      // 6. Delete associated check-in requests
-      await tx.delete(checkInRequestsTable).where(eq(checkInRequestsTable.profile_id, req.params.id as string));
-      // 7. Nullify reviewed_by in check-in requests
-      await tx.update(checkInRequestsTable).set({ reviewed_by: null }).where(eq(checkInRequestsTable.reviewed_by, req.params.id as string));
-      // 8. Nullify created_by in events
-      await tx.update(eventsTable).set({ created_by: null }).where(eq(eventsTable.created_by, req.params.id as string));
-      // 9. Delete the profile itself
-      await tx.delete(profilesTable).where(eq(profilesTable.id, req.params.id as string));
-    });
-    return res.json({ message: "Profile deleted successfully" });
+    return res.status(200).json({ success: true });
   } catch (err) {
-    req.log.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    Sentry.captureException(err);
+    return res.status(500).json({ error: "Delete failed" });
   }
 });
 

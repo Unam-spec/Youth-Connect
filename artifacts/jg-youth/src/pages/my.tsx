@@ -27,12 +27,24 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload, Check, BookOpen } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useNavigate } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@clerk/clerk-react";
 
 export default function MyDashboard() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      navigate("/sign-in", { replace: true });
+    }
+  }, [isLoaded, isSignedIn, navigate]);
+
+  if (!isLoaded || !isSignedIn) return null;
+
   const leaderSession = getLeaderSession();
 
   // For PIN-authenticated leaders, fetch profile directly by profile_id from session
@@ -551,7 +563,7 @@ export default function MyDashboard() {
                 id="prompt-gender"
                 value={promptGender}
                 onChange={(e) => setPromptGender(e.target.value as "male" | "female")}
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl h-10 px-3 text-sm text-white focus:border-teal-500 focus:ring-teal-500 cursor-pointer"
+                className="w-full bg-stone-900 border border-slate-700 rounded-xl h-10 px-3 text-sm text-white focus:border-teal-500 focus:ring-teal-500 cursor-pointer"
               >
                 <option value="male">Male</option>
                 <option value="female">Female</option>
@@ -590,7 +602,7 @@ export default function MyDashboard() {
                 const showNone = "None / Completed Schooling".toLowerCase().includes(query);
 
                 return (
-                  <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
+                  <div className="absolute z-50 w-full mt-1 bg-stone-900 border border-slate-800 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
                     {filteredWaterberg.length > 0 && (
                       <>
                         <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">
@@ -801,7 +813,7 @@ export default function MyDashboard() {
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Take Live Photo</label>
               {isCameraActive ? (
                 <div className="flex flex-col items-center gap-3">
-                  <div className="relative w-full aspect-square max-w-[240px] rounded-2xl overflow-hidden bg-black border border-border">
+                  <div className="relative w-full aspect-square max-w-[240px] rounded-2xl overflow-hidden bg-stone-900 border border-border">
                     <video
                       ref={videoRef}
                       className="w-full h-full object-cover transform -scale-x-100 animate-fade-in"

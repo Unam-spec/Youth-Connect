@@ -401,7 +401,7 @@ export default function Register() {
                               <GraduationCap className="w-5 h-5" />
                             </div>
                             {showSchoolDropdown && (
-                              <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-md">
+                              <div className="absolute z-50 w-full mt-1 bg-stone-900 border border-slate-800 rounded-xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-md">
                                 {filteredWaterberg.length > 0 && (
                                   <>
                                     <div className="px-3 py-1.5 text-2xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">Waterberg Schools</div>
@@ -541,7 +541,7 @@ export default function Register() {
                     control={form.control}
                     name="whatsapp_opt_in"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-2xl border border-slate-800/60 bg-slate-950/40 p-4 shadow-xs backdrop-blur-xs cursor-pointer hover:bg-slate-900/60 transition-colors"
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-2xl border border-slate-800/60 bg-slate-950/40 p-4 shadow-xs backdrop-blur-xs cursor-pointer hover:bg-stone-900/60 transition-colors"
                                 onClick={() => field.onChange(!field.value)}>
                         <FormControl>
                           <input
