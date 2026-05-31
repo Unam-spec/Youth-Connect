@@ -4,6 +4,13 @@ import { eq } from "drizzle-orm";
 import { db, membershipRequestsTable, profilesTable, pendingEmailsTable } from "@workspace/db";
 import { CreateMembershipRequestBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import twilio from "twilio";
+import * as Sentry from "@sentry/node";
+
+const twilioClient = twilio(
+  process.env.TWILIO_ACCOUNT_SID,
+  process.env.TWILIO_AUTH_TOKEN
+);
 
 const router = Router();
 
@@ -119,6 +126,20 @@ router.post("/membership-requests/:id/approve", requireLeaderSession("leader"), 
       });
     }
 
+    if (member?.phone) {
+      try {
+        await twilioClient.messages.create({
+          body: "Congratulations! Your membership at JG Youth has been approved. Welcome to the family!",
+          from: process.env.TWILIO_PHONE_NUMBER,
+          to: member.phone,
+        });
+      } catch (smsErr) {
+        Sentry.captureException(smsErr, {
+          extra: { context: "membership-approved-sms", profileId: member.id }
+        });
+      }
+    }
+
     return res.json({ ...updated, profile: member ?? null });
   } catch (err) {
     req.log.error(err);
@@ -158,6 +179,20 @@ router.post("/membership-requests/:id/reject", requireLeaderSession("leader"), a
         subject: "Your membership request — Jeremiah Generation Youth",
         body_html: emailBody,
       });
+    }
+
+    if (member?.phone) {
+      try {
+        await twilioClient.messages.create({
+          body: "Thank you for your interest in JG Youth membership. Unfortunately your request was not approved at this time. Please speak to a leader if you have questions.",
+          from: process.env.TWILIO_PHONE_NUMBER,
+          to: member.phone,
+        });
+      } catch (smsErr) {
+        Sentry.captureException(smsErr, {
+          extra: { context: "membership-rejected-sms", profileId: member.id }
+        });
+      }
     }
 
     return res.json({ ...updated, profile: member ?? null });
