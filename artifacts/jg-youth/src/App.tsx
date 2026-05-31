@@ -124,16 +124,15 @@ function SignUpPage() {
 function ApiClientAuthBridge() {
   const { getToken, isLoaded, isSignedIn } = useAuth();
 
-  useEffect(() => {
-    if (!isLoaded || !isSignedIn) {
-      setAuthTokenGetter(null);
-      return;
-    }
-
+  if (!isLoaded || !isSignedIn) {
+    setAuthTokenGetter(null);
+  } else {
     setAuthTokenGetter(() => getToken());
+  }
 
+  useEffect(() => {
     return () => setAuthTokenGetter(null);
-  }, [getToken, isLoaded, isSignedIn]);
+  }, []);
 
   return null;
 }
