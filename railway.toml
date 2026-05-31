@@ -3,6 +3,6 @@ builder = "nixpacks"
 buildCommand = "pnpm run typecheck:libs && pnpm --filter=@workspace/api-server run build"
 
 [deploy]
-startCommand = "pnpm run start --filter=@workspace/api-server"
+startCommand = "pnpm --filter=@workspace/api-server run start"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
