@@ -2,7 +2,6 @@ import { useRef, useEffect, useState } from "react";
 import { MessageSquare, Trash2 } from "lucide-react";
 import { RoleBadge } from "./shared";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
 
 interface ChatMessage {
   id: string;
@@ -32,7 +31,7 @@ export function ChatPanel({
   const [chatInput, setChatInput] = useState("");
   const [isSendingChatMessage, setIsSendingChatMessage] = useState(false);
   const [chatConnectionStatus, setChatConnectionStatus] = useState<
-    "connecting" | "connected" | "error"
+    "connecting" | "connected" | "polling" | "error"
   >("connecting");
   const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -41,6 +40,8 @@ export function ChatPanel({
     if (activeTab !== "channel") return;
 
     let isMounted = true;
+    let eventSource: EventSource | null = null;
+    let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
     async function fetchHistory() {
       try {
@@ -68,51 +69,86 @@ export function ChatPanel({
       }
     }
 
-    fetchHistory();
+    async function connectSSE() {
+      setChatConnectionStatus("connecting");
+      try {
+        const token = isSignedIn ? await getToken() : "";
+        const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
+        const apiBase = import.meta.env.VITE_API_URL || "";
+        const url = `${apiBase}/api/messages/stream?token=${encodeURIComponent(
+          token || ""
+        )}&leader_session=${encodeURIComponent(leaderSessionStr)}`;
 
-    const channel = supabase
-      .channel('messages')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
+        eventSource = new EventSource(url);
+
+        eventSource.onopen = () => {
+          if (isMounted) setChatConnectionStatus("connected");
+        };
+
+        eventSource.onmessage = (event) => {
           if (!isMounted) return;
-          const newMsg = payload.new as ChatMessage;
-          setChatMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            const next = [...prev, newMsg];
-            setTimeout(() => {
-              if (chatMessagesContainerRef.current) {
-                chatMessagesContainerRef.current.scrollTop =
-                  chatMessagesContainerRef.current.scrollHeight;
-              }
-            }, 50);
-            return next;
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'messages' },
-        (payload) => {
+          try {
+            const newMsg = JSON.parse(event.data);
+            setChatMessages((prev) => {
+              if (prev.some((m) => m.id === newMsg.id)) return prev;
+              const next = [...prev, newMsg];
+              setTimeout(() => {
+                if (chatMessagesContainerRef.current) {
+                  chatMessagesContainerRef.current.scrollTop =
+                    chatMessagesContainerRef.current.scrollHeight;
+                }
+              }, 50);
+              return next;
+            });
+          } catch (err) {
+            console.error("Failed to parse incoming message:", err);
+          }
+        };
+
+        eventSource.addEventListener("delete", (event: any) => {
           if (!isMounted) return;
-          const { id } = payload.old;
-          setChatMessages((prev) => prev.filter((m) => m.id !== id));
-        }
-      )
-      .subscribe((status) => {
-        if (!isMounted) return;
-        console.log('Realtime status:', status);
-        if (status === 'SUBSCRIBED') {
-          setChatConnectionStatus('connected');
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-          setChatConnectionStatus('error');
-        }
-      });
+          try {
+            const { id } = JSON.parse(event.data);
+            setChatMessages((prev) => prev.filter((m) => m.id !== id));
+          } catch (err) {
+            console.error("Failed to parse delete event:", err);
+          }
+        });
+
+        eventSource.onerror = () => {
+          if (!isMounted) return;
+          console.warn("SSE connection error — falling back to polling");
+          cleanupSSE();
+          startPolling();
+        };
+      } catch (err) {
+        console.error("Failed to initialize SSE:", err);
+        startPolling();
+      }
+    }
+
+    function startPolling() {
+      if (!isMounted) return;
+      setChatConnectionStatus("polling");
+      fetchHistory();
+      pollingInterval = setInterval(fetchHistory, 5000);
+    }
+
+    function cleanupSSE() {
+      if (eventSource) {
+        eventSource.close();
+        eventSource = null;
+      }
+    }
+
+    fetchHistory().then(() => {
+      if (isMounted) connectSSE();
+    });
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(channel);
+      cleanupSSE();
+      if (pollingInterval) clearInterval(pollingInterval);
     };
   }, [activeTab, isSignedIn, getToken]);
 
@@ -204,22 +240,22 @@ export function ChatPanel({
             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
               chatConnectionStatus === "connected" ? "bg-emerald-400" :
               chatConnectionStatus === "connecting" ? "bg-amber-400" :
-              "bg-destructive"
+              chatConnectionStatus === "polling" ? "bg-cyan-400" : "bg-destructive"
             }`} />
             <span className={`relative inline-flex rounded-full h-2 w-2 ${
               chatConnectionStatus === "connected" ? "bg-emerald-400" :
               chatConnectionStatus === "connecting" ? "bg-amber-400" :
-              "bg-destructive"
+              chatConnectionStatus === "polling" ? "bg-cyan-400" : "bg-destructive"
             }`} />
           </span>
           <span className={
             chatConnectionStatus === "connected" ? "text-emerald-400" :
             chatConnectionStatus === "connecting" ? "text-amber-400" :
-            "text-destructive"
+            chatConnectionStatus === "polling" ? "text-cyan-400" : "text-destructive"
           }>
             {chatConnectionStatus === "connected" ? "Live Feed" :
              chatConnectionStatus === "connecting" ? "Syncing..." :
-             "Offline"}
+             chatConnectionStatus === "polling" ? "Polling (SSE Fail)" : "Offline"}
           </span>
         </div>
       </div>
