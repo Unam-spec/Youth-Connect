@@ -51,19 +51,19 @@ export function LeaderManagementPanel({
             </thead>
             <tbody className="divide-y divide-border/40">
               {leaders.map((l: any) => (
-                <tr key={l.id} className="hover:bg-muted/15 transition-colors">
+                <tr key={l.profile_id} className="hover:bg-muted/15 transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-sm">{l.full_name}</p>
+                    <p className="font-semibold text-sm">{l.profile?.full_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {l.phone ?? "No phone"}
+                      {l.profile?.phone ?? "No phone"}
                     </p>
                   </td>
                   <td className="px-4 py-3 text-center align-middle">
                     <Switch
                       checked={!!l.can_view_members}
-                      disabled={isUpdatingPermissions}
+                      disabled={isUpdatingPermissions || l.profile?.role === "super_admin"}
                       onCheckedChange={(val) =>
-                        handlePermissionChange(l.id, "can_view_members", val)
+                        handlePermissionChange(l.profile_id, "can_view_members", val)
                       }
                       className="mx-auto"
                     />
@@ -71,9 +71,9 @@ export function LeaderManagementPanel({
                   <td className="px-4 py-3 text-center align-middle">
                     <Switch
                       checked={!!l.can_view_attendance}
-                      disabled={isUpdatingPermissions}
+                      disabled={isUpdatingPermissions || l.profile?.role === "super_admin"}
                       onCheckedChange={(val) =>
-                        handlePermissionChange(l.id, "can_view_attendance", val)
+                        handlePermissionChange(l.profile_id, "can_view_attendance", val)
                       }
                       className="mx-auto"
                     />
@@ -81,9 +81,9 @@ export function LeaderManagementPanel({
                   <td className="px-4 py-3 text-center align-middle">
                     <Switch
                       checked={!!l.can_create_events}
-                      disabled={isUpdatingPermissions}
+                      disabled={isUpdatingPermissions || l.profile?.role === "super_admin"}
                       onCheckedChange={(val) =>
-                        handlePermissionChange(l.id, "can_create_events", val)
+                        handlePermissionChange(l.profile_id, "can_create_events", val)
                       }
                       className="mx-auto"
                     />
@@ -91,9 +91,9 @@ export function LeaderManagementPanel({
                   <td className="px-4 py-3 text-center align-middle">
                     <Switch
                       checked={!!l.can_view_kpis}
-                      disabled={isUpdatingPermissions}
+                      disabled={isUpdatingPermissions || l.profile?.role === "super_admin"}
                       onCheckedChange={(val) =>
-                        handlePermissionChange(l.id, "can_view_kpis", val)
+                        handlePermissionChange(l.profile_id, "can_view_kpis", val)
                       }
                       className="mx-auto"
                     />
