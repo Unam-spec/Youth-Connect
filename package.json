@@ -36,7 +36,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "bcrypt",
-      "esbuild"
+      "esbuild",
+      "@clerk/shared"
     ]
   }
 }
