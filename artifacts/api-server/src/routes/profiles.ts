@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getAuth } from "@clerk/express";
+import { getAuth, clerkClient } from "@clerk/express";
 import { eq, ilike, or, and, count } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -39,14 +39,14 @@ router.get("/profiles/me", async (req: Request, res: Response) => {
     });
 
     if (!profile) {
-      // Extract name, email, phone from Clerk session claims
-      const claims = (req as any).auth?.sessionClaims ?? {};
-      const firstName = claims?.given_name ?? claims?.first_name ?? "";
-      const lastName = claims?.family_name ?? claims?.last_name ?? "";
-      const fullName =
-        [firstName, lastName].filter(Boolean).join(" ").trim() || "New Member";
-      const email: string | null = claims?.email ?? null;
-      const phone: string | null = claims?.phone_number ?? null;
+      // Fetch live user data directly from Clerk to prevent session claim drift
+      const clerkUser = await clerkClient.users.getUser(clerkId);
+      const email = clerkUser.emailAddresses?.[0]?.emailAddress ?? null;
+      const firstName = clerkUser.firstName ?? "";
+      const lastName = clerkUser.lastName ?? "";
+      const fullName = [firstName, lastName].filter(Boolean).join(" ").trim() || "New Member";
+      
+      const phone = clerkUser.phoneNumbers?.[0]?.phoneNumber ?? null;
 
       // Fallback: look up by email
       if (email) {
