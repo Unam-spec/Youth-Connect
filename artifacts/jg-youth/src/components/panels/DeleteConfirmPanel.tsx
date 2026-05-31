@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +28,8 @@ export interface DeleteConfirmPanelProps {
   showWipeConfirm: boolean;
   setShowWipeConfirm: (v: boolean) => void;
   isWipingData: boolean;
-  handleWipeData: () => void;
+  handleWipeData: (token: string) => void;
+  sessionRole?: string;
 }
 
 export function DeleteConfirmPanel({
@@ -46,7 +48,9 @@ export function DeleteConfirmPanel({
   setShowWipeConfirm,
   isWipingData,
   handleWipeData,
+  sessionRole,
 }: DeleteConfirmPanelProps) {
+  const [wipeInput, setWipeInput] = useState("");
   return (
     <>
       <AlertDialog
@@ -69,30 +73,46 @@ export function DeleteConfirmPanel({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog
-        open={showWipeConfirm}
-        onOpenChange={setShowWipeConfirm}
-      >
-        <AlertDialogContent className="bg-stone-900 text-white border-slate-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-400 font-bold">Wipe All Test Data</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-300">
-              Are you absolutely sure you want to delete all events, check-ins, RSVPs, attendance, and non-admin members?
-              This action cannot be undone and will completely wipe the database clean.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700">Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleWipeData}
-              disabled={isWipingData}
-              className="bg-red-650 hover:bg-red-500 text-white font-semibold border-0"
-            >
-              {isWipingData ? "Wiping Data..." : "Wipe Everything"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {sessionRole === "super_admin" && (
+        <AlertDialog
+          open={showWipeConfirm}
+          onOpenChange={(v) => {
+            setShowWipeConfirm(v);
+            if (!v) setWipeInput("");
+          }}
+        >
+          <AlertDialogContent className="bg-stone-900 text-white border-slate-800">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-red-400 font-bold">Wipe All Test Data</AlertDialogTitle>
+              <AlertDialogDescription className="text-slate-300">
+                Are you absolutely sure you want to delete all events, check-ins, RSVPs, attendance, and non-admin members?
+                This action cannot be undone and will completely wipe the database clean.
+                <br /><br />
+                Type <strong>CONFIRM_WIPE</strong> below to confirm.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="my-4">
+              <input
+                type="text"
+                value={wipeInput}
+                onChange={(e) => setWipeInput(e.target.value)}
+                placeholder="CONFIRM_WIPE"
+                className="w-full bg-slate-800 border-slate-700 text-white p-2 rounded"
+              />
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700">Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => handleWipeData(wipeInput)}
+                disabled={isWipingData || wipeInput !== "CONFIRM_WIPE"}
+                className="bg-red-650 hover:bg-red-500 text-white font-semibold border-0"
+              >
+                {isWipingData ? "Wiping Data..." : "Wipe Everything"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
 
       <AlertDialog
         open={!!roleConfirm}

@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { getAuth } from "@clerk/express";
+import * as Sentry from "@sentry/node";
+import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { eq, ne } from "drizzle-orm";
 import {
   db,
@@ -26,63 +28,56 @@ function hasLeaderSession(req: any): boolean {
 
 const router = Router();
 
-router.post("/reset-data", async (req: Request, res: Response) => {
+const requireSuperAdmin = requireLeaderSession("super_admin");
+
+router.delete("/wipe-all", requireSuperAdmin, async (req: Request, res: Response) => {
+  const { confirmToken } = req.body;
+
+  if (confirmToken !== "CONFIRM_WIPE") {
+    return res.status(400).json({ error: "Invalid confirmation token" });
+  }
+
+  Sentry.addBreadcrumb({
+    category: "admin.wipe",
+    message: "Full data wipe initiated",
+    level: "warning",
+    data: { adminId: (req as any).leaderId, timestamp: new Date().toISOString() }
+  });
+  Sentry.captureMessage("Admin wipe executed", "warning");
+
   try {
-    const auth = getAuth(req);
-    const isLeaderSess = hasLeaderSession(req);
-    if (!auth?.userId && !isLeaderSess)
-      return res.status(401).json({ error: "Unauthorized" });
-
-    let requesterProfile: any = null;
-    if (auth?.userId) {
-      requesterProfile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.clerk_id, auth.userId),
-      });
-    } else {
-      const session = JSON.parse(req.headers["x-leader-session"] as string);
-      requesterProfile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.id, session.profile_id),
-      });
+    // 1. Delete all check-in requests
+    await db.delete(checkInRequestsTable);
+    // 2. Delete all attendance
+    await db.delete(attendanceTable);
+    // 3. Delete all RSVPs
+    await db.delete(rsvpsTable);
+    // 4. Delete all events
+    await db.delete(eventsTable);
+    // 5. Delete all membership requests
+    await db.delete(membershipRequestsTable);
+    
+    // 6. Delete all leader permissions for non-super_admins
+    const nonSuperAdmins = await db
+      .select({ id: profilesTable.id })
+      .from(profilesTable)
+      .where(ne(profilesTable.role, "super_admin"));
+    const nonAdminIds = nonSuperAdmins.map((p: any) => p.id);
+    
+    if (nonAdminIds.length > 0) {
+      const { inArray } = await import("drizzle-orm");
+      await db.delete(leaderPermissionsTable).where(inArray(leaderPermissionsTable.profile_id, nonAdminIds));
     }
+    
+    // 7. Delete all visitors
+    await db.delete(visitorsTable);
+    // 8. Delete all profiles EXCEPT super admins
+    await db.delete(profilesTable).where(ne(profilesTable.role, "super_admin"));
 
-    if (!requesterProfile || requesterProfile.role !== "super_admin") {
-      return res.status(403).json({ error: "Forbidden. Super admins only." });
-    }
-
-    await db.transaction(async (tx: any) => {
-      // 1. Delete all check-in requests
-      await tx.delete(checkInRequestsTable);
-      // 2. Delete all attendance
-      await tx.delete(attendanceTable);
-      // 3. Delete all RSVPs
-      await tx.delete(rsvpsTable);
-      // 4. Delete all events
-      await tx.delete(eventsTable);
-      // 5. Delete all membership requests
-      await tx.delete(membershipRequestsTable);
-      
-      // 6. Delete all leader permissions for non-super_admins
-      const nonSuperAdmins = await tx
-        .select({ id: profilesTable.id })
-        .from(profilesTable)
-        .where(ne(profilesTable.role, "super_admin"));
-      const nonAdminIds = nonSuperAdmins.map((p: any) => p.id);
-      
-      if (nonAdminIds.length > 0) {
-        const { inArray } = await import("drizzle-orm");
-        await tx.delete(leaderPermissionsTable).where(inArray(leaderPermissionsTable.profile_id, nonAdminIds));
-      }
-      
-      // 7. Delete all visitors
-      await tx.delete(visitorsTable);
-      // 8. Delete all profiles EXCEPT super admins
-      await tx.delete(profilesTable).where(ne(profilesTable.role, "super_admin"));
-    });
-
-    return res.json({ success: true, message: "All test data has been successfully wiped." });
+    return res.status(200).json({ success: true });
   } catch (err: any) {
-    req.log.error(err);
-    return res.status(500).json({ error: "Internal server error" });
+    Sentry.captureException(err);
+    return res.status(500).json({ error: "Wipe failed" });
   }
 });
 

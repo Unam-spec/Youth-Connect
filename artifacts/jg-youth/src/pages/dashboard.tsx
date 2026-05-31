@@ -293,18 +293,22 @@ export default function Dashboard() {
   const [isWipingData, setIsWipingData] = useState(false);
   const [showWipeConfirm, setShowWipeConfirm] = useState(false);
 
-  async function handleWipeData() {
+  async function handleWipeData(confirmToken: string) {
     setIsWipingData(true);
     try {
-      const response = await apiFetch("/api/admin/reset-data", {
-        method: "POST",
+      const response = await apiFetch("/api/admin/wipe-all", {
+        method: "DELETE",
+        body: JSON.stringify({ confirmToken }),
       });
-      if (!response.ok) throw new Error();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Wipe failed");
+      }
       toast({ title: "Database Wiped Successfully", description: "All test data has been reset." });
       setShowWipeConfirm(false);
       window.location.reload();
-    } catch {
-      toast({ title: "Wipe Failed", description: "Could not reset the database.", variant: "destructive" });
+    } catch (err: any) {
+      toast({ title: "Wipe Failed", description: err.message || "Could not reset the database.", variant: "destructive" });
     } finally {
       setIsWipingData(false);
     }
@@ -1198,6 +1202,7 @@ export default function Dashboard() {
         setShowWipeConfirm={setShowWipeConfirm}
         isWipingData={isWipingData}
         handleWipeData={handleWipeData}
+        sessionRole={session?.role}
       />
       <DialogManager
         showSessionQrCodeDialog={showSessionQrCodeDialog}
