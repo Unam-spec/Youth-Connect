@@ -187,7 +187,14 @@ export default function Dashboard() {
                 can_view_attendance: profile.role === "super_admin" ? true : profile.can_view_attendance,
               });
               window.location.reload();
+            } else {
+              // If they are a visitor or member, they shouldn't be on the dashboard.
+              // Redirect them to their personal dashboard.
+              window.location.href = "/my";
             }
+          } else {
+            // If the fetch fails (e.g., 401 due to Clerk keys mismatch), redirect to /my
+            window.location.href = "/my";
           }
         } catch (e) {
           console.error("Failed to restore leader session automatically:", e);
