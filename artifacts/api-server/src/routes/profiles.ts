@@ -48,6 +48,24 @@ router.get("/profiles/me", async (req: Request, res: Response) => {
       const email: string | null = claims?.email ?? null;
       const phone: string | null = claims?.phone_number ?? null;
 
+      // Fallback: look up by email
+      if (email) {
+        const existingByEmail = await db.query.profilesTable.findFirst({
+          where: eq(profilesTable.email, email)
+        });
+
+        if (existingByEmail) {
+          // Update that row with the new clerk_id to preserve existing role
+          const [updatedProfile] = await db
+            .update(profilesTable)
+            .set({ clerk_id: clerkId })
+            .where(eq(profilesTable.id, existingByEmail.id))
+            .returning();
+          
+          return res.json(updatedProfile);
+        }
+      }
+
       // Unsafe Clerk auto-linking stripped completely.
       // Fresh visitor profile is generated directly for new Clerk signups without verified links.
       const [created] = await db
