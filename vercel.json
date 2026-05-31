@@ -1,7 +1,7 @@
 {
   "version": 2,
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm run typecheck:libs && pnpm --filter=@workspace/jg-youth run build",
+  "buildCommand": "pnpm -w run typecheck:libs && pnpm --filter=@workspace/jg-youth run build",
   "outputDirectory": "artifacts/jg-youth/dist/public",
   "framework": null,
   "rewrites": [
