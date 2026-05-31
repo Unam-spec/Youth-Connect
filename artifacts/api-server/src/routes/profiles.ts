@@ -550,42 +550,38 @@ router.patch("/profiles/:id", requireLeaderSession("leader"), async (req: Reques
 });
 
 // DELETE /profiles/:id - Hard deletes profile
-router.delete("/:id", requireLeaderOrAdmin, async (req, res) => {
+router.delete("/:id", requireLeaderSession("super_admin"), async (req: Request, res: Response) => {
   try {
-    const { data: profile, error: fetchError } = await supabase
-      .from("profiles")
-      .select("clerk_id")
-      .eq("id", req.params.id)
-      .single();
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, req.params.id as string)
+    });
 
-    if (fetchError || !profile) {
+    if (!profile) {
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    const { error: deleteError } = await supabase
-      .from("profiles")
-      .delete()
-      .eq("id", req.params.id);
-
-    if (deleteError) throw deleteError;
+    // Delete the profile (which should cascade or be handled)
+    await db.delete(profilesTable).where(eq(profilesTable.id, req.params.id as string));
 
     if (profile.clerk_id) {
       try {
-        await clerkClient.users.deleteUser(profile.clerk_id);
+        if (process.env.CLERK_SECRET_KEY) {
+          await fetch(`https://api.clerk.com/v1/users/${profile.clerk_id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+          });
+        }
       } catch (clerkErr) {
-        Sentry.captureException(clerkErr, {
-          extra: {
-            orphanedClerkId: profile.clerk_id,
-            profileId: req.params.id,
-            context: "post-delete-clerk-sync",
-          },
-        });
+        req.log.error(
+          { clerkErr, orphanedClerkId: profile.clerk_id, profileId: req.params.id },
+          "Failed to delete Clerk user in post-delete-clerk-sync"
+        );
       }
     }
 
     return res.status(200).json({ success: true });
   } catch (err) {
-    Sentry.captureException(err);
+    req.log.error(err, "Delete failed");
     return res.status(500).json({ error: "Delete failed" });
   }
 });
