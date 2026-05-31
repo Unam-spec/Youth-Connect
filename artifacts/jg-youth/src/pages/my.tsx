@@ -536,7 +536,7 @@ export default function MyDashboard() {
 
       {/* Phone + name prompt dialog */}
       <Dialog open={showProfilePrompt} onOpenChange={(open) => { if (!open && !needsPhone && !needsName) { setShowProfilePrompt(false); localStorage.setItem("dismissed_school_prompt", "true"); } }}>
-        <DialogContent className="sm:max-w-md rounded-2xl bg-slate-800/95 border-slate-700 text-white shadow-2xl backdrop-blur-sm">
+        <DialogContent className="sm:max-w-md rounded-2xl bg-slate-800/95 border-slate-700 text-white shadow-2xl backdrop-blur-sm max-h-[85vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
             <DialogTitle>Complete your profile</DialogTitle>
             <DialogDescription>
