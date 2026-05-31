@@ -108,7 +108,7 @@ export function RoleBadge({ role }: { role: string }) {
   }
   return (
     <Badge className={`${classes} text-xs`} variant="outline">
-      {role ? role.replace("_", " ") : "Visitor"}
+      {role ? role?.replace("_", " ") : "Visitor"}
     </Badge>
   );
 }

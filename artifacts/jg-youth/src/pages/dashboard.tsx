@@ -701,7 +701,7 @@ export default function Dashboard() {
       }
       toast({
         title: "Role updated",
-        description: `${profile.full_name} is now ${targetRole.replace("_", " ")}`,
+        description: `${profile.full_name} is now ${targetRole?.replace("_", " ")}`,
       });
       refreshDashboard();
     } catch {
@@ -995,7 +995,7 @@ export default function Dashboard() {
                 variant="outline"
               >
                 <Shield className="h-3 w-3 mr-1" />
-                {session.role.replace("_", " ")}
+                {session?.role?.replace("_", " ")}
               </Badge>
             </div>
           </div>

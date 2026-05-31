@@ -345,9 +345,9 @@ export default function MyDashboard() {
                     <h3 className="text-xl font-bold tracking-tight">{profile.full_name}</h3>
                     <div className="capitalize flex items-center gap-2 mt-1">
                       <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">
-                        {profile.role.replace("_", " ").replace("-", " ")}
+                        {profile?.role?.replace("_", " ")?.replace("-", " ")}
                       </span>
-                      {profile.role === "visitor" && (
+                      {profile?.role === "visitor" && (
                         <Link href="/become-member" className="text-xs text-primary hover:underline font-medium">
                           Become a Member
                         </Link>
@@ -520,7 +520,7 @@ export default function MyDashboard() {
                               rsvp.status === "not_going" ? "bg-red-500/10 text-red-500" :
                               "bg-yellow-500/10 text-yellow-500"}`}
                         >
-                          {rsvp.status.replace("_", " ").toUpperCase()}
+                          {rsvp.status?.replace("_", " ")?.toUpperCase()}
                         </div>
                       </CardContent>
                     </Card>
