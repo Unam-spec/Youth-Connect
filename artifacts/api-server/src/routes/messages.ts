@@ -127,6 +127,7 @@ messagesRouter.get("/messages/stream", resolveLeaderOrSuperAdmin, (req, res) => 
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
     "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
   });
   res.flushHeaders();
 
