@@ -196,7 +196,7 @@ router.get("/dashboard/attendance-history", async (req, res) => {
       .select({
         session_date: attendanceTable.session_date,
         total_count: count(),
-        member_count: sql<number>`count(*) filter (where ${profilesTable.role} = 'member')`,
+        member_count: sql<number>`count(*) filter (where ${profilesTable.role} IN ('member', 'leader', 'super_admin'))`,
         visitor_count: sql<number>`count(*) filter (where ${profilesTable.role} = 'visitor')`,
       })
       .from(attendanceTable)

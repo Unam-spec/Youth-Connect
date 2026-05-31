@@ -48,6 +48,21 @@ router.get("/profiles/me", async (req: Request, res: Response) => {
       const email: string | null = claims?.email ?? null;
       const phone: string | null = claims?.phone_number ?? null;
 
+      if (email) {
+        const existingByEmail = await db.query.profilesTable.findFirst({
+          where: eq(profilesTable.email, email),
+        });
+
+        if (existingByEmail) {
+          const [updated] = await db
+            .update(profilesTable)
+            .set({ clerk_id: clerkId })
+            .where(eq(profilesTable.id, existingByEmail.id))
+            .returning();
+          return res.json(updated);
+        }
+      }
+
       // Unsafe Clerk auto-linking stripped completely.
       // Fresh visitor profile is generated directly for new Clerk signups without verified links.
       const [created] = await db
