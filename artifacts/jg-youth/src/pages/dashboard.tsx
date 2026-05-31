@@ -296,7 +296,7 @@ export default function Dashboard() {
   async function handleWipeData() {
     setIsWipingData(true);
     try {
-      const response = await apiFetch("/api/admin/reset-data", {
+      const response = await apiFetch("/api/reset-data", {
         method: "POST",
       });
       if (!response.ok) throw new Error();

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, ne } from "drizzle-orm";
+import { eq, ne, inArray } from "drizzle-orm";
 import {
   db,
   profilesTable,
@@ -12,6 +12,8 @@ import {
   eventsTable,
   visitorsTable,
 } from "@workspace/db";
+import { db as messagesDb } from "../db";
+import { messagesTable } from "../db/schema/messages";
 
 function hasLeaderSession(req: any): boolean {
   try {
@@ -69,7 +71,6 @@ router.post("/reset-data", async (req: Request, res: Response) => {
       const nonAdminIds = nonSuperAdmins.map((p: any) => p.id);
       
       if (nonAdminIds.length > 0) {
-        const { inArray } = await import("drizzle-orm");
         await tx.delete(leaderPermissionsTable).where(inArray(leaderPermissionsTable.profile_id, nonAdminIds));
       }
       
@@ -78,6 +79,9 @@ router.post("/reset-data", async (req: Request, res: Response) => {
       // 8. Delete all profiles EXCEPT super admins
       await tx.delete(profilesTable).where(ne(profilesTable.role, "super_admin"));
     });
+
+    // 9. Delete all messages
+    await messagesDb.delete(messagesTable);
 
     return res.json({ success: true, message: "All test data has been successfully wiped." });
   } catch (err: any) {

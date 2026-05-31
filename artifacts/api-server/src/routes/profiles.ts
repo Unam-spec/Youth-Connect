@@ -64,6 +64,13 @@ router.get("/profiles/me", async (req: Request, res: Response) => {
         })
         .returning();
       profile = created;
+
+      // Create automatic pending membership request for direct Clerk signups
+      await db.insert(membershipRequestsTable).values({
+        profile_id: profile.id,
+        reason: "Direct Clerk signup",
+        status: "pending",
+      });
     }
 
     return res.json(profile);
@@ -550,7 +557,7 @@ router.patch("/profiles/:id", requireLeaderSession("leader"), async (req: Reques
 });
 
 // DELETE /profiles/:id - Hard deletes profile
-router.delete("/:id", requireLeaderSession("super_admin"), async (req: Request, res: Response) => {
+router.delete("/profiles/:id", requireLeaderSession("super_admin"), async (req: Request, res: Response) => {
   try {
     const profile = await db.query.profilesTable.findFirst({
       where: eq(profilesTable.id, req.params.id as string)

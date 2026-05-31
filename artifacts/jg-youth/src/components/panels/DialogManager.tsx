@@ -86,7 +86,7 @@ export function DialogManager(props: DialogManagerProps) {
       </Dialog>
 
       <Dialog open={props.showEditDialog} onOpenChange={props.setShowEditDialog}>
-        <DialogContent className="sm:max-w-lg rounded-2xl bg-stone-900 text-white border-slate-800">
+        <DialogContent className="sm:max-w-lg rounded-2xl bg-slate-800/95 text-white border-slate-700 shadow-2xl backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle className="text-white font-bold">Edit Profile Details</DialogTitle>
             <DialogDescription className="text-slate-300">
@@ -139,8 +139,8 @@ export function DialogManager(props: DialogManagerProps) {
                   onChange={(e: any) => props.setEditGender(e.target.value)}
                   className="flex h-9 w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-1 text-sm text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-500 rounded-xl"
                 >
-                  <option value="male" className="bg-stone-900 text-white">Male</option>
-                  <option value="female" className="bg-stone-900 text-white">Female</option>
+                  <option value="male" className="bg-slate-800 text-white">Male</option>
+                  <option value="female" className="bg-slate-800 text-white">Female</option>
                 </select>
               </div>
               <div className="space-y-1.5">
@@ -175,7 +175,7 @@ export function DialogManager(props: DialogManagerProps) {
                 </div>
               </div>
               {props.editShowSchoolDropdown && (
-                <div className="absolute z-50 w-full mt-1 bg-stone-900 border border-slate-800 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
+                <div className="absolute z-50 w-full mt-1 bg-slate-800/95 border border-slate-700 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
                   {[
                     "University of Namibia (UNAM)",
                     "Namibia University of Science and Technology (NUST)",

@@ -28,6 +28,17 @@ const resolveLeaderOrSuperAdmin = async (
           claims.first_name ||
           "Leader";
         return next();
+      } else {
+        // Fallback: Check DB in case Clerk claims are stale
+        const profile = await mainDb.query.profilesTable.findFirst({
+          where: eq(profilesTable.clerk_id, auth.userId),
+        });
+        if (profile && ["leader", "super_admin"].includes(profile.role as string)) {
+          req.body.sender_id = auth.userId;
+          req.body.sender_role = profile.role;
+          req.body.sender_name = profile.full_name || "Leader";
+          return next();
+        }
       }
     }
 
@@ -67,6 +78,14 @@ const resolveSuperAdmin = async (
       const claims = (req as any).auth?.sessionClaims ?? {};
       if (claims.role === "super_admin") {
         return next();
+      } else {
+        // Fallback: Check DB in case Clerk claims are stale
+        const profile = await mainDb.query.profilesTable.findFirst({
+          where: eq(profilesTable.clerk_id, auth.userId),
+        });
+        if (profile && profile.role === "super_admin") {
+          return next();
+        }
       }
     }
 

@@ -148,6 +148,19 @@ export function MemberDirectoryPanel({
                 >
                   Edit Details
                 </Button>
+                {sessionRole === "super_admin" && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setDeleteMemberId(profile.id);
+                      setDeleteMemberName(profile.full_name || "Unknown");
+                    }}
+                    className="h-7 text-xs px-3 border-red-500/20 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-colors"
+                  >
+                    Delete
+                  </Button>
+                )}
                 {profile.role === "visitor" && (
                   <Button
                     size="sm"
