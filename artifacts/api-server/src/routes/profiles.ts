@@ -51,7 +51,7 @@ router.get("/profiles/me", async (req: Request, res: Response) => {
       // Fallback: look up by email
       if (email) {
         const existingByEmail = await db.query.profilesTable.findFirst({
-          where: eq(profilesTable.email, email)
+          where: ilike(profilesTable.email, email.trim())
         });
 
         if (existingByEmail) {

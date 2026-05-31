@@ -43,7 +43,6 @@ export default function MyDashboard() {
     }
   }, [isLoaded, isSignedIn, setLocation]);
 
-  if (!isLoaded || !isSignedIn) return null;
 
   const leaderSession = getLeaderSession();
 
@@ -290,6 +289,8 @@ export default function MyDashboard() {
   const getRsvpStatus = (eventId: string) => {
     return rsvps?.find((r) => r.event_id === eventId)?.status;
   };
+
+  if (!isLoaded || !isSignedIn) return null;
 
   return (
     <Layout>
