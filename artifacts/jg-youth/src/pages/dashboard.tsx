@@ -126,7 +126,9 @@ function useApiFetch() {
       } catch {
         /* ignore */
       }
-      return fetch(url, {
+      const apiBase = import.meta.env.VITE_API_URL || "";
+      const finalUrl = url.startsWith("/") ? `${apiBase}${url}` : url;
+      return fetch(finalUrl, {
         ...init,
         headers: { ...headers, ...(init?.headers as Record<string, string>) },
       });

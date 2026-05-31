@@ -530,7 +530,7 @@ export default function MyDashboard() {
 
       {/* Phone + name prompt dialog */}
       <Dialog open={showProfilePrompt} onOpenChange={(open) => { if (!open && !needsPhone && !needsName) { setShowProfilePrompt(false); localStorage.setItem("dismissed_school_prompt", "true"); } }}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent className="sm:max-w-md rounded-2xl bg-slate-800/95 border-slate-700 text-white shadow-2xl backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle>Complete your profile</DialogTitle>
             <DialogDescription>
@@ -563,10 +563,10 @@ export default function MyDashboard() {
                 id="prompt-gender"
                 value={promptGender}
                 onChange={(e) => setPromptGender(e.target.value as "male" | "female")}
-                className="w-full bg-stone-900 border border-slate-700 rounded-xl h-10 px-3 text-sm text-white focus:border-teal-500 focus:ring-teal-500 cursor-pointer"
+                className="w-full bg-slate-950/50 border border-slate-700 rounded-xl h-10 px-3 text-sm text-white focus:border-teal-500 focus:ring-teal-500 cursor-pointer"
               >
-                <option value="male">Male</option>
-                <option value="female">Female</option>
+                <option value="male" className="bg-slate-800 text-white">Male</option>
+                <option value="female" className="bg-slate-800 text-white">Female</option>
               </select>
             </div>
             {/* Autocomplete School / University dropdown */}
@@ -602,7 +602,7 @@ export default function MyDashboard() {
                 const showNone = "None / Completed Schooling".toLowerCase().includes(query);
 
                 return (
-                  <div className="absolute z-50 w-full mt-1 bg-stone-900 border border-slate-800 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
+                  <div className="absolute z-50 w-full mt-1 bg-slate-800/95 border border-slate-700 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
                     {filteredWaterberg.length > 0 && (
                       <>
                         <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">
@@ -772,7 +772,7 @@ export default function MyDashboard() {
 
       {/* Change Profile Picture Dialog */}
       <Dialog open={showAvatarDialog} onOpenChange={(open) => { setShowAvatarDialog(open); if (!open) stopCamera(); }}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
+        <DialogContent className="sm:max-w-md rounded-2xl bg-slate-800/95 border-slate-700 text-white shadow-2xl backdrop-blur-sm">
           <DialogHeader>
             <DialogTitle>Update Profile Picture</DialogTitle>
             <DialogDescription>
@@ -812,8 +812,8 @@ export default function MyDashboard() {
             <div className="space-y-2">
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Take Live Photo</label>
               {isCameraActive ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="relative w-full aspect-square max-w-[240px] rounded-2xl overflow-hidden bg-stone-900 border border-border">
+                <div className="flex flex-col gap-3">
+                  <div className="relative w-full aspect-square max-w-[240px] rounded-2xl overflow-hidden bg-slate-950/50 border border-slate-700 mx-auto">
                     <video
                       ref={videoRef}
                       className="w-full h-full object-cover transform -scale-x-100 animate-fade-in"

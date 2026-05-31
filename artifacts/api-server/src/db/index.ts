@@ -66,6 +66,16 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_super_admin_limit ON profiles (role) WHERE
 CREATE INDEX IF NOT EXISTS idx_profiles_clerk_id ON profiles (clerk_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles (email);
 CREATE INDEX IF NOT EXISTS idx_profiles_phone ON profiles (phone);
+
+-- Ensure messages table exists for chat
+CREATE TABLE IF NOT EXISTS "messages" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"sender_id" text NOT NULL,
+	"sender_name" text NOT NULL,
+	"sender_role" text NOT NULL,
+	"content" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
 `;
 
 export async function runMigrations() {
