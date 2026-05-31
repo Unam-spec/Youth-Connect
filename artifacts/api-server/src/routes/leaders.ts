@@ -243,6 +243,32 @@ router.get("/leaders/pins", requireLeaderSession("super_admin"), async (req, res
   }
 });
 
+// POST /leaders/:id/set-pin - Secure manual PIN setting (protected: super_admin only)
+router.post("/leaders/:id/set-pin", requireLeaderSession("super_admin"), async (req, res) => {
+  try {
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, req.params.id as string),
+    });
+    if (!profile) return res.status(404).json({ error: "Leader not found" });
+
+    const pin = req.body.pin;
+    if (!pin || typeof pin !== "string" || pin.length !== 4) {
+      return res.status(400).json({ error: "Invalid PIN format. Must be a 4-digit string." });
+    }
+
+    const pinHash = await bcrypt.hash(pin, 12); // Strength 12 bcrypt
+
+    await db.update(profilesTable)
+      .set({ pin_hash: pinHash })
+      .where(eq(profilesTable.id, profile.id));
+
+    return res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /leaders/:id/reset-pin - Secure random PIN reset (protected: super_admin only)
 router.post("/leaders/:id/reset-pin", requireLeaderSession("super_admin"), async (req, res) => {
   try {
