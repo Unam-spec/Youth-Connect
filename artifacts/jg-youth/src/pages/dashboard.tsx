@@ -1096,14 +1096,24 @@ export default function Dashboard() {
             <TabsTrigger value="session" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white">
               <Activity className="h-4 w-4 mr-2 hidden sm:block" /> Session
             </TabsTrigger>
-            <TabsTrigger value="members" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+            <TabsTrigger value="members" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white relative">
               <Users className="h-4 w-4 mr-2 hidden sm:block" /> Members
+              {((kpis?.total_members ?? 0) > 0 || totalRequestBadge > 0) && (
+                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-teal-600 text-[10px] text-white shadow-sm">
+                    {totalRequestBadge > 0 ? `${kpis?.total_members ?? 0} (+${totalRequestBadge})` : (kpis?.total_members ?? 0)}
+                 </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="events" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white">
               <Calendar className="h-4 w-4 mr-2 hidden sm:block" /> Events
             </TabsTrigger>
-            <TabsTrigger value="manage" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+            <TabsTrigger value="manage" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white relative">
               <Settings className="h-4 w-4 mr-2 hidden sm:block" /> Manage
+              {(leaders?.length ?? 0) > 0 && (
+                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-purple-500 text-[10px] text-white shadow-sm">
+                    {leaders?.length}
+                 </span>
+              )}
             </TabsTrigger>
           </TabsList>
 
