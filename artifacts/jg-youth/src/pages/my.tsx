@@ -68,7 +68,7 @@ export default function MyDashboard() {
     }
   }, [leaderSession?.profile_id]);
 
-  const { data: clerkProfile, isLoading: isClerkProfileLoading } = useGetMyProfile({
+  const { data: clerkProfile, isLoading: isClerkProfileLoading, error: clerkProfileError } = useGetMyProfile({
     query: { enabled: true, queryKey: getGetMyProfileQueryKey() },
   });
 
@@ -389,8 +389,13 @@ export default function MyDashboard() {
               </CardContent>
             </Card>
           ) : (
-            <div className="p-4 border border-destructive/20 bg-destructive/10 rounded-2xl text-destructive text-sm">
-              Could not load profile.
+            <div className="p-4 border border-destructive/20 bg-destructive/10 rounded-2xl text-destructive text-sm flex flex-col gap-2">
+              <span className="font-semibold">Could not load profile.</span>
+              {clerkProfileError && (
+                <span className="text-xs opacity-80 break-words">
+                  {clerkProfileError instanceof Error ? clerkProfileError.message : String(clerkProfileError)}
+                </span>
+              )}
             </div>
           )}
         </section>
