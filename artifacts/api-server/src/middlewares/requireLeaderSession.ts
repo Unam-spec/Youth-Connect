@@ -22,7 +22,8 @@ export function requireLeaderSession(minRole: "leader" | "super_admin" = "leader
           });
         }
       } catch (clerkErr) {
-        // Log or ignore if Clerk middleware is not active for this route
+        // Log Clerk errors so token mismatches or missing env vars are visible in server logs
+        req.log.warn({ err: clerkErr }, "Clerk Authentication failed in requireLeaderSession");
       }
 
       // 2. If no Clerk profile, try Custom PIN-based session (x-leader-session)
