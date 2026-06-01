@@ -51,3 +51,6 @@ Thumbs.db
 *.env
 **/.env
 **/.env
+
+# pnpm lockfile backups (never commit these; keep only pnpm-lock.yaml)
+pnpm-lock.yaml.*

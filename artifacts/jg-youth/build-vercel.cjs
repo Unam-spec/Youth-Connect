@@ -2,32 +2,21 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-try {
-  // Run the normal vite build
-  execSync('vite build --config vite.config.ts', { stdio: 'inherit' });
+// Run the Vite build. Vite is configured to emit into dist/public.
+execSync('vite build --config vite.config.ts', { stdio: 'inherit' });
 
-  // The built files are in dist/public
-  const source = path.resolve(__dirname, 'dist/public');
+const source = path.resolve(__dirname, 'dist/public');
 
-  // Possible locations Vercel might look
-  const destinations = [
-    path.resolve(__dirname, 'public'), // if Root is artifacts/jg-youth and outDir is public
-    path.resolve(__dirname, 'dist'), // if Root is artifacts/jg-youth and outDir is dist
-    path.resolve(__dirname, '../../public'), // if Root is repo root and outDir is public
-    path.resolve(__dirname, '../../dist') // if Root is repo root and outDir is dist
-  ];
+// Vercel's Root Directory is the repo root and outputDirectory is "public",
+// so the one correct destination is repo-root/public.
+const dest = path.resolve(__dirname, '../../public');
 
-  destinations.forEach(dest => {
-    if (dest === source) return;
-    try {
-      // recursively copy source to dest
-      fs.cpSync(source, dest, { recursive: true, force: true });
-      console.log(`Copied build output to ${dest}`);
-    } catch (err) {
-      console.error(`Failed to copy to ${dest}:`, err.message);
-    }
-  });
-} catch (error) {
-  console.error('Build failed:', error);
+if (!fs.existsSync(source)) {
+  console.error(`Build output not found at ${source}`);
   process.exit(1);
 }
+
+// Replace any previous output, then copy. Any failure here must fail the build.
+fs.rmSync(dest, { recursive: true, force: true });
+fs.cpSync(source, dest, { recursive: true });
+console.log(`Copied build output to ${dest}`);
