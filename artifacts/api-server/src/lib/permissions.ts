@@ -2,6 +2,7 @@ import { Request } from "express";
 import { getAuth } from "@clerk/express";
 import { db, profilesTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { validateLeaderSession } from "./validateLeaderSession";
 
 export interface ResolvedAuth {
   type: "clerk" | "leader_session";
@@ -44,26 +45,21 @@ export async function resolveAuth(req: Request): Promise<ResolvedAuth | null> {
     };
   }
 
-  // ── PIN / leader session header ────────────────────────────────────────────
-  const header = req.headers["x-leader-session"];
-  if (header) {
-    try {
-      const session = JSON.parse(header as string);
-      if (session?.expires_at && Date.now() < session.expires_at && session.profile_id) {
-        return {
-          type: "leader_session",
-          userId: null,
-          profileId: session.profile_id,
-          role: session.role ?? "leader",
-          canCreateEvents: session.can_create_events ?? (session.role === "super_admin"),
-          canViewKpis: session.can_view_kpis ?? true,
-          canViewMembers: session.can_view_members ?? true,
-          canViewAttendance: session.can_view_attendance ?? true,
-        };
-      }
-    } catch {
-      // malformed header — fall through
-    }
+  // ── PIN / leader session header (validated against the DB) ───────────────────
+  const sessionProfile = await validateLeaderSession(req.headers["x-leader-session"]);
+  if (sessionProfile) {
+    const isPrivileged =
+      sessionProfile.role === "super_admin" || sessionProfile.role === "leader";
+    return {
+      type: "leader_session",
+      userId: null,
+      profileId: sessionProfile.id,
+      role: sessionProfile.role as ResolvedAuth["role"],
+      canCreateEvents: isPrivileged || sessionProfile.can_create_events,
+      canViewKpis: isPrivileged || sessionProfile.can_view_kpis,
+      canViewMembers: isPrivileged || sessionProfile.can_view_members,
+      canViewAttendance: isPrivileged || sessionProfile.can_view_attendance,
+    };
   }
 
   return null;

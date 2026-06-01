@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import { getAuth } from "@clerk/express";
 import { eq } from "drizzle-orm";
 import { db, profilesTable } from "@workspace/db";
+import { validateLeaderSession } from "../lib/validateLeaderSession";
 
 const ROLE_HIERARCHY: Record<string, number> = {
   leader: 1,
@@ -26,38 +27,9 @@ export function requireLeaderSession(minRole: "leader" | "super_admin" = "leader
         req.log.warn({ err: clerkErr }, "Clerk Authentication failed in requireLeaderSession");
       }
 
-      // 2. If no Clerk profile, try Custom PIN-based session (x-leader-session)
+      // 2. If no Clerk profile, try PIN-based session (x-leader-session)
       if (!profile) {
-        const sessionHeader = req.headers["x-leader-session"];
-        if (sessionHeader) {
-          let parsedSession: any;
-          try {
-            parsedSession = JSON.parse(sessionHeader as string);
-          } catch (err) {
-            return res.status(401).json({ error: "Unauthorized: Invalid session format" });
-          }
-
-          const { profile_id, session_token, expires_at } = parsedSession;
-          if (!profile_id || !session_token || !expires_at) {
-            return res.status(401).json({ error: "Unauthorized: Incomplete session payload" });
-          }
-
-          if (new Date(expires_at) < new Date()) {
-            return res.status(401).json({ error: "Unauthorized: Session expired" });
-          }
-
-          profile = await db.query.profilesTable.findFirst({
-            where: eq(profilesTable.id, profile_id),
-          });
-
-          if (!profile) {
-            return res.status(401).json({ error: "Unauthorized: Leader profile not found" });
-          }
-
-          if (!profile.session_token || profile.session_token !== session_token) {
-            return res.status(401).json({ error: "Unauthorized: Session revoked or invalid" });
-          }
-        }
+        profile = await validateLeaderSession(req.headers["x-leader-session"]);
       }
 
       // 3. If no profile found by either method, reject
