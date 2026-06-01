@@ -1,4 +1,4 @@
-import { eq, and, lt, isNull } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, pendingEmailsTable } from "@workspace/db";
 import { sendEmail } from "../lib/twilio";
 import { logger } from "../lib/logger";
@@ -7,25 +7,29 @@ let intervalId: NodeJS.Timeout | null = null;
 
 export async function processPendingEmails() {
   try {
-    // Read up to 10 rows where sent_at is NULL and attempts < 3
-    const pending = await db.query.pendingEmailsTable.findFirst
-      ? await db
-          .select()
-          .from(pendingEmailsTable)
-          .where(
-            and(
-              isNull(pendingEmailsTable.sent_at),
-              lt(pendingEmailsTable.attempts, 3)
-            )
-          )
-          .limit(10)
-      : [];
+    // Use raw SQL for the atomic lock
+    const result = await db.execute(sql`
+      SELECT id, to_address, subject, body_html, attempts
+      FROM pending_emails
+      WHERE sent_at IS NULL AND attempts < max_attempts
+      ORDER BY created_at ASC
+      LIMIT 10
+      FOR UPDATE SKIP LOCKED
+    `);
 
-    if (pending.length === 0) return;
+    // Handle both pg (returns object with rows) and postgres.js (returns array directly)
+    const pending = Array.isArray(result) ? result : (result as any).rows;
+
+    if (!pending || pending.length === 0) return;
 
     logger.info(`[emailProcessor] Processing ${pending.length} pending email(s)...`);
 
     for (const email of pending) {
+      // Increment attempts BEFORE sending
+      await db.update(pendingEmailsTable)
+        .set({ attempts: sql`attempts + 1` })
+        .where(eq(pendingEmailsTable.id, email.id));
+
       try {
         await sendEmail({
           to: email.to_address,
@@ -41,19 +45,16 @@ export async function processPendingEmails() {
 
         logger.info(`[emailProcessor] Successfully sent email to ${email.to_address}`);
       } catch (err: any) {
-        const attempts = (email.attempts ?? 0) + 1;
         const lastError = err instanceof Error ? err.message : String(err);
         
+        // Record error for debugging
         await db.update(pendingEmailsTable)
-          .set({ 
-            attempts,
-            last_error: lastError,
-          })
+          .set({ last_error: lastError })
           .where(eq(pendingEmailsTable.id, email.id));
 
         logger.error(
           { err, emailId: email.id, recipient: email.to_address },
-          `[emailProcessor] Failed sending email to ${email.to_address} (Attempt ${attempts}/3)`
+          `[emailProcessor] Failed sending email to ${email.to_address}`
         );
       }
     }
