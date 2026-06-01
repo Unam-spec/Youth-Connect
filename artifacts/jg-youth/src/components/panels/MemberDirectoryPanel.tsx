@@ -169,13 +169,24 @@ export function MemberDirectoryPanel({
                   </Button>
                 )}
                 {profile.role === "visitor" && (
-                  <Button
-                    size="sm"
-                    onClick={() => mutateProfileRole("promote", profile.id)}
-                    className="bg-teal-500 hover:bg-teal-400 text-white border-0 h-7 text-xs px-3"
-                  >
-                    Make Member
-                  </Button>
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-col sm:items-end">
+                    {sessionRole === "super_admin" && (
+                      <Button
+                        size="sm"
+                        onClick={() => setRoleConfirm({ profile, targetRole: "leader" })}
+                        className="bg-blue-500 hover:bg-blue-400 text-white border-0 h-7 text-xs px-3 mb-1"
+                      >
+                        Make Leader
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={() => mutateProfileRole("promote", profile.id)}
+                      className="bg-teal-500 hover:bg-teal-400 text-white border-0 h-7 text-xs px-3"
+                    >
+                      Make Member
+                    </Button>
+                  </div>
                 )}
                 {profile.role === "member" && (
                   <div className="flex items-center gap-2 flex-wrap sm:flex-col sm:items-end">

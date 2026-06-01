@@ -86,7 +86,7 @@ export function DialogManager(props: DialogManagerProps) {
       </Dialog>
 
       <Dialog open={props.showEditDialog} onOpenChange={props.setShowEditDialog}>
-        <DialogContent className="sm:max-w-lg rounded-2xl bg-slate-800/95 text-white border-slate-700 shadow-2xl backdrop-blur-sm">
+        <DialogContent className="sm:max-w-lg rounded-2xl bg-slate-800/95 text-white border-slate-700 shadow-2xl backdrop-blur-sm overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="text-white font-bold">Edit Profile Details</DialogTitle>
             <DialogDescription className="text-slate-300">

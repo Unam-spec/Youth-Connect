@@ -53,10 +53,7 @@ export function LeaderManagementPanel({
               {leaders.map((l: any) => (
                 <tr key={l.profile_id} className="hover:bg-muted/15 transition-colors">
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-sm">{l.profile?.full_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {l.profile?.phone ?? "No phone"}
-                    </p>
+                    <p className="font-semibold text-sm">{l.profile?.full_name || "Unnamed Leader"}</p>
                   </td>
                   <td className="px-4 py-3 text-center align-middle">
                     <Switch
