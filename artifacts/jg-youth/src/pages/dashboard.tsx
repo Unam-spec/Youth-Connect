@@ -1145,6 +1145,8 @@ export default function Dashboard() {
             {canViewMembers && (
               <MemberDirectoryPanel
                 sessionRole={session.role}
+                sessionProfileId={session.profile_id ?? ""}
+                canManageMembers={session.can_view_members}
                 superAdminCount={superAdminCount}
                 openEditDialog={openEditDialog}
                 mutateProfileRole={mutateProfileRole}

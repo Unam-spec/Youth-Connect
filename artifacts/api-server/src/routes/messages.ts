@@ -150,7 +150,7 @@ messagesRouter.get("/messages/stream", resolveLeaderOrSuperAdmin, (req, res) => 
 
 // POST /api/messages: Send new message (leaders/super admins only)
 messagesRouter.post("/messages", resolveLeaderOrSuperAdmin, async (req, res) => {
-  const { content, sender_id, sender_name, sender_role } = req.body;
+  const { content, sender_id, sender_name, sender_role, reply_to_id } = req.body;
 
   if (!content || typeof content !== "string" || !content.trim()) {
     return res.status(400).json({ message: "content is required" });
@@ -164,6 +164,7 @@ messagesRouter.post("/messages", resolveLeaderOrSuperAdmin, async (req, res) => 
         sender_id,
         sender_name,
         sender_role,
+        replyToId: reply_to_id || null,
       })
       .returning();
 
@@ -199,6 +200,55 @@ messagesRouter.delete("/messages/:id", resolveSuperAdmin, async (req, res) => {
     return res.status(204).send();
   } catch (error) {
     console.error("Error deleting message:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// PATCH /api/messages/:id/delete-for-me
+messagesRouter.patch("/messages/:id/delete-for-me", resolveLeaderOrSuperAdmin, async (req, res) => {
+  const { sender_id } = req.body;
+  const id = req.params.id as string;
+
+  try {
+    const [message] = await messagesDb.select().from(messagesTable).where(eq(messagesTable.id, id));
+    if (!message) return res.status(404).json({ error: "Message not found" });
+    if (message.sender_id !== sender_id) return res.status(403).json({ error: "Forbidden" });
+
+    await messagesDb.update(messagesTable)
+      .set({ deletedForSender: true })
+      .where(eq(messagesTable.id, id));
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting message for sender:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// PATCH /api/messages/:id/delete-for-everyone
+messagesRouter.patch("/messages/:id/delete-for-everyone", resolveLeaderOrSuperAdmin, async (req, res) => {
+  const { sender_id, sender_role } = req.body;
+  const id = req.params.id as string;
+
+  try {
+    const [message] = await messagesDb.select().from(messagesTable).where(eq(messagesTable.id, id));
+    if (!message) return res.status(404).json({ error: "Message not found" });
+
+    const canDelete = message.sender_id === sender_id || ["super_admin", "leader"].includes(sender_role);
+    if (!canDelete) return res.status(403).json({ error: "Forbidden" });
+
+    const [updated] = await messagesDb.update(messagesTable)
+      .set({ deletedForEveryone: true, deletedAt: new Date() })
+      .where(eq(messagesTable.id, id))
+      .returning();
+
+    // Broadcast update to all SSE clients
+    const sseData = `event: update\ndata: ${JSON.stringify(updated)}\n\n`;
+    clients.forEach((c) => c.res.write(sseData));
+
+    return res.json(updated);
+  } catch (error) {
+    console.error("Error deleting message for everyone:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
 });

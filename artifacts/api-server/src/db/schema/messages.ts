@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, pgEnum, boolean, AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const roleEnum = pgEnum("role", [
   "super_admin",
@@ -13,6 +13,10 @@ export const messagesTable = pgTable("messages", {
   sender_name: text("sender_name").notNull(),
   sender_role: roleEnum("sender_role").notNull(),
   content: text("content").notNull(),
+  replyToId: uuid("reply_to_id").references((): AnyPgColumn => messagesTable.id, { onDelete: "set null" }),
+  deletedForEveryone: boolean("deleted_for_everyone").default(false).notNull(),
+  deletedForSender: boolean("deleted_for_sender").default(false).notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

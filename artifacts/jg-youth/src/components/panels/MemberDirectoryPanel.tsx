@@ -6,9 +6,15 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useListProfiles, getListProfilesQueryKey } from "@workspace/api-client-react";
 import { DashCard, SectionTitle, SkeletonRows, RoleBadge, EmptyState } from "./shared";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { MoreVertical } from "lucide-react";
+import { format } from "date-fns";
 
 interface MemberDirectoryPanelProps {
   sessionRole: string;
+  sessionProfileId: string;
+  canManageMembers?: boolean;
   superAdminCount: number;
   openEditDialog: (profile: any) => void;
   mutateProfileRole: (action: "promote" | "revoke", profileId: string) => void;
@@ -20,6 +26,8 @@ interface MemberDirectoryPanelProps {
 
 export function MemberDirectoryPanel({
   sessionRole,
+  sessionProfileId,
+  canManageMembers = false,
   superAdminCount,
   openEditDialog,
   mutateProfileRole,
@@ -40,6 +48,8 @@ export function MemberDirectoryPanel({
       queryKey: getListProfilesQueryKey(search ? { search } : undefined),
     },
   });
+
+  const [demoteAlert, setDemoteAlert] = useState<{ isOpen: boolean; profile: any | null }>({ isOpen: false, profile: null });
 
   return (
     <DashCard>
@@ -83,158 +93,101 @@ export function MemberDirectoryPanel({
         </div>
       ) : profiles && profiles.length > 0 ? (
         <div className="space-y-2.5">
-          {profiles.map((profile: any) => (
-            <div
-              key={profile.id}
-              className="flex flex-col gap-3 rounded-xl border border-border/50 bg-card/30 p-4 sm:flex-row sm:items-start sm:justify-between hover:border-teal-500/30 hover:bg-teal-500/3 transition-all"
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  onClick={() => {
-                    if (profile.avatar_url && !profile.avatar_url.startsWith("gradient:")) {
-                      setLightboxImage(profile.avatar_url);
-                    }
-                  }}
-                  className={`h-10 w-10 rounded-full overflow-hidden flex items-center justify-center shrink-0 text-sm font-bold cursor-pointer hover:opacity-80 transition-opacity ${
-                    profile.role === "super_admin"
-                      ? "bg-purple-500/20 text-purple-300"
-                      : profile.role === "leader"
-                        ? "bg-blue-500/20 text-blue-300"
-                        : profile.role === "member"
-                          ? "bg-teal-500/20 text-teal-300"
-                          : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {profile.avatar_url ? (
-                    profile.avatar_url.startsWith("gradient:") ? (
-                      <div
-                        className="h-full w-full"
-                        style={{ background: profile.avatar_url.replace("gradient:", "") }}
-                      />
-                    ) : (
-                      <img
-                        src={profile.avatar_url}
-                        alt={profile.full_name}
-                        className="h-full w-full object-cover"
-                      />
-                    )
-                  ) : (
-                    profile.full_name?.charAt(0)?.toUpperCase() ?? "?"
-                  )}
-                </div>
-                <div>
-                  <p className="font-semibold text-sm leading-tight">{profile.full_name}</p>
-                  <div className="text-xs text-muted-foreground mt-0.5 flex flex-col gap-0.5">
-                    <span>{profile.phone || "No phone"}</span>
-                    {profile.school && (
-                      <span className="text-[10px] text-teal-400 font-medium flex items-center gap-1">
-                        School: {profile.school}
-                      </span>
-                    )}
+          {profiles.map((profile: any) => {
+            const isSelf = profile.id === sessionProfileId || profile.clerk_id === sessionProfileId;
+            const targetRole = profile.role;
+            
+            let showMenu = false;
+            if (!isSelf) {
+              if (sessionRole === 'super_admin') {
+                showMenu = true;
+              } else if (sessionRole === 'leader' && canManageMembers && targetRole === 'member') {
+                showMenu = true;
+              }
+            }
+
+            return (
+              <div
+                key={profile.id}
+                className="flex items-center justify-between rounded-xl border border-border/50 bg-card/30 p-4 hover:border-teal-500/30 hover:bg-teal-500/3 transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 text-lg font-bold border ${
+                    targetRole === "super_admin" ? "bg-amber-100 text-amber-800 border-amber-200" :
+                    targetRole === "leader" ? "bg-teal-100 text-teal-800 border-teal-200" :
+                    targetRole === "member" ? "bg-slate-100 text-slate-700 border-slate-200" :
+                    "bg-gray-100 text-gray-500 border-gray-200"
+                  }`}>
+                    {profile.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "?"}
                   </div>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <RoleBadge role={profile.role} />
-                    {profile.whatsapp_opt_in ? (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                        WA <Check className="w-2.5 h-2.5 ml-0.5" />
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-medium bg-slate-500/10 text-slate-450 border border-slate-500/10">
-                        WA <X className="w-2.5 h-2.5 ml-0.5" />
-                      </span>
-                    )}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-base leading-tight">{profile.full_name}</p>
+                      <RoleBadge role={targetRole} />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {profile.created_at ? format(new Date(profile.created_at), "'Joined' MMM yyyy") : "Join date unknown"}
+                    </p>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-start gap-2 flex-wrap sm:flex-col sm:items-end sm:shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEditDialog(profile)}
-                  className="h-7 text-xs px-3 border-teal-500/20 hover:border-teal-500 hover:text-teal-300 transition-colors"
-                >
-                  Edit Details
-                </Button>
-                {sessionRole === "super_admin" && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setDeleteMemberId(profile.id);
-                      setDeleteMemberName(profile.full_name || "Unknown");
-                    }}
-                    className="h-7 text-xs px-3 border-red-500/20 hover:bg-red-500/10 hover:border-red-500/30 hover:text-red-400 transition-colors"
-                  >
-                    Delete
-                  </Button>
-                )}
-                {profile.role === "visitor" && (
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-col sm:items-end">
-                    {sessionRole === "super_admin" && (
-                      <Button
-                        size="sm"
-                        onClick={() => setRoleConfirm({ profile, targetRole: "leader" })}
-                        className="bg-blue-500 hover:bg-blue-400 text-white border-0 h-7 text-xs px-3 mb-1"
-                      >
-                        Make Leader
+
+                {showMenu && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                        <MoreVertical className="h-4 w-4" />
                       </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      onClick={() => mutateProfileRole("promote", profile.id)}
-                      className="bg-teal-500 hover:bg-teal-400 text-white border-0 h-7 text-xs px-3"
-                    >
-                      Make Member
-                    </Button>
-                  </div>
-                )}
-                {profile.role === "member" && (
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-col sm:items-end">
-                    {sessionRole === "super_admin" && (
-                      <Button
-                        size="sm"
-                        onClick={() => setRoleConfirm({ profile, targetRole: "leader" })}
-                        className="bg-blue-500 hover:bg-blue-400 text-white border-0 h-7 text-xs px-3 mb-1"
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => openEditDialog(profile)}>
+                        View Profile
+                      </DropdownMenuItem>
+                      
+                      {sessionRole === 'super_admin' && targetRole === 'member' && (
+                        <>
+                          <DropdownMenuItem onClick={() => setRoleConfirm({ profile, targetRole: "leader" })}>
+                            Promote to Leader
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setRoleConfirm({ profile, targetRole: "super_admin" })}>
+                            Make Super Admin (transfer)
+                          </DropdownMenuItem>
+                        </>
+                      )}
+
+                      {sessionRole === 'super_admin' && targetRole === 'leader' && (
+                        <>
+                          <DropdownMenuItem onClick={() => setDemoteAlert({ isOpen: true, profile })}>
+                            Demote to Member
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setRoleConfirm({ profile, targetRole: "super_admin" })}>
+                            Transfer Super Admin
+                          </DropdownMenuItem>
+                        </>
+                      )}
+
+                      {sessionRole === 'leader' && targetRole === 'member' && (
+                        <DropdownMenuItem onClick={() => setRoleConfirm({ profile, targetRole: "leader" })}>
+                          Promote to Leader
+                        </DropdownMenuItem>
+                      )}
+
+                      <DropdownMenuSeparator />
+                      
+                      <DropdownMenuItem 
+                        className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                        onClick={() => {
+                          setDeleteMemberId(profile.id);
+                          setDeleteMemberName(profile.full_name || "Unknown");
+                        }}
                       >
-                        Make Leader
-                      </Button>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => mutateProfileRole("revoke", profile.id)}
-                      className="h-7 text-xs px-3 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
-                    >
-                      Revoke
-                    </Button>
-                  </div>
-                )}
-                {profile.role === "leader" && (
-                  <div className="flex items-center gap-2 flex-wrap sm:flex-col sm:items-end">
-                    {sessionRole === "super_admin" && (
-                      <>
-                        <Button
-                          size="sm"
-                          onClick={() => setRoleConfirm({ profile, targetRole: "super_admin" })}
-                          className="bg-purple-500 hover:bg-purple-400 text-white border-0 h-7 text-xs px-3 mb-1"
-                        >
-                          Make Super Admin
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => mutateProfileRole("revoke", profile.id)}
-                          className="h-7 text-xs px-3 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
-                        >
-                          Revoke
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                        Remove Member
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <EmptyState text="No members found matching your search." />
@@ -246,6 +199,33 @@ export function MemberDirectoryPanel({
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog 
+        open={demoteAlert.isOpen} 
+        onOpenChange={(isOpen) => setDemoteAlert(prev => ({ ...prev, isOpen }))}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Demote {demoteAlert.profile?.full_name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This user will lose their leader privileges and be reverted to a standard member. They will no longer be able to manage events or access the leader dashboard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-red-600 hover:bg-red-700 text-white border-0"
+              onClick={() => {
+                if (demoteAlert.profile) {
+                  mutateProfileRole("revoke", demoteAlert.profile.id);
+                }
+              }}
+            >
+              Demote
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashCard>
   );
 }
