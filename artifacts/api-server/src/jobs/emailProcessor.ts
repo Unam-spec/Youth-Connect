@@ -8,14 +8,20 @@ let intervalId: NodeJS.Timeout | null = null;
 export async function processPendingEmails() {
   try {
     // Use raw SQL for the atomic lock
-    const result = await db.execute(sql`
-      SELECT id, to_address, subject, body_html, attempts
-      FROM pending_emails
-      WHERE sent_at IS NULL AND attempts < max_attempts
-      ORDER BY created_at ASC
-      LIMIT 10
-      FOR UPDATE SKIP LOCKED
-    `);
+    let result;
+    try {
+      result = await db.execute(sql`
+        SELECT id, to_address, subject, body_html, attempts
+        FROM pending_emails
+        WHERE sent_at IS NULL AND attempts < max_attempts
+        ORDER BY created_at ASC
+        LIMIT 10
+        FOR UPDATE SKIP LOCKED
+      `);
+    } catch (sqlErr) {
+      logger.error({ err: sqlErr }, "[emailProcessor] Failed to execute atomic lock query. Does the max_attempts column exist in Supabase?");
+      return;
+    }
 
     // Handle both pg (returns object with rows) and postgres.js (returns array directly)
     const pending = Array.isArray(result) ? result : (result as any).rows;
