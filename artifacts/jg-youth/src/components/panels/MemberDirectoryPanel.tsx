@@ -112,13 +112,34 @@ export function MemberDirectoryPanel({
                 className="flex items-center justify-between rounded-xl border border-border/50 bg-card/30 p-4 hover:border-teal-500/30 hover:bg-teal-500/3 transition-all"
               >
                 <div className="flex items-center gap-4">
-                  <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 text-lg font-bold border ${
+                  <div 
+                    onClick={() => {
+                      if (profile.avatar_url && !profile.avatar_url.startsWith("gradient:")) {
+                        setLightboxImage(profile.avatar_url);
+                      }
+                    }}
+                    className={`h-12 w-12 rounded-full overflow-hidden flex items-center justify-center shrink-0 text-lg font-bold border ${profile.avatar_url ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''} ${
                     targetRole === "super_admin" ? "bg-amber-100 text-amber-800 border-amber-200" :
                     targetRole === "leader" ? "bg-teal-100 text-teal-800 border-teal-200" :
                     targetRole === "member" ? "bg-slate-100 text-slate-700 border-slate-200" :
                     "bg-gray-100 text-gray-500 border-gray-200"
                   }`}>
-                    {profile.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "?"}
+                    {profile.avatar_url ? (
+                      profile.avatar_url.startsWith("gradient:") ? (
+                        <div
+                          className="h-full w-full"
+                          style={{ background: profile.avatar_url.replace("gradient:", "") }}
+                        />
+                      ) : (
+                        <img
+                          src={profile.avatar_url}
+                          alt={profile.full_name}
+                          className="h-full w-full object-cover"
+                        />
+                      )
+                    ) : (
+                      profile.full_name?.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase() || "?"
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -149,7 +170,7 @@ export function MemberDirectoryPanel({
                             Promote to Leader
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setRoleConfirm({ profile, targetRole: "super_admin" })}>
-                            Make Super Admin (transfer)
+                            Make Super Admin
                           </DropdownMenuItem>
                         </>
                       )}
@@ -160,7 +181,7 @@ export function MemberDirectoryPanel({
                             Demote to Member
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => setRoleConfirm({ profile, targetRole: "super_admin" })}>
-                            Transfer Super Admin
+                            Make Super Admin
                           </DropdownMenuItem>
                         </>
                       )}

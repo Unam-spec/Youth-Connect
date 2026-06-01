@@ -184,13 +184,27 @@ export function ChatPanel({
         });
         if (response.ok && isMounted) {
           const data = await response.json();
-          setChatMessages(data);
+          if (Array.isArray(data)) {
+            // Map snake_case to camelCase in case the API returns raw DB rows
+            const mapped = data.map(m => ({
+              ...m,
+              deletedForEveryone: m.deletedForEveryone ?? m.deleted_for_everyone ?? false,
+              deletedForSender: m.deletedForSender ?? m.deleted_for_sender ?? false,
+              replyToId: m.replyToId ?? m.reply_to_id ?? null
+            }));
+            setChatMessages(mapped);
+          } else {
+            console.error("API returned non-array:", data);
+            setChatMessages([]);
+          }
           setTimeout(() => {
             if (chatMessagesContainerRef.current) {
               chatMessagesContainerRef.current.scrollTop =
                 chatMessagesContainerRef.current.scrollHeight;
             }
           }, 100);
+        } else if (!response.ok) {
+          console.error("Failed to fetch history, status:", response.status);
         }
       } catch (err) {
         console.error("Failed to fetch chat history:", err);
@@ -216,7 +230,13 @@ export function ChatPanel({
         eventSource.onmessage = (event) => {
           if (!isMounted) return;
           try {
-            const newMsg = JSON.parse(event.data);
+            const parsed = JSON.parse(event.data);
+            const newMsg = {
+              ...parsed,
+              deletedForEveryone: parsed.deletedForEveryone ?? parsed.deleted_for_everyone ?? false,
+              deletedForSender: parsed.deletedForSender ?? parsed.deleted_for_sender ?? false,
+              replyToId: parsed.replyToId ?? parsed.reply_to_id ?? null
+            };
             setChatMessages((prev) => {
               if (prev.some((m) => m.id === newMsg.id)) return prev;
               const next = [...prev, newMsg];
@@ -246,7 +266,13 @@ export function ChatPanel({
         eventSource.addEventListener("update", (event: any) => {
           if (!isMounted) return;
           try {
-            const updatedMsg = JSON.parse(event.data);
+            const parsed = JSON.parse(event.data);
+            const updatedMsg = {
+              ...parsed,
+              deletedForEveryone: parsed.deletedForEveryone ?? parsed.deleted_for_everyone ?? false,
+              deletedForSender: parsed.deletedForSender ?? parsed.deleted_for_sender ?? false,
+              replyToId: parsed.replyToId ?? parsed.reply_to_id ?? null
+            };
             setChatMessages((prev) => prev.map((m) => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
           } catch (err) {
             console.error("Failed to parse update event:", err);
