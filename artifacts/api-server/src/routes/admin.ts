@@ -1,6 +1,5 @@
 import { Router, Request, Response } from "express";
-import { getAuth } from "@clerk/express";
-import { eq, ne, inArray } from "drizzle-orm";
+import { ne, inArray } from "drizzle-orm";
 import {
   db,
   profilesTable,
@@ -14,44 +13,13 @@ import {
 } from "@workspace/db";
 import { db as messagesDb } from "../db";
 import { messagesTable } from "../db/schema/messages";
-
-function hasLeaderSession(req: any): boolean {
-  try {
-    const h = req.headers["x-leader-session"];
-    if (!h) return false;
-    const s = JSON.parse(h as string);
-    return typeof s?.expires_at === "number" && Date.now() < s.expires_at;
-  } catch {
-    return false;
-  }
-}
+import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 
 const router = Router();
 
-router.post("/reset-data", async (req: Request, res: Response) => {
+router.post("/reset-data", requireLeaderSession("super_admin"), async (req: Request, res: Response) => {
   try {
-    const auth = getAuth(req);
-    const isLeaderSess = hasLeaderSession(req);
-    if (!auth?.userId && !isLeaderSess)
-      return res.status(401).json({ error: "Unauthorized" });
-
-    let requesterProfile: any = null;
-    if (auth?.userId) {
-      requesterProfile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.clerk_id, auth.userId),
-      });
-    } else {
-      const session = JSON.parse(req.headers["x-leader-session"] as string);
-      requesterProfile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.id, session.profile_id),
-      });
-    }
-
-    if (!requesterProfile || requesterProfile.role !== "super_admin") {
-      return res.status(403).json({ error: "Forbidden. Super admins only." });
-    }
-
-    await db.transaction(async (tx: any) => {
+    await db.transaction(async (tx) => {
       // 1. Delete all check-in requests
       await tx.delete(checkInRequestsTable);
       // 2. Delete all attendance
@@ -68,7 +36,7 @@ router.post("/reset-data", async (req: Request, res: Response) => {
         .select({ id: profilesTable.id })
         .from(profilesTable)
         .where(ne(profilesTable.role, "super_admin"));
-      const nonAdminIds = nonSuperAdmins.map((p: any) => p.id);
+      const nonAdminIds = nonSuperAdmins.map((p) => p.id);
       
       if (nonAdminIds.length > 0) {
         await tx.delete(leaderPermissionsTable).where(inArray(leaderPermissionsTable.profile_id, nonAdminIds));
