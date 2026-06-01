@@ -112,6 +112,7 @@ export default function MyDashboard() {
   }, []);
 
   // Profile Picture state
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [showAvatarDialog, setShowAvatarDialog] = useState(false);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -302,13 +303,25 @@ export default function MyDashboard() {
             <Skeleton className="h-44 w-full max-w-md rounded-2xl" />
           ) : profile ? (
             <Card className="max-w-md border-primary/20 bg-card/50 backdrop-blur rounded-2xl overflow-hidden shadow-lg hover:border-primary/45 transition-colors duration-300">
-              <div className="h-24 bg-gradient-to-r from-primary/30 to-teal-500/20 relative">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
+              <div 
+                className="h-24 relative bg-cover bg-center bg-no-repeat"
+                style={{ backgroundImage: "url('/youth-night-cover.jpg')", backgroundColor: "#10b981" }}
+              >
+                <div className="absolute inset-0 bg-black/40" />
               </div>
               <CardContent className="pt-0 relative px-6 pb-6">
                 <div className="flex justify-between items-end -mt-10 mb-4">
-                  <div className="relative group cursor-pointer" onClick={() => setShowAvatarDialog(true)}>
-                    <div className="h-20 w-20 rounded-full border-4 border-background overflow-hidden bg-muted flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-200">
+                  <div className="relative group cursor-pointer">
+                    <div 
+                      onClick={() => {
+                        if (profile.avatar_url && !profile.avatar_url.startsWith("gradient:")) {
+                          setLightboxImage(profile.avatar_url);
+                        } else {
+                          setShowAvatarDialog(true);
+                        }
+                      }}
+                      className="h-20 w-20 rounded-full border-4 border-background overflow-hidden bg-muted flex items-center justify-center shadow-lg transition-transform hover:scale-105 duration-200"
+                    >
                       {profile.avatar_url ? (
                         profile.avatar_url.startsWith("gradient:") ? (
                           <div
@@ -328,7 +341,10 @@ export default function MyDashboard() {
                         </div>
                       )}
                     </div>
-                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <div 
+                      onClick={() => setShowAvatarDialog(true)}
+                      className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"
+                    >
                       <Camera className="w-5 h-5 text-white" />
                     </div>
                   </div>
@@ -904,6 +920,16 @@ export default function MyDashboard() {
               <p className="text-2xs text-muted-foreground mt-1">Supports PNG, JPG, or WEBP up to 2MB. Image will be saved directly in your profile.</p>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
+        <DialogContent className="max-w-2xl bg-transparent border-0 shadow-none p-0 flex flex-col items-center justify-center">
+          {lightboxImage && (
+            <img src={lightboxImage} alt="Profile" className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" />
+          )}
+          <Button onClick={() => { setLightboxImage(null); setShowAvatarDialog(true); }} className="mt-4 bg-teal-500 hover:bg-teal-400">
+            <Camera className="w-4 h-4 mr-2" /> Change Photo
+          </Button>
         </DialogContent>
       </Dialog>
     </Layout>

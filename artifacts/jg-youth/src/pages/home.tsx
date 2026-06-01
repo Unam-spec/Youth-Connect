@@ -1,25 +1,16 @@
-import { useState } from "react";
 import { useUser } from "@clerk/react";
 import { Link, useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, Users, UserCheck } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
 
 function PublicHome() {
   const [, setLocation] = useLocation();
-  const [showLoginChoice, setShowLoginChoice] = useState(false);
 
   const { data: kpis, isLoading: isKpisLoading } = useGetDashboardKpis({
     query: { enabled: true, queryKey: getGetDashboardKpisQueryKey() },
@@ -45,20 +36,22 @@ function PublicHome() {
             Register, show up, be part of it.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <Link href="/register">
-              <Button size="lg" className="w-full sm:w-auto h-12 px-8 text-base">
-                <UserPlus className="mr-2 h-5 w-5" />
-                Register as First Timer
-              </Button>
-            </Link>
+            <Button 
+              size="lg" 
+              className="w-full sm:w-auto h-12 px-8 text-base"
+              onClick={() => setLocation("/sign-up")}
+            >
+              <UserPlus className="mr-2 h-5 w-5" />
+              Sign Up
+            </Button>
             <Button
               size="lg"
               variant="outline"
               className="w-full sm:w-auto h-12 px-8 text-base"
-              onClick={() => setShowLoginChoice(true)}
+              onClick={() => setLocation("/sign-in")}
             >
               <LogIn className="mr-2 h-5 w-5" />
-              Login
+              Sign In
             </Button>
           </div>
         </section>
@@ -159,34 +152,6 @@ function PublicHome() {
           </div>
         </section>
       </div>
-      {/* Login choice dialog */}
-      <Dialog open={showLoginChoice} onOpenChange={setShowLoginChoice}>
-        <DialogContent className="rounded-2xl max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Welcome back!</DialogTitle>
-            <DialogDescription>
-              Are you an existing member or visiting for the first time?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-3 pt-2">
-            <Button
-              className="w-full h-12 rounded-xl bg-gradient-to-r from-[#0A84FF] to-[#32ADE6] hover:opacity-90 border-0"
-              onClick={() => { setShowLoginChoice(false); setLocation("/sign-in"); }}
-            >
-              <UserCheck className="w-4 h-4 mr-2" />
-              I'm a Member — Sign In
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full h-12 rounded-xl border-slate-700 bg-slate-800 text-slate-100 hover:bg-slate-700 hover:text-white font-semibold shadow-xs"
-              onClick={() => { setShowLoginChoice(false); setLocation("/register"); }}
-            >
-              <Users className="w-4 h-4 mr-2" />
-              First Timer — Register
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </Layout>
   );
 }

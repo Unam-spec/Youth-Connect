@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Users, Star, MapPin, User, Search, RefreshCw, AlertCircle, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useListProfiles, getListProfilesQueryKey } from "@workspace/api-client-react";
 import { DashCard, SectionTitle, SkeletonRows, RoleBadge, EmptyState } from "./shared";
 
@@ -28,6 +29,7 @@ export function MemberDirectoryPanel({
   setDeleteMemberName,
 }: MemberDirectoryPanelProps) {
   const [search, setSearch] = useState("");
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const {
     data: profiles,
     isLoading: isProfilesLoading,
@@ -88,7 +90,12 @@ export function MemberDirectoryPanel({
             >
               <div className="flex items-start gap-3">
                 <div
-                  className={`h-10 w-10 rounded-full overflow-hidden flex items-center justify-center shrink-0 text-sm font-bold ${
+                  onClick={() => {
+                    if (profile.avatar_url && !profile.avatar_url.startsWith("gradient:")) {
+                      setLightboxImage(profile.avatar_url);
+                    }
+                  }}
+                  className={`h-10 w-10 rounded-full overflow-hidden flex items-center justify-center shrink-0 text-sm font-bold cursor-pointer hover:opacity-80 transition-opacity ${
                     profile.role === "super_admin"
                       ? "bg-purple-500/20 text-purple-300"
                       : profile.role === "leader"
@@ -191,6 +198,29 @@ export function MemberDirectoryPanel({
                     </Button>
                   </div>
                 )}
+                {profile.role === "leader" && (
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-col sm:items-end">
+                    {sessionRole === "super_admin" && (
+                      <>
+                        <Button
+                          size="sm"
+                          onClick={() => setRoleConfirm({ profile, targetRole: "super_admin" })}
+                          className="bg-purple-500 hover:bg-purple-400 text-white border-0 h-7 text-xs px-3 mb-1"
+                        >
+                          Make Super Admin
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => mutateProfileRole("revoke", profile.id)}
+                          className="h-7 text-xs px-3 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                        >
+                          Revoke
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -198,6 +228,13 @@ export function MemberDirectoryPanel({
       ) : (
         <EmptyState text="No members found matching your search." />
       )}
+      <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
+        <DialogContent className="max-w-2xl bg-transparent border-0 shadow-none p-0 flex items-center justify-center">
+          {lightboxImage && (
+            <img src={lightboxImage} alt="Profile" className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" />
+          )}
+        </DialogContent>
+      </Dialog>
     </DashCard>
   );
 }

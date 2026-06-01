@@ -54,6 +54,11 @@ export function RequestsPanel({
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {req.profile?.phone ?? "No phone"}
                   </p>
+                  {req.reason && (
+                    <p className="text-xs italic text-slate-400 mt-2 bg-black/20 p-2 rounded-md">
+                      "{req.reason}"
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <Button
