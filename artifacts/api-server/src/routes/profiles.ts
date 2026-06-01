@@ -21,6 +21,7 @@ import {
   UpdateMyProfileBody,
 } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { resolveAuth } from "../lib/permissions";
 
 const router = Router();
 
@@ -622,29 +623,8 @@ const upload = multer({
 
 router.post("/profiles/avatar/upload", upload.single("file"), async (req: Request, res: Response) => {
   try {
-    let profileId: string | null = null;
-
-    // 1. Try Clerk Auth first
-    const auth = getAuth(req);
-    if (auth?.userId) {
-      const profile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.clerk_id, auth.userId),
-      });
-      if (profile) profileId = profile.id;
-    }
-
-    // 2. Try leader session fallback
-    if (!profileId) {
-      const sessionHeader = req.headers["x-leader-session"];
-      if (sessionHeader) {
-        try {
-          const parsed = JSON.parse(sessionHeader as string);
-          if (parsed && parsed.profile_id) {
-            profileId = parsed.profile_id;
-          }
-        } catch {}
-      }
-    }
+    const auth = await resolveAuth(req);
+    const profileId = auth?.profileId ?? null;
 
     if (!profileId) {
       return res.status(401).json({ error: "Unauthorized" });
