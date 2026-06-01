@@ -34,7 +34,7 @@ export const checkInMethodEnum = pgEnum("check_in_method", [
   "qr",
 ]);
 
-export const qrCodeTypeEnum = pgEnum("qr_code_type", ["public", "leader"]);
+export const qrCodeTypeEnum = pgEnum("qr_code_type", ["public", "leader", "session"]);
 
 export const rsvpStatusEnum = pgEnum("rsvp", ["going", "not_going", "maybe"]);
 
