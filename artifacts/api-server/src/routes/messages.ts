@@ -4,6 +4,7 @@ import { db as messagesDb } from "../db";
 import { db as mainDb, profilesTable } from "@workspace/db";
 import { messagesTable } from "../db/schema/messages";
 import { eq, asc } from "drizzle-orm";
+import { validateLeaderSession } from "../lib/validateLeaderSession";
 
 const messagesRouter = Router();
 
@@ -42,20 +43,12 @@ const resolveLeaderOrSuperAdmin = async (
       }
     }
 
-    const h = req.headers["x-leader-session"];
-    if (h) {
-      const s = JSON.parse(h as string);
-      if (typeof s?.expires_at === "number" && Date.now() < s.expires_at) {
-        const profile = await mainDb.query.profilesTable.findFirst({
-          where: eq(profilesTable.id, s.profile_id),
-        });
-        if (profile && ["leader", "super_admin"].includes(profile.role as string)) {
-          req.body.sender_id = profile.id;
-          req.body.sender_role = profile.role;
-          req.body.sender_name = profile.full_name;
-          return next();
-        }
-      }
+    const sessionProfile = await validateLeaderSession(req.headers["x-leader-session"]);
+    if (sessionProfile && ["leader", "super_admin"].includes(sessionProfile.role)) {
+      req.body.sender_id = sessionProfile.id;
+      req.body.sender_role = sessionProfile.role;
+      req.body.sender_name = sessionProfile.full_name;
+      return next();
     }
 
     res.status(403).json({ message: "Forbidden" });
@@ -89,14 +82,9 @@ const resolveSuperAdmin = async (
       }
     }
 
-    const h = req.headers["x-leader-session"];
-    if (h) {
-      const s = JSON.parse(h as string);
-      if (typeof s?.expires_at === "number" && Date.now() < s.expires_at) {
-        if (s.role === "super_admin") {
-          return next();
-        }
-      }
+    const sessionProfile = await validateLeaderSession(req.headers["x-leader-session"]);
+    if (sessionProfile && sessionProfile.role === "super_admin") {
+      return next();
     }
 
     res.status(403).json({ message: "Forbidden" });
