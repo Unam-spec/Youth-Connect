@@ -49,6 +49,11 @@ export const checkInRequestTypeEnum = pgEnum("check_in_request_type", [
   "visitor",
 ]);
 
+// DB invariant (managed via Supabase migration, not drizzle-kit):
+//   CREATE UNIQUE INDEX profiles_phone_unique ON profiles (lower(btrim(phone)))
+//     WHERE phone IS NOT NULL AND btrim(phone) <> '';
+// Enforces case/whitespace-insensitive phone uniqueness for non-blank phones.
+// Mirrored in app logic by normalizePhone()/phoneInUse() in the api-server.
 export const profilesTable = pgTable("profiles", {
   id: uuid("id").primaryKey().defaultRandom(),
   clerk_id: text("clerk_id").unique(),
