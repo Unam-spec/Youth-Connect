@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { db, pendingEmailsTable } from "@workspace/db";
-import { sendEmail } from "../lib/twilio";
+import { sendEmail } from "../lib/email";
 import { logger } from "../lib/logger";
 
 let intervalId: NodeJS.Timeout | null = null;
