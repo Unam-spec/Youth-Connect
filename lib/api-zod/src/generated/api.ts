@@ -784,7 +784,9 @@ export const VerifyLeaderPinResponse = zod.object({
   "can_create_events": zod.boolean().optional(),
   "can_view_kpis": zod.boolean().optional(),
   "can_view_members": zod.boolean().optional(),
-  "can_view_attendance": zod.boolean().optional()
+  "can_view_attendance": zod.boolean().optional(),
+  "session_token": zod.string().optional(),
+  "expires_at": zod.number().optional()
 })
 
 
