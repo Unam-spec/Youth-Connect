@@ -34,6 +34,8 @@ export * from './listProfilesRole';
 export * from './membershipRequest';
 export * from './membershipRequestInput';
 export * from './membershipRequestStatus';
+export * from './mergeProfilesInput';
+export * from './myAttendanceRecord';
 export * from './pinUpdate';
 export * from './pinVerification';
 export * from './pinVerificationResult';

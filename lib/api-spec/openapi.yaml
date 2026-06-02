@@ -186,6 +186,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Profile"
 
+  /profiles/merge:
+    post:
+      operationId: mergeProfiles
+      tags: [profiles]
+      summary: Merge a duplicate profile into another (super admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MergeProfilesInput"
+      responses:
+        "200":
+          description: Merged
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessMessage"
+        "400":
+          description: Invalid request
+        "404":
+          description: Profile not found
+
   # Events
   /events:
     get:
@@ -363,6 +386,23 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AttendanceRecord"
+
+  /attendance/my:
+    get:
+      operationId: getMyAttendance
+      tags: [attendance]
+      summary: Current user's own attendance history
+      responses:
+        "200":
+          description: Attendance rows for the authenticated member
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MyAttendanceRecord"
+        "401":
+          description: Unauthorized
 
   /attendance/checkin-by-name:
     post:
@@ -1194,6 +1234,31 @@ components:
       required: [message]
       properties:
         message:
+          type: string
+
+    MyAttendanceRecord:
+      type: object
+      required: [id, session_date, check_in_method]
+      properties:
+        id:
+          type: string
+        session_date:
+          type: string
+        check_in_method:
+          type: string
+        checked_in_at:
+          type: string
+        event_title:
+          type: string
+          nullable: true
+
+    MergeProfilesInput:
+      type: object
+      required: [keepId, mergeId]
+      properties:
+        keepId:
+          type: string
+        mergeId:
           type: string
 
     QrCode:
