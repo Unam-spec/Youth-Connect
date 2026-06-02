@@ -310,6 +310,37 @@ router.post("/leaders/:id/reset-pin", requireLeaderSession("super_admin"), async
   }
 });
 
+// POST /leaders/session - Mint a PIN-equivalent session_token for a Clerk-authenticated
+// leader/super_admin. This lets the x-leader-session header authenticate requests (and the
+// SSE chat stream, which can't send an Authorization header) even when the Clerk Bearer
+// token isn't attached. Guarded by requireLeaderSession, which accepts the Clerk JWT.
+router.post("/leaders/session", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    const sessionToken = crypto.randomUUID();
+    const [profile] = await db
+      .update(profilesTable)
+      .set({ session_token: sessionToken })
+      .where(eq(profilesTable.id, req.leaderId!))
+      .returning();
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const isSuperAdmin = profile.role === "super_admin";
+    return res.json({
+      profile_id: profile.id,
+      session_token: sessionToken,
+      expires_at: Date.now() + 8 * 60 * 60 * 1000, // 8 hours
+      role: profile.role,
+      can_create_events: isSuperAdmin ? true : profile.can_create_events,
+      can_view_kpis: isSuperAdmin ? true : profile.can_view_kpis,
+      can_view_members: isSuperAdmin ? true : profile.can_view_members,
+      can_view_attendance: isSuperAdmin ? true : profile.can_view_attendance,
+    });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /leaders/logout - Clear own session (protected: leader)
 router.post("/leaders/logout", requireLeaderSession("leader"), async (req, res) => {
   try {

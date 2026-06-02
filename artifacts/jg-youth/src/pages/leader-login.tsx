@@ -87,10 +87,30 @@ export default function LeaderLogin() {
         const profile = await response.json();
 
         if (profile.role === "super_admin") {
+          // Mint a PIN-equivalent session_token so the x-leader-session header (and the
+          // SSE chat stream) authenticate even when the Clerk Bearer token isn't attached.
+          let session_token: string | undefined;
+          try {
+            const sres = await fetch("/api/leaders/session", {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json",
+              },
+            });
+            if (sres.ok) {
+              const data = await sres.json();
+              session_token = data.session_token;
+            }
+          } catch {
+            // Fall back to Clerk-only auth if minting fails.
+          }
+
           // Super admin: set session and skip PIN screen entirely
           setLeaderSession({
             role: profile.role,
             profile_id: profile.id, // fix: was profile.profile_id, correct field is id
+            session_token,
             can_create_events: true,
             can_view_kpis: true,
             can_view_members: true,
