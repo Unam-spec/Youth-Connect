@@ -15,4 +15,6 @@ export interface PinVerificationResult {
   can_view_kpis?: boolean;
   can_view_members?: boolean;
   can_view_attendance?: boolean;
+  session_token?: string;
+  expires_at?: number;
 }

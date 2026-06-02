@@ -1,20 +1,32 @@
 import { useAuth } from "@clerk/react";
 import { getLeaderSession } from "./auth";
 
+interface ClerkGlobal {
+  loaded?: boolean;
+  load?: () => Promise<void>;
+  session?: { getToken?: () => Promise<string | null> };
+}
+
 export async function apiFetch(
   url: string,
   options: RequestInit = {},
 ): Promise<Response> {
-  // This is a client-side utility, so we can't use hooks here
-  // Instead, we'll use Clerk's getToken from the window object if available
+  // This is a client-side utility, so we can't use hooks here.
+  // Use Clerk's global object, ensuring it is fully loaded before requesting a
+  // token (the session isn't available until Clerk finishes loading).
   let token = "";
 
-  if (typeof window !== "undefined" && (window as any).Clerk) {
-    try {
-      const clerk = (window as any).Clerk;
-      token = await clerk.session?.getToken();
-    } catch (error) {
-      console.error("Failed to get Clerk token:", error);
+  if (typeof window !== "undefined") {
+    const clerk = (window as unknown as { Clerk?: ClerkGlobal }).Clerk;
+    if (clerk) {
+      try {
+        if (!clerk.loaded && typeof clerk.load === "function") {
+          await clerk.load();
+        }
+        token = (await clerk.session?.getToken?.()) ?? "";
+      } catch (error) {
+        console.error("Failed to get Clerk token:", error);
+      }
     }
   }
 

@@ -1175,6 +1175,10 @@ components:
           type: boolean
         can_view_attendance:
           type: boolean
+        session_token:
+          type: string
+        expires_at:
+          type: number
 
     PinUpdate:
       type: object
