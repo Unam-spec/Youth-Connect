@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
-import { eq, ilike, or, and, count } from "drizzle-orm";
+import { eq, ilike, or, and, count, inArray, sql, ne } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import {
@@ -21,8 +21,34 @@ import {
   UpdateMyProfileBody,
 } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { resolveAuth } from "../lib/permissions";
+import { parseMembersDirectoryQuery } from "../lib/membersDirectoryQuery";
+import { normalizePhone } from "../lib/phone";
+import { deleteProfileCascade } from "../lib/deleteProfileCascade";
 
 const router = Router();
+
+/**
+ * Returns true if another profile already uses this phone (normalized).
+ * `excludeId` lets a self-update skip its own row.
+ */
+async function phoneInUse(phone: unknown, excludeId?: string): Promise<boolean> {
+  const norm = normalizePhone(phone);
+  if (!norm) return false;
+  const rows = await db
+    .select({ id: profilesTable.id })
+    .from(profilesTable)
+    .where(
+      excludeId
+        ? and(
+            sql`lower(btrim(${profilesTable.phone})) = ${norm}`,
+            ne(profilesTable.id, excludeId),
+          )
+        : sql`lower(btrim(${profilesTable.phone})) = ${norm}`,
+    )
+    .limit(1);
+  return rows.length > 0;
+}
 
 // GET /profiles/me - Retrieve current logged in Clerk user's profile
 router.get("/profiles/me", async (req: Request, res: Response) => {
@@ -111,6 +137,9 @@ router.patch("/profiles/me", async (req: Request, res: Response) => {
       where: eq(profilesTable.clerk_id, clerkId),
     });
     if (!existing) return res.status(404).json({ error: "Profile not found" });
+    if (parsed.data.phone !== undefined && (await phoneInUse(parsed.data.phone, existing.id))) {
+      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    }
     const [updated] = await db
       .update(profilesTable)
       .set(parsed.data)
@@ -183,6 +212,10 @@ router.post("/profiles/register/first-timer", async (req: Request, res: Response
       return res.status(400).json({ error: parsed.error.flatten() });
 
     const { clerk_id, ...rest } = parsed.data;
+
+    if (await phoneInUse(parsed.data.phone)) {
+      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    }
 
     // Generate secure 32-byte hexadecimal link verification token
     const token = crypto.randomBytes(32).toString("hex");
@@ -299,6 +332,9 @@ router.post("/profiles/register", async (req: Request, res: Response) => {
       return res.status(400).json({ error: parsed.error.flatten() });
     const auth = getAuth(req);
     const { clerk_id, ...rest } = parsed.data;
+    if (await phoneInUse(parsed.data.phone)) {
+      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    }
     const linkedClerkId = auth?.userId ?? clerk_id ?? null;
     const [profile] = await db
       .insert(profilesTable)
@@ -316,6 +352,62 @@ router.post("/profiles/register", async (req: Request, res: Response) => {
 });
 
 // GET /profiles - Enforced Paginated profiles listing (protected: leaders and super_admins)
+// GET /profiles/members-directory - member|leader|super_admin only (protected: leaders)
+router.get(
+  "/profiles/members-directory",
+  requireLeaderSession("leader"),
+  async (req: Request, res: Response) => {
+    try {
+      const { search, role, page, limit, offset } = parseMembersDirectoryQuery(req.query);
+
+      const roleFilter = role
+        ? eq(profilesTable.role, role)
+        : inArray(profilesTable.role, ["member", "leader", "super_admin"]);
+      const searchFilter = search
+        ? or(
+            ilike(profilesTable.full_name, `%${search}%`),
+            ilike(profilesTable.phone, `%${search}%`),
+          )
+        : undefined;
+      const whereClause = searchFilter ? and(roleFilter, searchFilter) : roleFilter;
+
+      const [countResult] = await db
+        .select({ value: count() })
+        .from(profilesTable)
+        .where(whereClause);
+      const total = countResult?.value ? Number(countResult.value) : 0;
+
+      const data = await db
+        .select({
+          id: profilesTable.id,
+          full_name: profilesTable.full_name,
+          role: profilesTable.role,
+          phone: profilesTable.phone,
+          email: profilesTable.email,
+          school: profilesTable.school,
+          parent_phone: profilesTable.parent_phone,
+          parent_name: profilesTable.parent_name,
+          whatsapp_opt_in: profilesTable.whatsapp_opt_in,
+          avatar_url: profilesTable.avatar_url,
+          created_at: profilesTable.created_at,
+          can_create_events: profilesTable.can_create_events,
+          can_view_kpis: profilesTable.can_view_kpis,
+          can_view_members: profilesTable.can_view_members,
+          can_view_attendance: profilesTable.can_view_attendance,
+        })
+        .from(profilesTable)
+        .where(whereClause)
+        .limit(limit)
+        .offset(offset);
+
+      return res.json({ data, total, page, limit });
+    } catch (err) {
+      req.log.error(err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
 router.get("/profiles", requireLeaderSession("leader"), async (req: Request, res: Response) => {
   try {
     const search = typeof req.query.search === "string" ? req.query.search : undefined;
@@ -560,6 +652,10 @@ router.patch("/profiles/:id", requireLeaderSession("leader"), async (req: Reques
     if (whatsapp_opt_in !== undefined) updateData.whatsapp_opt_in = whatsapp_opt_in;
     if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
 
+    if (updateData.phone !== undefined && (await phoneInUse(updateData.phone, req.params.id as string))) {
+      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    }
+
     const [updated] = await db
       .update(profilesTable)
       .set(updateData)
@@ -585,21 +681,18 @@ router.delete("/profiles/:id", requireLeaderSession("super_admin"), async (req: 
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    // Delete the profile (which should cascade or be handled)
-    await db.delete(profilesTable).where(eq(profilesTable.id, req.params.id as string));
+    await deleteProfileCascade(profile.id);
 
-    if (profile.clerk_id) {
+    if (profile.clerk_id && process.env.CLERK_SECRET_KEY) {
       try {
-        if (process.env.CLERK_SECRET_KEY) {
-          await fetch(`https://api.clerk.com/v1/users/${profile.clerk_id}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
-          });
-        }
+        await fetch(`https://api.clerk.com/v1/users/${profile.clerk_id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+        });
       } catch (clerkErr) {
         req.log.error(
           { clerkErr, orphanedClerkId: profile.clerk_id, profileId: req.params.id },
-          "Failed to delete Clerk user in post-delete-clerk-sync"
+          "Failed to delete Clerk user after profile cascade"
         );
       }
     }
@@ -622,29 +715,8 @@ const upload = multer({
 
 router.post("/profiles/avatar/upload", upload.single("file"), async (req: Request, res: Response) => {
   try {
-    let profileId: string | null = null;
-
-    // 1. Try Clerk Auth first
-    const auth = getAuth(req);
-    if (auth?.userId) {
-      const profile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.clerk_id, auth.userId),
-      });
-      if (profile) profileId = profile.id;
-    }
-
-    // 2. Try leader session fallback
-    if (!profileId) {
-      const sessionHeader = req.headers["x-leader-session"];
-      if (sessionHeader) {
-        try {
-          const parsed = JSON.parse(sessionHeader as string);
-          if (parsed && parsed.profile_id) {
-            profileId = parsed.profile_id;
-          }
-        } catch {}
-      }
-    }
+    const auth = await resolveAuth(req);
+    const profileId = auth?.profileId ?? null;
 
     if (!profileId) {
       return res.status(401).json({ error: "Unauthorized" });
