@@ -59,8 +59,10 @@ CREATE TABLE IF NOT EXISTS "pending_emails" (
   "last_error" text
 );
 
--- Ensure super admin role unique constraint exists
-CREATE UNIQUE INDEX IF NOT EXISTS idx_super_admin_limit ON profiles (role) WHERE role = 'super_admin';
+-- Super admins are limited to 4 at the APPLICATION level (see PATCH /profiles/:id/role).
+-- The old single-super-admin unique index is wrong (it caps at 1) and a unique index
+-- cannot express "max 4", so we actively drop it on every boot to undo any leftover.
+DROP INDEX IF EXISTS idx_super_admin_limit;
 
 -- Ensure database indexes exist
 CREATE INDEX IF NOT EXISTS idx_profiles_clerk_id ON profiles (clerk_id);
