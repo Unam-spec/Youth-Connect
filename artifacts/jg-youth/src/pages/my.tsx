@@ -449,30 +449,17 @@ export default function MyDashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold tracking-tight">Check-In</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Link href="/checkin">
-              <div className="rounded-2xl border border-[#0A84FF]/30 bg-gradient-to-br from-[#0A84FF]/10 to-[#32ADE6]/5 p-5 flex items-center gap-4 cursor-pointer hover:border-[#0A84FF]/50 transition-colors">
-                <div className="w-12 h-12 rounded-full bg-[#0A84FF]/15 flex items-center justify-center flex-shrink-0">
-                  <QrCode className="w-6 h-6 text-[#0A84FF]" />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm">Scan QR Check-In</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Scan the venue QR to check in</p>
-                </div>
+          <Link href="/checkin">
+            <div className="rounded-2xl border border-[#0A84FF]/30 bg-gradient-to-br from-[#0A84FF]/10 to-[#32ADE6]/5 p-5 flex items-center gap-4 cursor-pointer hover:border-[#0A84FF]/50 transition-colors">
+              <div className="w-12 h-12 rounded-full bg-[#0A84FF]/15 flex items-center justify-center flex-shrink-0">
+                <QrCode className="w-6 h-6 text-[#0A84FF]" />
               </div>
-            </Link>
-            <Link href="/checkin">
-              <div className="rounded-2xl border border-[#30D158]/30 bg-gradient-to-br from-[#30D158]/10 to-[#30D158]/5 p-5 flex items-center gap-4 cursor-pointer hover:border-[#30D158]/50 transition-colors">
-                <div className="w-12 h-12 rounded-full bg-[#30D158]/15 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="w-6 h-6 text-[#30D158]" />
-                </div>
-                <div>
-                  <p className="font-semibold text-sm">Self Check-In</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Search your name to check in</p>
-                </div>
+              <div>
+                <p className="font-semibold text-sm">Check In</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Scan the venue QR or search your name</p>
               </div>
-            </Link>
-          </div>
+            </div>
+          </Link>
         </section>
 
         {/* My Check-ins */}

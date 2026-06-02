@@ -119,20 +119,20 @@ const MessageBubble = ({
         </div>
       </div>
 
-      <div className={`absolute top-0 ${isMe ? "-left-[4.5rem]" : "-right-[4.5rem]"} flex items-center gap-0.5 transition-opacity duration-200 ${showHover || menuOpen ? "opacity-100" : "opacity-0 md:opacity-0"}`}>
-        <button 
-          className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 md:block hidden"
+      <div className={`absolute -top-2 ${isMe ? "left-1" : "right-1"} flex items-center gap-0.5 transition-opacity duration-200 ${showHover || menuOpen ? "opacity-100" : "opacity-100 md:opacity-0"}`}>
+        <button
+          className="p-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-400 hidden md:block"
           onClick={() => onReply(msg)}
         >
           <CornerDownRight className="w-4 h-4" />
         </button>
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
-            <button className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 md:block hidden">
+            <button className="p-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-400 block">
               <MoreVertical className="w-4 h-4" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align={isMe ? "end" : "start"}>
+          <DropdownMenuContent align={isMe ? "end" : "start"} side="bottom" sideOffset={4} className="z-50">
             <DropdownMenuItem onClick={() => onReply(msg)}>Reply</DropdownMenuItem>
             {isMe && <DropdownMenuItem onClick={() => onDeleteForMe(msg.id)}>Delete for me</DropdownMenuItem>}
             {canDeleteForEveryone && (
@@ -162,19 +162,24 @@ export function ChatPanel({
     "connecting" | "connected" | "polling" | "error"
   >("connecting");
   const chatMessagesContainerRef = useRef<HTMLDivElement>(null);
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
   const { toast } = useToast();
 
+  // Poll the message history on a fixed interval. SSE was removed because an
+  // EventSource proxied through Vercel's rewrite to Railway never establishes
+  // (it hangs in CONNECTING — the old "Syncing forever" symptom). Polling is
+  // reliable on this hosting. getTokenRef avoids re-running the effect on every
+  // render (getToken changes identity each render).
   useEffect(() => {
     if (activeTab !== "channel") return;
 
     let isMounted = true;
-    let eventSource: EventSource | null = null;
     let pollingInterval: ReturnType<typeof setInterval> | null = null;
-    let connectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    async function fetchHistory() {
+    async function fetchMessages(initial: boolean) {
       try {
-        const token = isSignedIn ? await getToken() : "";
+        const token = isSignedIn ? await getTokenRef.current() : "";
         const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
         const apiBase = import.meta.env.VITE_API_URL || "";
         const response = await fetch(`${apiBase}/api/messages`, {
@@ -183,159 +188,44 @@ export function ChatPanel({
             ...(token && { Authorization: `Bearer ${token}` }),
           },
         });
-        if (response.ok && isMounted) {
-          const data = await response.json();
-          if (Array.isArray(data)) {
-            // Map snake_case to camelCase in case the API returns raw DB rows
-            const mapped = data.map(m => ({
+        if (!response.ok) {
+          if (isMounted) setChatConnectionStatus("error");
+          return;
+        }
+        const data = await response.json();
+        if (!isMounted) return;
+        if (Array.isArray(data)) {
+          setChatMessages(
+            data.map((m) => ({
               ...m,
               deletedForEveryone: m.deletedForEveryone ?? m.deleted_for_everyone ?? false,
               deletedForSender: m.deletedForSender ?? m.deleted_for_sender ?? false,
-              replyToId: m.replyToId ?? m.reply_to_id ?? null
-            }));
-            setChatMessages(mapped);
-          } else {
-            console.error("API returned non-array:", data);
-            setChatMessages([]);
+              replyToId: m.replyToId ?? m.reply_to_id ?? null,
+            })),
+          );
+          setChatConnectionStatus("connected");
+          if (initial) {
+            setTimeout(() => {
+              if (chatMessagesContainerRef.current) {
+                chatMessagesContainerRef.current.scrollTop = chatMessagesContainerRef.current.scrollHeight;
+              }
+            }, 100);
           }
-          setTimeout(() => {
-            if (chatMessagesContainerRef.current) {
-              chatMessagesContainerRef.current.scrollTop =
-                chatMessagesContainerRef.current.scrollHeight;
-            }
-          }, 100);
-        } else if (!response.ok) {
-          console.error("Failed to fetch history, status:", response.status);
         }
-      } catch (err) {
-        console.error("Failed to fetch chat history:", err);
+      } catch {
+        if (isMounted) setChatConnectionStatus("error");
       }
     }
 
-    async function connectSSE() {
-      setChatConnectionStatus("connecting");
-      try {
-        const token = isSignedIn ? await getToken() : "";
-        const leaderSessionStr = localStorage.getItem("jg_leader_session") ?? "";
-        const apiBase = import.meta.env.VITE_API_URL || "";
-        const url = `${apiBase}/api/messages/stream?token=${encodeURIComponent(
-          token || ""
-        )}&leader_session=${encodeURIComponent(leaderSessionStr)}`;
-
-        eventSource = new EventSource(url);
-
-        // If the stream neither opens nor errors within a few seconds (e.g. it
-        // hangs behind a proxy), fall back to polling so history still loads.
-        connectTimer = setTimeout(() => {
-          if (isMounted && eventSource && eventSource.readyState !== EventSource.OPEN) {
-            console.warn("SSE connect timeout — falling back to polling");
-            cleanupSSE();
-            startPolling();
-          }
-        }, 4000);
-
-        eventSource.onopen = () => {
-          if (connectTimer) {
-            clearTimeout(connectTimer);
-            connectTimer = null;
-          }
-          if (isMounted) setChatConnectionStatus("connected");
-        };
-
-        eventSource.onmessage = (event) => {
-          if (!isMounted) return;
-          try {
-            const parsed = JSON.parse(event.data);
-            const newMsg = {
-              ...parsed,
-              deletedForEveryone: parsed.deletedForEveryone ?? parsed.deleted_for_everyone ?? false,
-              deletedForSender: parsed.deletedForSender ?? parsed.deleted_for_sender ?? false,
-              replyToId: parsed.replyToId ?? parsed.reply_to_id ?? null
-            };
-            setChatMessages((prev) => {
-              if (prev.some((m) => m.id === newMsg.id)) return prev;
-              const next = [...prev, newMsg];
-              setTimeout(() => {
-                if (chatMessagesContainerRef.current) {
-                  chatMessagesContainerRef.current.scrollTop =
-                    chatMessagesContainerRef.current.scrollHeight;
-                }
-              }, 50);
-              return next;
-            });
-          } catch (err) {
-            console.error("Failed to parse incoming message:", err);
-          }
-        };
-
-        eventSource.addEventListener("delete", (event: any) => {
-          if (!isMounted) return;
-          try {
-            const { id } = JSON.parse(event.data);
-            setChatMessages((prev) => prev.filter((m) => m.id !== id));
-          } catch (err) {
-            console.error("Failed to parse delete event:", err);
-          }
-        });
-
-        eventSource.addEventListener("update", (event: any) => {
-          if (!isMounted) return;
-          try {
-            const parsed = JSON.parse(event.data);
-            const updatedMsg = {
-              ...parsed,
-              deletedForEveryone: parsed.deletedForEveryone ?? parsed.deleted_for_everyone ?? false,
-              deletedForSender: parsed.deletedForSender ?? parsed.deleted_for_sender ?? false,
-              replyToId: parsed.replyToId ?? parsed.reply_to_id ?? null
-            };
-            setChatMessages((prev) => prev.map((m) => m.id === updatedMsg.id ? { ...m, ...updatedMsg } : m));
-          } catch (err) {
-            console.error("Failed to parse update event:", err);
-          }
-        });
-
-        eventSource.onerror = () => {
-          if (!isMounted) return;
-          if (connectTimer) {
-            clearTimeout(connectTimer);
-            connectTimer = null;
-          }
-          console.warn("SSE connection error — falling back to polling");
-          cleanupSSE();
-          startPolling();
-        };
-      } catch (err) {
-        console.error("Failed to initialize SSE:", err);
-        startPolling();
-      }
-    }
-
-    function startPolling() {
-      if (!isMounted) return;
-      if (pollingInterval) return; // already polling — don't stack intervals
-      setChatConnectionStatus("polling");
-      fetchHistory();
-      pollingInterval = setInterval(fetchHistory, 5000);
-    }
-
-    function cleanupSSE() {
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-      }
-    }
-
-    fetchHistory().then(() => {
-      if (isMounted) connectSSE();
-    });
+    setChatConnectionStatus("connecting");
+    fetchMessages(true);
+    pollingInterval = setInterval(() => fetchMessages(false), 4000);
 
     return () => {
       isMounted = false;
-      cleanupSSE();
-      if (connectTimer) clearTimeout(connectTimer);
       if (pollingInterval) clearInterval(pollingInterval);
     };
-  }, [activeTab, isSignedIn, getToken]);
+  }, [activeTab, isSignedIn]);
 
   async function handleSendChatMessage(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -431,6 +321,9 @@ export function ChatPanel({
         },
       });
       if (!response.ok) throw new Error();
+      setChatMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, deletedForEveryone: true } : m)),
+      );
       toast({ title: "Message deleted for everyone" });
     } catch {
       toast({ title: "Failed to delete message", variant: "destructive" });
