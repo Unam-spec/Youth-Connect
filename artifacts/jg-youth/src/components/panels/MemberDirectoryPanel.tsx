@@ -4,7 +4,8 @@ import { Users, Star, MapPin, User, Search, RefreshCw, AlertCircle, Check, X } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useListProfiles, getListProfilesQueryKey } from "@workspace/api-client-react";
+import { useListProfiles, getListProfilesQueryKey, useMergeProfiles } from "@workspace/api-client-react";
+import { useToast } from "@/hooks/use-toast";
 import { DashCard, SectionTitle, SkeletonRows, RoleBadge, EmptyState } from "./shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -50,6 +51,14 @@ export function MemberDirectoryPanel({
   });
 
   const [demoteAlert, setDemoteAlert] = useState<{ isOpen: boolean; profile: any | null }>({ isOpen: false, profile: null });
+
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const mergeMutation = useMergeProfiles();
+  const [viewAttendanceFor, setViewAttendanceFor] = useState<any | null>(null);
+  const [attendanceRows, setAttendanceRows] = useState<any[]>([]);
+  const [mergeKeep, setMergeKeep] = useState<any | null>(null);
+  const [mergeFromId, setMergeFromId] = useState<string>("");
 
   return (
     <DashCard>
@@ -142,9 +151,14 @@ export function MemberDirectoryPanel({
                     )}
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-base leading-tight">{profile.full_name}</p>
                       <RoleBadge role={targetRole} />
+                      {(!profile.full_name || profile.full_name === "New Member" || !profile.phone) && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-amber-500/15 text-amber-500 border border-amber-500/25">
+                          Incomplete
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       {profile.created_at ? format(new Date(profile.created_at), "'Joined' MMM yyyy") : "Join date unknown"}
@@ -163,7 +177,28 @@ export function MemberDirectoryPanel({
                       <DropdownMenuItem onClick={() => openEditDialog(profile)}>
                         View Profile
                       </DropdownMenuItem>
-                      
+
+                      {sessionRole === 'super_admin' && (
+                        <>
+                          <DropdownMenuItem
+                            onClick={async () => {
+                              setViewAttendanceFor(profile);
+                              setAttendanceRows([]);
+                              const sessionStr = localStorage.getItem("jg_leader_session") ?? "";
+                              const r = await fetch(`/api/attendance?profile_id=${profile.id}`, {
+                                headers: { "x-leader-session": sessionStr },
+                              });
+                              if (r.ok) setAttendanceRows(await r.json());
+                            }}
+                          >
+                            View Check-ins
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setMergeKeep(profile); setMergeFromId(""); }}>
+                            Merge Duplicate Into This
+                          </DropdownMenuItem>
+                        </>
+                      )}
+
                       {sessionRole === 'super_admin' && targetRole === 'member' && (
                         <>
                           <DropdownMenuItem onClick={() => setRoleConfirm({ profile, targetRole: "leader" })}>
@@ -221,8 +256,69 @@ export function MemberDirectoryPanel({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog 
-        open={demoteAlert.isOpen} 
+      <Dialog open={!!viewAttendanceFor} onOpenChange={(o) => !o && setViewAttendanceFor(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <h3 className="font-bold text-lg mb-1">{viewAttendanceFor?.full_name}</h3>
+          <p className="text-xs text-muted-foreground mb-4">Check-in history</p>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {attendanceRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No check-ins recorded.</p>
+            ) : (
+              attendanceRows.map((a) => (
+                <div key={a.id} className="flex items-center justify-between rounded-xl border border-border/50 px-3 py-2">
+                  <span className="text-sm">{a.session_date ? format(new Date(a.session_date), "MMM d, yyyy") : "Session"}</span>
+                  <span className="text-[10px] uppercase font-semibold text-muted-foreground">{a.check_in_method}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!mergeKeep} onOpenChange={(o) => !o && setMergeKeep(null)}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <h3 className="font-bold text-lg mb-1">Merge duplicate</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Keep <strong>{mergeKeep?.full_name}</strong> and merge another profile's history into it. The other profile is deleted. This cannot be undone.
+          </p>
+          <select
+            value={mergeFromId}
+            onChange={(e) => setMergeFromId(e.target.value)}
+            className="w-full bg-card/50 border border-border/60 rounded-xl h-10 px-3 text-sm mb-4"
+          >
+            <option value="">Select profile to merge from…</option>
+            {(profiles ?? []).filter((p: any) => p.id !== mergeKeep?.id).map((p: any) => (
+              <option key={p.id} value={p.id}>{p.full_name} {p.phone ? `(${p.phone})` : ""}</option>
+            ))}
+          </select>
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" onClick={() => setMergeKeep(null)}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white border-0"
+              disabled={!mergeFromId || mergeMutation.isPending}
+              onClick={() => {
+                if (!mergeKeep || !mergeFromId) return;
+                mergeMutation.mutate(
+                  { data: { keepId: mergeKeep.id, mergeId: mergeFromId } },
+                  {
+                    onSuccess: () => {
+                      toast({ title: "Profiles merged" });
+                      queryClient.invalidateQueries({ queryKey: getListProfilesQueryKey() });
+                      setMergeKeep(null);
+                    },
+                    onError: () => toast({ title: "Merge failed", variant: "destructive" }),
+                  },
+                );
+              }}
+            >
+              {mergeMutation.isPending ? "Merging…" : "Merge"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={demoteAlert.isOpen}
         onOpenChange={(isOpen) => setDemoteAlert(prev => ({ ...prev, isOpen }))}
       >
         <AlertDialogContent>
