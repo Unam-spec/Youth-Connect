@@ -1,19 +1,21 @@
 /**
- * Email transport via Resend (https://resend.com).
+ * Email transport via Gmail SMTP (nodemailer).
  *
- * Switched from Twilio SendGrid after SendGrid declined to activate the account.
+ * Chosen because it needs no domain and no provider vetting — it uses an
+ * existing Gmail account with an App Password.
  *
  * Required env vars:
- *   RESEND_API_KEY  — Resend API key (starts with "re_")
- *   RESEND_FROM     — verified sender, e.g. "Jeremiah Generation Youth <noreply@yourdomain.org>"
- *                     (must be on a domain verified in the Resend dashboard)
+ *   GMAIL_USER          — the Gmail address that sends the mail
+ *   GMAIL_APP_PASSWORD  — a 16-character Google App Password (NOT the account password;
+ *                         requires 2-Step Verification enabled on the account)
+ * Optional:
+ *   EMAIL_FROM_NAME     — display name on the From header (default below)
  */
+import nodemailer, { type Transporter } from "nodemailer";
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
-const FROM_EMAIL =
-  process.env.RESEND_FROM ??
-  process.env.EMAIL_FROM ??
-  "Jeremiah Generation Youth <noreply@jeremiahgenerationyouth.org>";
+const GMAIL_USER = process.env.GMAIL_USER ?? "";
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD ?? "";
+const FROM_NAME = process.env.EMAIL_FROM_NAME ?? "Jeremiah Generation Youth";
 
 export interface EmailPayload {
   to: string;
@@ -22,37 +24,39 @@ export interface EmailPayload {
   html?: string;
 }
 
+let transporter: Transporter | null = null;
+
+function getTransporter(): Transporter {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+    });
+  }
+  return transporter;
+}
+
 /**
- * Send a transactional email via the Resend REST API.
- * Throws when the API key is missing or Resend rejects the request, so the
- * caller (the email queue) records the failure instead of marking mail as sent.
+ * Send a transactional email via Gmail SMTP.
+ * Throws when credentials are missing or the SMTP send fails, so the caller
+ * (the email queue) records the failure instead of marking mail as sent.
  */
 export async function sendEmail(payload: EmailPayload): Promise<void> {
-  if (!RESEND_API_KEY) {
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
     // Throw (rather than silently return) so the queue does NOT mark this email
-    // as sent. A missing key means nothing was delivered — that must be visible.
-    throw new Error("RESEND_API_KEY is not configured — email cannot be sent");
+    // as sent. Missing credentials mean nothing was delivered — keep it visible.
+    throw new Error(
+      "GMAIL_USER / GMAIL_APP_PASSWORD not configured — email cannot be sent",
+    );
   }
 
-  const body = {
-    from: FROM_EMAIL,
-    to: [payload.to],
+  await getTransporter().sendMail({
+    from: `${FROM_NAME} <${GMAIL_USER}>`,
+    to: payload.to,
     subject: payload.subject,
     text: payload.text,
     ...(payload.html ? { html: payload.html } : {}),
-  };
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
   });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Resend API error (${res.status}): ${errorText}`);
-  }
 }
