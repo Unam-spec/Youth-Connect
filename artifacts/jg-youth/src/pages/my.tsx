@@ -23,7 +23,10 @@ import {
   useUpsertRsvp,
   getGetEventStatsQueryKey,
   useUpdateMyProfile,
+  useGetMyAttendance,
+  getGetMyAttendanceQueryKey,
 } from "@workspace/api-client-react";
+import { isPostServiceWindow, serviceBannerKey } from "@/lib/serviceBanner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload, Check, BookOpen } from "lucide-react";
@@ -81,6 +84,15 @@ export default function MyDashboard() {
   const { data: rsvps, isLoading: isRsvpsLoading } = useListMyRsvps({
     query: { enabled: !!profile, queryKey: getListMyRsvpsQueryKey() },
   });
+  const { data: myAttendance, isLoading: isAttendanceLoading } = useGetMyAttendance({
+    query: { enabled: !!profile, queryKey: getGetMyAttendanceQueryKey() },
+  });
+
+  const now = new Date();
+  const [bannerDismissed, setBannerDismissed] = useState(
+    () => typeof localStorage !== "undefined" && !!localStorage.getItem(serviceBannerKey(now)),
+  );
+  const showServiceBanner = isPostServiceWindow(now) && !bannerDismissed;
 
   const upsertRsvp = useUpsertRsvp();
   const updateProfile = useUpdateMyProfile();
@@ -297,6 +309,21 @@ export default function MyDashboard() {
     <Layout>
       <div className="max-w-4xl mx-auto space-y-10 py-6 px-4">
 
+        {showServiceBanner && (
+          <div className="rounded-2xl border border-[#30D158]/30 bg-gradient-to-br from-[#30D158]/15 to-[#0A84FF]/10 p-4 flex items-center justify-between gap-3 animate-fade-in">
+            <p className="text-sm font-semibold">Thanks for coming tonight! 🙌</p>
+            <button
+              onClick={() => {
+                localStorage.setItem(serviceBannerKey(now), "1");
+                setBannerDismissed(true);
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Profile card */}
         <section>
           {isProfileLoading ? (
@@ -446,6 +473,41 @@ export default function MyDashboard() {
               </div>
             </Link>
           </div>
+        </section>
+
+        {/* My Check-ins */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold tracking-tight">My Check-ins</h2>
+            {myAttendance && myAttendance.length > 0 && (
+              <span className="text-xs text-muted-foreground">{myAttendance.length} total</span>
+            )}
+          </div>
+          {isAttendanceLoading ? (
+            <Skeleton className="h-16 w-full rounded-2xl" />
+          ) : myAttendance && myAttendance.length > 0 ? (
+            <div className="space-y-2.5">
+              {myAttendance.map((a) => (
+                <div key={a.id} className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/40 px-4 py-3">
+                  <div>
+                    <p className="font-semibold text-sm">
+                      {a.session_date ? format(new Date(a.session_date), "EEEE, MMM d, yyyy") : "Session"}
+                    </p>
+                    {a.event_title && <p className="text-xs text-muted-foreground mt-0.5">{a.event_title}</p>}
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                    a.check_in_method === "qr" ? "bg-[#0A84FF]/10 text-[#0A84FF]" :
+                    a.check_in_method === "self" ? "bg-[#30D158]/10 text-[#30D158]" :
+                    "bg-[#FF9F0A]/10 text-[#FF9F0A]"
+                  }`}>
+                    {a.check_in_method}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground py-6">No check-ins yet. See you on Friday! 🙌</p>
+          )}
         </section>
 
         {/* Events */}
