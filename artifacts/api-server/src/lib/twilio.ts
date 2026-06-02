@@ -28,16 +28,16 @@ export interface EmailPayload {
 
 /**
  * Send a transactional email via Twilio SendGrid REST API.
- * Silently skips (logs warning) when credentials are missing so the
- * app stays functional in environments without email configured.
+ * Throws when credentials are missing or the API rejects the request, so the
+ * caller (the email queue) records the failure instead of marking mail as sent.
  */
 export async function sendEmail(payload: EmailPayload): Promise<void> {
   if (!SENDGRID_API_KEY) {
-    console.warn(
-      "[twilio-sendgrid] TWILIO_SENDGRID_API_KEY not set — skipping email to",
-      payload.to
+    // Throw (rather than silently return) so the queue does NOT mark this email
+    // as sent. A missing key means nothing was delivered — that must be visible.
+    throw new Error(
+      "TWILIO_SENDGRID_API_KEY is not configured — email cannot be sent",
     );
-    return;
   }
 
   const body = {

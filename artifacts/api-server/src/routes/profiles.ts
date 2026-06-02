@@ -25,6 +25,7 @@ import { resolveAuth } from "../lib/permissions";
 import { parseMembersDirectoryQuery } from "../lib/membersDirectoryQuery";
 import { normalizePhone } from "../lib/phone";
 import { deleteProfileCascade } from "../lib/deleteProfileCascade";
+import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembershipRequest";
 
 const router = Router();
 
@@ -115,6 +116,7 @@ router.get("/profiles/me", async (req: Request, res: Response) => {
         reason: "Direct Clerk signup",
         status: "pending",
       });
+      await notifyLeadersOfMembershipRequest(profile.full_name, "Direct Clerk signup");
     }
 
     return res.json(profile);
@@ -315,6 +317,10 @@ router.post("/profiles/verify-link", async (req: Request, res: Response) => {
         reason: "First-timer link verification profile matching",
         status: "pending",
       });
+      await notifyLeadersOfMembershipRequest(
+        profile.full_name,
+        "First-timer link verification profile matching",
+      );
     }
 
     return res.status(200).json({ success: true });
