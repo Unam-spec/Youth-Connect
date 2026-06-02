@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, and, ilike, or } from "drizzle-orm";
-import { db, attendanceTable, profilesTable } from "@workspace/db";
+import { eq, and, ilike, or, desc } from "drizzle-orm";
+import { db, attendanceTable, profilesTable, eventsTable } from "@workspace/db";
 import {
   CheckInBody,
   CheckInByNameBody,
@@ -12,8 +12,14 @@ const router = Router();
 router.get("/attendance", async (req, res) => {
   try {
     const auth = getAuth(req);
-    if (!auth?.userId) {
-      return res.status(401).json({ error: "Unauthorized" });
+    if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
+    const requester = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+    const isPrivileged = requester?.role === "leader" || requester?.role === "super_admin";
+    const requestedProfileId = req.query.profile_id ? String(req.query.profile_id) : undefined;
+    if (requestedProfileId && !isPrivileged && requestedProfileId !== requester?.id) {
+      return res.status(403).json({ error: "Forbidden" });
     }
     const { session_date, event_id, profile_id } = req.query;
     const conditions: any[] = [];
@@ -106,6 +112,37 @@ router.get("/attendance/today", async (req, res) => {
       .leftJoin(profilesTable, eq(attendanceTable.profile_id, profilesTable.id))
       .where(eq(attendanceTable.session_date, today));
     return res.json(records);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /attendance/my - the authenticated member's own attendance history
+router.get("/attendance/my", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+    if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+    const rows = await db
+      .select({
+        id: attendanceTable.id,
+        session_date: attendanceTable.session_date,
+        check_in_method: attendanceTable.check_in_method,
+        checked_in_at: attendanceTable.checked_in_at,
+        event_title: eventsTable.title,
+      })
+      .from(attendanceTable)
+      .leftJoin(eventsTable, eq(attendanceTable.event_id, eventsTable.id))
+      .where(eq(attendanceTable.profile_id, profile.id))
+      .orderBy(desc(attendanceTable.session_date), desc(attendanceTable.checked_in_at));
+
+    return res.json(rows);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
