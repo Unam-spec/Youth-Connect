@@ -183,21 +183,21 @@ export default function Register() {
     return (
       <Layout>
         <div className="max-w-md mx-auto pt-10">
-          <Card className="border-slate-700/80 bg-slate-800/90 text-white shadow-xl overflow-hidden relative">
+          <Card className="border border-border bg-card rounded-2xl overflow-hidden relative">
             <div className="absolute top-0 left-0 w-full h-2 bg-primary" />
             <CardHeader className="text-center pb-2 pt-8">
-              <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+              <div className="mx-auto w-16 h-16 bg-primary/10 border border-primary/20 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle2 className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl">You're in!</CardTitle>
-              <CardDescription className="text-base mt-2 text-slate-350">
+              <CardTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">You're in!</CardTitle>
+              <CardDescription className="text-base mt-2 text-muted-foreground">
                 A leader will review your registration and you'll receive an email once approved. See you on Friday.
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6 pb-8">
               <div className="flex flex-col gap-3 pt-2">
                 <Link href="/">
-                  <Button className="w-full bg-teal-500 hover:bg-teal-400 text-white border-0 rounded-xl" size="lg">
+                  <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 rounded-xl" size="lg">
                     Return Home
                   </Button>
                 </Link>
@@ -223,30 +223,30 @@ export default function Register() {
                 window.history.back();
               }
             }}
-            className="-ml-3 text-muted-foreground hover:bg-slate-800/50 hover:text-white"
+            className="-ml-3 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Back
           </Button>
-          <span className="text-sm font-medium text-slate-400">Step {step} of {totalSteps}</span>
+          <span className="text-sm font-medium text-muted-foreground">Step {step} of {totalSteps}</span>
         </div>
 
-        <Card className="shadow-2xl border-slate-700 bg-slate-800/90 text-white overflow-hidden relative">
+        <Card className="border border-border bg-card rounded-2xl overflow-hidden relative">
           {/* Progress Bar */}
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-800">
-            <div 
-              className="h-full bg-gradient-to-r from-primary via-teal-400 to-primary/60 transition-all duration-300 ease-in-out"
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-muted">
+            <div
+              className="h-full bg-primary transition-all duration-300 ease-in-out"
               style={{ width: `${(step / totalSteps) * 100}%` }}
             />
           </div>
 
           <CardHeader className="pb-4 pt-8">
-            <CardTitle className="text-2xl text-white font-bold">
+            <CardTitle className="font-[family-name:var(--app-font-heading)] text-2xl text-foreground font-semibold tracking-tight">
               {step === 1 && "Personal Details"}
               {step === 2 && "Education & Discovery"}
               {step === 3 && "Parent & Contact Info"}
             </CardTitle>
-            <CardDescription className="text-slate-300 text-sm leading-relaxed">
+            <CardDescription className="text-muted-foreground text-sm leading-relaxed">
               {step === 1 && "Welcome! Please fill in your basic details."}
               {step === 2 && "Tell us a bit about your education and how you found us."}
               {step === 3 && "We need parent/guardian details and your communication preferences."}
@@ -270,11 +270,11 @@ export default function Register() {
                      name="full_name"
                      render={({ field }) => (
                        <FormItem>
-                         <FormLabel className="text-slate-200">Full Name *</FormLabel>
+                         <FormLabel className="text-foreground">Full Name *</FormLabel>
                          <FormControl>
                            <Input
                              placeholder="John Doe"
-                             className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                             className="bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
                              {...field}
                            />
                          </FormControl>
@@ -288,12 +288,12 @@ export default function Register() {
                       name="phone_number"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-200">Phone Number *</FormLabel>
+                          <FormLabel className="text-foreground">Phone Number *</FormLabel>
                           <FormControl>
                             <Input
                               type="tel"
                               placeholder="082 123 4567"
-                              className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                              className="bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
                               {...field}
                             />
                           </FormControl>
@@ -306,12 +306,12 @@ export default function Register() {
                       name="email"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-200">Email *</FormLabel>
+                          <FormLabel className="text-foreground">Email *</FormLabel>
                           <FormControl>
                             <Input
                               type="email"
                               placeholder="john@example.com"
-                              className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                              className="bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
                               {...field}
                             />
                           </FormControl>
@@ -326,7 +326,7 @@ export default function Register() {
                       name="gender"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-200">Gender *</FormLabel>
+                          <FormLabel className="text-foreground">Gender *</FormLabel>
                           <FormControl>
                             <div className="flex gap-4 pt-1">
                               {["male", "female", "prefer_not_to_say"].map((option) => (
@@ -336,9 +336,9 @@ export default function Register() {
                                     value={option}
                                     checked={field.value === option}
                                     onChange={(e) => field.onChange(e.target.value)}
-                                    className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-slate-700 bg-slate-950/50"
+                                    className="h-4 w-4 text-primary focus:ring-primary border-border bg-card"
                                   />
-                                  <span className="text-sm text-slate-200 capitalize">{option.replace(/_/g, " ")}</span>
+                                  <span className="text-sm text-foreground capitalize">{option.replace(/_/g, " ")}</span>
                                 </label>
                               ))}
                             </div>
@@ -352,13 +352,13 @@ export default function Register() {
                       name="age"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-200">Age *</FormLabel>
+                          <FormLabel className="text-foreground">Age *</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               min={10}
                               max={100}
-                              className="bg-slate-950/50 border-slate-700 text-white focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                              className="bg-card border-border text-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
                               {...field}
                             />
                           </FormControl>
@@ -382,7 +382,7 @@ export default function Register() {
 
                       return (
                         <FormItem className="relative">
-                          <FormLabel className="text-slate-200">School / University *</FormLabel>
+                          <FormLabel className="text-foreground">School / University *</FormLabel>
                           <div className="relative" ref={dropdownRef}>
                             <FormControl>
                               <Input
@@ -394,17 +394,17 @@ export default function Register() {
                                 }}
                                 onFocus={() => setShowSchoolDropdown(true)}
                                 placeholder="Start typing school or university..."
-                                className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11 pr-10"
+                                className="bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary rounded-xl h-11 pr-10"
                               />
                             </FormControl>
-                            <div className="absolute right-3 top-3 text-slate-400">
+                            <div className="absolute right-3 top-3 text-muted-foreground">
                               <GraduationCap className="w-5 h-5" />
                             </div>
                             {showSchoolDropdown && (
-                              <div className="absolute z-50 w-full mt-1 bg-stone-900 border border-slate-800 rounded-xl shadow-xl max-h-60 overflow-y-auto backdrop-blur-md">
+                              <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-lg max-h-60 overflow-y-auto">
                                 {filteredWaterberg.length > 0 && (
                                   <>
-                                    <div className="px-3 py-1.5 text-2xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">Waterberg Schools</div>
+                                    <div className="px-3 py-1.5 text-2xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted">Waterberg Schools</div>
                                     {filteredWaterberg.map((schoolName) => (
                                       <div
                                         key={schoolName}
@@ -413,18 +413,18 @@ export default function Register() {
                                           setSchoolQuery(schoolName);
                                           setShowSchoolDropdown(false);
                                         }}
-                                        className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between"
+                                        className="px-4 py-2 text-sm text-foreground hover:bg-primary/5 hover:text-primary cursor-pointer flex items-center justify-between"
                                       >
-                                        <span className="flex items-center gap-2"><BookOpen className="w-3.5 h-3.5 text-teal-550/60" />{schoolName}</span>
-                                        {field.value === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                                        <span className="flex items-center gap-2"><BookOpen className="w-3.5 h-3.5 text-primary/60" />{schoolName}</span>
+                                        {field.value === schoolName && <Check className="w-3.5 h-3.5 text-primary" />}
                                       </div>
                                     ))}
                                   </>
                                 )}
-                                {filteredWaterberg.length > 0 && filteredUni.length > 0 && <div className="h-px bg-slate-800 my-1" />}
+                                {filteredWaterberg.length > 0 && filteredUni.length > 0 && <div className="h-px bg-border my-1" />}
                                 {filteredUni.length > 0 && (
                                   <>
-                                    <div className="px-3 py-1.5 text-2xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">South African Universities</div>
+                                    <div className="px-3 py-1.5 text-2xs font-semibold text-muted-foreground uppercase tracking-wider bg-muted">South African Universities</div>
                                     {filteredUni.map((schoolName) => (
                                       <div
                                         key={schoolName}
@@ -433,15 +433,15 @@ export default function Register() {
                                           setSchoolQuery(schoolName);
                                           setShowSchoolDropdown(false);
                                         }}
-                                        className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between"
+                                        className="px-4 py-2 text-sm text-foreground hover:bg-primary/5 hover:text-primary cursor-pointer flex items-center justify-between"
                                       >
-                                        <span className="flex items-center gap-2"><GraduationCap className="w-3.5 h-3.5 text-teal-550/60" />{schoolName}</span>
-                                        {field.value === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                                        <span className="flex items-center gap-2"><GraduationCap className="w-3.5 h-3.5 text-primary/60" />{schoolName}</span>
+                                        {field.value === schoolName && <Check className="w-3.5 h-3.5 text-primary" />}
                                       </div>
                                     ))}
                                   </>
                                 )}
-                                {((filteredWaterberg.length > 0 || filteredUni.length > 0) && showNone) && <div className="h-px bg-slate-800 my-1" />}
+                                {((filteredWaterberg.length > 0 || filteredUni.length > 0) && showNone) && <div className="h-px bg-border my-1" />}
                                 {showNone && (
                                   <div
                                     onClick={() => {
@@ -449,16 +449,16 @@ export default function Register() {
                                       setSchoolQuery(NONE_SCHOOL);
                                       setShowSchoolDropdown(false);
                                     }}
-                                    className="px-4 py-2 text-sm text-slate-300 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between"
+                                    className="px-4 py-2 text-sm text-foreground hover:bg-primary/5 hover:text-primary cursor-pointer flex items-center justify-between"
                                   >
-                                    <span className="flex items-center gap-2 font-medium"><XCircle className="w-3.5 h-3.5 text-slate-500/65" />{NONE_SCHOOL}</span>
-                                    {field.value === NONE_SCHOOL && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                                    <span className="flex items-center gap-2 font-medium"><XCircle className="w-3.5 h-3.5 text-muted-foreground" />{NONE_SCHOOL}</span>
+                                    {field.value === NONE_SCHOOL && <Check className="w-3.5 h-3.5 text-primary" />}
                                   </div>
                                 )}
                                 {field.value && ![...WATERBERG_SCHOOLS, ...SA_UNIVERSITIES, NONE_SCHOOL].includes(field.value) && (
                                   <div
                                     onClick={() => setShowSchoolDropdown(false)}
-                                    className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2 border-t border-slate-800 mt-1"
+                                    className="px-4 py-2 text-sm text-primary hover:bg-primary/5 cursor-pointer italic flex items-center gap-2 border-t border-border mt-1"
                                   >
                                     <Check className="w-3.5 h-3.5" /> Use Custom School: "{field.value}"
                                   </div>
@@ -476,11 +476,11 @@ export default function Register() {
                     name="how_did_you_hear"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-slate-200">How did you hear about us? *</FormLabel>
+                        <FormLabel className="text-foreground">How did you hear about us? *</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="Friend, Social Media, etc."
-                            className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                            className="bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
                             {...field}
                           />
                         </FormControl>
@@ -492,9 +492,9 @@ export default function Register() {
 
                 {/* Step 3: Parent & Contact Info */}
                 <div className={step === 3 ? "space-y-4 animate-in fade-in slide-in-from-right-4 duration-300" : "hidden"}>
-                  <p className="text-sm text-slate-300 pb-2">We ask for a parent or guardian contact for members under 18.</p>
-                  <div className="bg-slate-950/40 border border-slate-800/80 rounded-2xl p-5 space-y-4 shadow-sm backdrop-blur-xs">
-                    <div className="flex items-center gap-2 text-teal-400 font-semibold text-sm border-b border-slate-850 pb-2">
+                  <p className="text-sm text-muted-foreground pb-2">We ask for a parent or guardian contact for members under 18.</p>
+                  <div className="bg-muted border border-border rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center gap-2 text-primary font-semibold text-sm border-b border-border pb-2">
                       <User className="w-4 h-4" />
                       Parent / Guardian Details
                     </div>
@@ -504,11 +504,11 @@ export default function Register() {
                         name="parent_name"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-200">Name *</FormLabel>
+                            <FormLabel className="text-foreground">Name *</FormLabel>
                             <FormControl>
                               <Input
                                 placeholder="e.g. Mary Doe"
-                                className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                                className="bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
                                 {...field}
                               />
                             </FormControl>
@@ -521,12 +521,12 @@ export default function Register() {
                         name="parent_phone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-200">Phone *</FormLabel>
+                            <FormLabel className="text-foreground">Phone *</FormLabel>
                             <FormControl>
                               <Input
                                 type="tel"
                                 placeholder="e.g. 081 123 4567"
-                                className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-11"
+                                className="bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
                                 {...field}
                               />
                             </FormControl>
@@ -541,21 +541,21 @@ export default function Register() {
                     control={form.control}
                     name="whatsapp_opt_in"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-2xl border border-slate-800/60 bg-slate-950/40 p-4 shadow-xs backdrop-blur-xs cursor-pointer hover:bg-stone-900/60 transition-colors"
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-2xl border border-border bg-card p-4 cursor-pointer hover:bg-muted transition-colors"
                                 onClick={() => field.onChange(!field.value)}>
                         <FormControl>
                           <input
                             type="checkbox"
                             checked={field.value}
                             onChange={(e) => field.onChange(e.target.checked)}
-                            className="w-5 h-5 rounded text-teal-600 focus:ring-teal-500 border-slate-700 bg-slate-950/50 cursor-pointer mt-0.5"
+                            className="w-5 h-5 rounded text-primary focus:ring-primary border-border bg-card cursor-pointer mt-0.5"
                           />
                         </FormControl>
                         <div className="space-y-1 leading-none">
-                          <FormLabel className="text-sm font-semibold text-slate-200 cursor-pointer">
+                          <FormLabel className="text-sm font-semibold text-foreground cursor-pointer">
                             Join our WhatsApp group for updates, reminders and community
                           </FormLabel>
-                          <p className="text-xs text-slate-400 mt-1">
+                          <p className="text-xs text-muted-foreground mt-1">
                             Receive session announcements, schedules, and event invitations directly on WhatsApp.
                           </p>
                         </div>
@@ -569,7 +569,7 @@ export default function Register() {
                     <Button
                       type="button"
                       onClick={nextStep}
-                      className="w-full text-base h-12 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-xl shadow-md border border-slate-700 transition-all duration-200 flex items-center justify-center gap-2"
+                      className="w-full text-base h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-xl transition-all duration-200 flex items-center justify-center gap-2"
                     >
                       Continue <ArrowRight className="w-4 h-4" />
                     </Button>
@@ -577,7 +577,7 @@ export default function Register() {
                     <Button
                       type="submit"
                       disabled={isPending}
-                      className="w-full text-base h-12 bg-gradient-to-r from-primary to-teal-400 hover:from-primary/90 hover:to-teal-400/90 text-white font-semibold rounded-xl shadow-md border-0 transition-all duration-200"
+                      className="w-full text-base h-12 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold rounded-xl transition-all duration-200"
                     >
                       {isPending ? "Registering..." : "Complete Registration"}
                     </Button>

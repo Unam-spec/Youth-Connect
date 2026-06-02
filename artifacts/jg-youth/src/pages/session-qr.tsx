@@ -82,10 +82,10 @@ export default function SessionQr() {
         </Link>
 
         <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#0A84FF]/20 to-[#32ADE6]/10 flex items-center justify-center mx-auto mb-4">
-            <QrCode className="w-7 h-7 text-[#0A84FF]" />
+          <div className="w-14 h-14 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4">
+            <QrCode className="w-7 h-7 text-primary" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Tonight's Check-In QR</h1>
+          <h1 className="font-[family-name:var(--app-font-heading)] text-3xl font-semibold tracking-tight text-foreground">Tonight's Check-In QR</h1>
           <p className="text-muted-foreground text-sm mt-1">
             Display this on screen — members scan it to check in
           </p>
@@ -93,7 +93,7 @@ export default function SessionQr() {
 
         {qrUrl ? (
           <div className="flex flex-col items-center gap-6">
-            <div className="bg-white p-6 rounded-3xl shadow-lg border border-border/40">
+            <div className="bg-white p-6 rounded-3xl border border-border">
               <QRCodeSVG
                 id="session-qr-svg"
                 value={qrUrl}
@@ -103,7 +103,7 @@ export default function SessionQr() {
               />
             </div>
 
-            <div className="w-full rounded-2xl border border-[#0A84FF]/20 bg-[#0A84FF]/5 px-4 py-3 text-center">
+            <div className="w-full rounded-2xl border border-border bg-muted px-4 py-3 text-center">
               <p className="text-xs text-muted-foreground font-mono break-all">{qrUrl}</p>
             </div>
 
@@ -118,7 +118,7 @@ export default function SessionQr() {
                 New QR
               </Button>
               <Button
-                className="flex-1 rounded-xl gap-2 bg-gradient-to-r from-[#0A84FF] to-[#32ADE6] border-0 hover:opacity-90"
+                className="flex-1 rounded-xl gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={downloadQR}
               >
                 <Download className="w-4 h-4" />
@@ -134,7 +134,7 @@ export default function SessionQr() {
           <div className="flex flex-col items-center gap-4 py-10">
             <p className="text-muted-foreground text-sm">No QR code yet.</p>
             <Button
-              className="rounded-xl bg-gradient-to-r from-[#0A84FF] to-[#32ADE6] border-0"
+              className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={regenerate}
               disabled={isRefreshing}
             >
