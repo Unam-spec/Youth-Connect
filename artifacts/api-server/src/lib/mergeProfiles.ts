@@ -6,6 +6,7 @@ import {
   membershipRequestsTable,
   checkInRequestsTable,
   leaderPermissionsTable,
+  eventsTable,
 } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 
@@ -106,6 +107,9 @@ export async function mergeProfiles(
     } else {
       await tx.update(leaderPermissionsTable).set({ profile_id: keepId }).where(eq(leaderPermissionsTable.profile_id, mergeId));
     }
+
+    // events.created_by → reassign authorship to keep (FK would otherwise block the delete)
+    await tx.update(eventsTable).set({ created_by: keepId }).where(eq(eventsTable.created_by, mergeId));
 
     // backfill missing fields on keep
     const backfill = pickBackfill(keep, merge);
