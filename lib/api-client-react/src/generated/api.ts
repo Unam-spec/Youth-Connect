@@ -41,6 +41,8 @@ import type {
   ListProfilesParams,
   MembershipRequest,
   MembershipRequestInput,
+  MergeProfilesInput,
+  MyAttendanceRecord,
   PinUpdate,
   PinVerification,
   PinVerificationResult,
@@ -662,6 +664,76 @@ export const useRevokeMembership = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRevokeMembershipMutationOptions(options));
+    }
+
+export const getMergeProfilesUrl = () => {
+
+
+
+
+  return `/api/profiles/merge`
+}
+
+/**
+ * @summary Merge a duplicate profile into another (super admin)
+ */
+export const mergeProfiles = async (mergeProfilesInput: MergeProfilesInput, options?: RequestInit): Promise<SuccessMessage> => {
+
+  return customFetch<SuccessMessage>(getMergeProfilesUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(mergeProfilesInput)
+  }
+);}
+
+
+
+
+export const getMergeProfilesMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeProfiles>>, TError,{data: BodyType<MergeProfilesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof mergeProfiles>>, TError,{data: BodyType<MergeProfilesInput>}, TContext> => {
+
+const mutationKey = ['mergeProfiles'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof mergeProfiles>>, {data: BodyType<MergeProfilesInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  mergeProfiles(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MergeProfilesMutationResult = NonNullable<Awaited<ReturnType<typeof mergeProfiles>>>
+    export type MergeProfilesMutationBody = BodyType<MergeProfilesInput>
+    export type MergeProfilesMutationError = ErrorType<void>
+
+    /**
+ * @summary Merge a duplicate profile into another (super admin)
+ */
+export const useMergeProfiles = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof mergeProfiles>>, TError,{data: BodyType<MergeProfilesInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof mergeProfiles>>,
+        TError,
+        {data: BodyType<MergeProfilesInput>},
+        TContext
+      > => {
+      return useMutation(getMergeProfilesMutationOptions(options));
     }
 
 export const getListEventsUrl = (params?: ListEventsParams,) => {
@@ -1332,6 +1404,83 @@ export function useGetTodayAttendance<TData = Awaited<ReturnType<typeof getToday
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetTodayAttendanceQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMyAttendanceUrl = () => {
+
+
+
+
+  return `/api/attendance/my`
+}
+
+/**
+ * @summary Current user's own attendance history
+ */
+export const getMyAttendance = async ( options?: RequestInit): Promise<MyAttendanceRecord[]> => {
+
+  return customFetch<MyAttendanceRecord[]>(getGetMyAttendanceUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMyAttendanceQueryKey = () => {
+    return [
+    `/api/attendance/my`
+    ] as const;
+    }
+
+
+export const getGetMyAttendanceQueryOptions = <TData = Awaited<ReturnType<typeof getMyAttendance>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyAttendance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMyAttendanceQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMyAttendance>>> = ({ signal }) => getMyAttendance({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMyAttendance>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetMyAttendanceQueryResult = NonNullable<Awaited<ReturnType<typeof getMyAttendance>>>
+export type GetMyAttendanceQueryError = ErrorType<void>
+
+
+/**
+ * @summary Current user's own attendance history
+ */
+
+export function useGetMyAttendance<TData = Awaited<ReturnType<typeof getMyAttendance>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getMyAttendance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetMyAttendanceQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

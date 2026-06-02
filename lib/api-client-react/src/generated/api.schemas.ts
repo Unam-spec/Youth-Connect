@@ -330,6 +330,19 @@ export interface SuccessMessage {
   message: string;
 }
 
+export interface MyAttendanceRecord {
+  id: string;
+  session_date: string;
+  check_in_method: string;
+  checked_in_at?: string;
+  event_title?: string | null;
+}
+
+export interface MergeProfilesInput {
+  keepId: string;
+  mergeId: string;
+}
+
 export type QrCodeType = typeof QrCodeType[keyof typeof QrCodeType];
 
 

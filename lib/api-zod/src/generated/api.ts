@@ -204,6 +204,19 @@ export const RevokeMembershipResponse = zod.object({
 
 
 /**
+ * @summary Merge a duplicate profile into another (super admin)
+ */
+export const MergeProfilesBody = zod.object({
+  "keepId": zod.string(),
+  "mergeId": zod.string()
+})
+
+export const MergeProfilesResponse = zod.object({
+  "message": zod.string()
+})
+
+
+/**
  * @summary List events
  */
 export const ListEventsQueryParams = zod.object({
@@ -426,6 +439,19 @@ export const GetTodayAttendanceResponseItem = zod.object({
 }).optional()
 })
 export const GetTodayAttendanceResponse = zod.array(GetTodayAttendanceResponseItem)
+
+
+/**
+ * @summary Current user's own attendance history
+ */
+export const GetMyAttendanceResponseItem = zod.object({
+  "id": zod.string(),
+  "session_date": zod.string(),
+  "check_in_method": zod.string(),
+  "checked_in_at": zod.string().optional(),
+  "event_title": zod.string().nullish()
+})
+export const GetMyAttendanceResponse = zod.array(GetMyAttendanceResponseItem)
 
 
 /**
