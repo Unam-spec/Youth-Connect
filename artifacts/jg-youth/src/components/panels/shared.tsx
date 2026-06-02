@@ -58,7 +58,7 @@ export function KpiCard({
 }
 export function DashCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`p-5 border border-border/50 rounded-2xl bg-card/40 backdrop-blur-sm ${className || ""}`}>
+    <div className={`p-6 border border-border rounded-2xl bg-card text-card-foreground ${className || ""}`}>
       {children}
     </div>
   );
@@ -68,7 +68,7 @@ export function SectionTitle({ title, icon }: { title: string; icon?: ReactNode 
   return (
     <div className="flex items-center gap-2 mb-4">
       {icon}
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <h3 className="font-[family-name:var(--app-font-heading)] text-base font-semibold tracking-tight text-foreground">{title}</h3>
     </div>
   );
 }
@@ -95,16 +95,16 @@ export function RoleBadge({ role }: { role: string }) {
   let classes = "";
   switch (role) {
     case "super_admin":
-      classes = "bg-purple-500/12 text-purple-300 border-purple-500/25";
+      classes = "bg-primary/10 text-primary border-primary/25";
       break;
     case "leader":
-      classes = "bg-blue-500/12 text-blue-300 border-blue-500/25";
+      classes = "bg-blue-600/10 text-blue-700 border-blue-600/25";
       break;
     case "member":
-      classes = "bg-teal-500/12 text-teal-300 border-teal-500/25";
+      classes = "bg-muted text-foreground border-border";
       break;
     default:
-      classes = "bg-muted/60 text-muted-foreground border-border/50";
+      classes = "bg-muted text-muted-foreground border-border";
   }
   return (
     <Badge className={`${classes} text-xs`} variant="outline">
