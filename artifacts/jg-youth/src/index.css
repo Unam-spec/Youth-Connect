@@ -1,12 +1,5 @@
-@import "@fontsource/sora/400.css";
-@import "@fontsource/sora/500.css";
-@import "@fontsource/sora/600.css";
-@import "@fontsource/sora/700.css";
-@import "@fontsource/sora/800.css";
-@import "@fontsource/inter/400.css";
-@import "@fontsource/inter/500.css";
-@import "@fontsource/inter/600.css";
-@import "@fontsource/inter/700.css";
+@import "@fontsource-variable/fraunces";
+@import "@fontsource-variable/hanken-grotesk";
 @layer theme, base, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -73,59 +66,59 @@
 }
 
 :root {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(0,0,0, .10);
+  --badge-outline: rgba(0,0,0, .06);
   --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
-  /* Brand: #0B0F14 bg, #2A9D8F teal primary, #E6E8EB text */
-  --background: 220 25% 7%;
-  --foreground: 210 11% 91%;
-  --border: 215 20% 16%;
-  --input: 215 20% 16%;
-  --ring: 174 57% 39%;
-  --card: 220 22% 10%;
-  --card-foreground: 210 11% 91%;
-  --card-border: 215 20% 16%;
-  --popover: 220 25% 7%;
-  --popover-foreground: 215 16% 57%;
-  --popover-border: 215 20% 16%;
-  --primary: 174 57% 39%;
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .06);
+  /* Editorial Light: #FAF8F4 paper, #2640FF cobalt primary, #15130F ink */
+  --background: 40 30% 97%;
+  --foreground: 40 16% 7%;
+  --border: 40 20% 87%;
+  --input: 40 20% 87%;
+  --ring: 233 100% 57%;
+  --card: 0 0% 100%;
+  --card-foreground: 40 16% 7%;
+  --card-border: 40 20% 87%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 40 16% 7%;
+  --popover-border: 40 20% 87%;
+  --primary: 233 100% 57%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 215 16% 20%;
-  --secondary-foreground: 210 11% 91%;
-  --muted: 220 22% 10%;
-  --muted-foreground: 215 16% 57%;
-  --accent: 177 13% 49%;
+  --secondary: 40 20% 92%;
+  --secondary-foreground: 40 16% 7%;
+  --muted: 40 24% 94%;
+  --muted-foreground: 40 8% 38%;
+  --accent: 233 100% 57%;
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
-  --sidebar: 220 22% 10%;
-  --sidebar-foreground: 210 11% 91%;
-  --sidebar-border: 215 20% 16%;
-  --sidebar-primary: 174 57% 39%;
+  --destructive: 0 72% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 40 16% 7%;
+  --sidebar-border: 40 20% 87%;
+  --sidebar-primary: 233 100% 57%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 215 16% 20%;
-  --sidebar-accent-foreground: 210 11% 91%;
-  --sidebar-ring: 174 57% 39%;
-  --chart-1: 174 57% 39%;
+  --sidebar-accent: 40 24% 94%;
+  --sidebar-accent-foreground: 40 16% 7%;
+  --sidebar-ring: 233 100% 57%;
+  --chart-1: 233 100% 57%;
   --chart-2: 177 40% 55%;
   --chart-3: 200 70% 50%;
   --chart-4: 160 50% 45%;
   --chart-5: 140 45% 42%;
-  --app-font-sans: 'Inter', sans-serif;
-  --app-font-serif: Georgia, serif;
+  --app-font-sans: 'Hanken Grotesk Variable', 'Hanken Grotesk', sans-serif;
+  --app-font-serif: 'Fraunces Variable', 'Fraunces', Georgia, serif;
   --app-font-mono: Menlo, monospace;
-  --app-font-heading: 'Sora', sans-serif;
+  --app-font-heading: 'Fraunces Variable', 'Fraunces', Georgia, serif;
   --radius: 0.625rem;
-  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
-  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
-  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 1px 2px -1px hsl(0 0% 0% / 0.15);
-  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 1px 2px -1px hsl(0 0% 0% / 0.15);
-  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 2px 4px -1px hsl(0 0% 0% / 0.15);
-  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 4px 6px -1px hsl(0 0% 0% / 0.15);
-  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.15), 0px 8px 10px -1px hsl(0 0% 0% / 0.15);
-  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.15);
+  --shadow-2xs: 0px 2px 0px 0px hsl(40 16% 7% / 0.04);
+  --shadow-xs: 0px 2px 0px 0px hsl(40 16% 7% / 0.04);
+  --shadow-sm: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 1px 2px -1px hsl(40 16% 7% / 0.06);
+  --shadow: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 1px 2px -1px hsl(40 16% 7% / 0.06);
+  --shadow-md: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 2px 4px -1px hsl(40 16% 7% / 0.06);
+  --shadow-lg: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 4px 6px -1px hsl(40 16% 7% / 0.06);
+  --shadow-xl: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 8px 10px -1px hsl(40 16% 7% / 0.06);
+  --shadow-2xl: 0px 2px 0px 0px hsl(40 16% 7% / 0.06);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
@@ -138,54 +131,66 @@
 }
 
 .dark {
-  --button-outline: rgba(255,255,255, .10);
-  --badge-outline: rgba(255,255,255, .05);
+  --button-outline: rgba(0,0,0, .10);
+  --badge-outline: rgba(0,0,0, .06);
   --opaque-button-border-intensity: 9;
-  --elevate-1: rgba(255,255,255, .04);
-  --elevate-2: rgba(255,255,255, .09);
-  /* Dark mode mirrors root (app is always dark) */
-  --background: 220 25% 7%;
-  --foreground: 210 11% 91%;
-  --border: 215 20% 16%;
-  --input: 215 20% 20%;
-  --ring: 174 57% 39%;
-  --card: 220 22% 10%;
-  --card-foreground: 210 11% 91%;
-  --card-border: 215 20% 16%;
-  --popover: 220 25% 7%;
-  --popover-foreground: 215 16% 57%;
-  --popover-border: 215 20% 16%;
-  --primary: 174 57% 39%;
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .06);
+  /* Mirrors Editorial Light root so an accidental .dark class stays light */
+  --background: 40 30% 97%;
+  --foreground: 40 16% 7%;
+  --border: 40 20% 87%;
+  --input: 40 20% 87%;
+  --ring: 233 100% 57%;
+  --card: 0 0% 100%;
+  --card-foreground: 40 16% 7%;
+  --card-border: 40 20% 87%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 40 16% 7%;
+  --popover-border: 40 20% 87%;
+  --primary: 233 100% 57%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 215 16% 20%;
-  --secondary-foreground: 210 11% 91%;
-  --muted: 220 22% 10%;
-  --muted-foreground: 215 16% 57%;
-  --accent: 177 13% 49%;
+  --secondary: 40 20% 92%;
+  --secondary-foreground: 40 16% 7%;
+  --muted: 40 24% 94%;
+  --muted-foreground: 40 8% 38%;
+  --accent: 233 100% 57%;
   --accent-foreground: 0 0% 100%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 210 40% 98%;
-  --sidebar: 220 22% 10%;
-  --sidebar-foreground: 210 11% 91%;
-  --sidebar-border: 215 20% 16%;
-  --sidebar-primary: 174 57% 39%;
+  --destructive: 0 72% 48%;
+  --destructive-foreground: 0 0% 100%;
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 40 16% 7%;
+  --sidebar-border: 40 20% 87%;
+  --sidebar-primary: 233 100% 57%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 215 16% 20%;
-  --sidebar-accent-foreground: 210 11% 91%;
-  --sidebar-ring: 174 57% 39%;
-  --chart-1: 174 57% 39%;
+  --sidebar-accent: 40 24% 94%;
+  --sidebar-accent-foreground: 40 16% 7%;
+  --sidebar-ring: 233 100% 57%;
+  --chart-1: 233 100% 57%;
   --chart-2: 177 40% 55%;
   --chart-3: 200 70% 50%;
   --chart-4: 160 50% 45%;
   --chart-5: 140 45% 42%;
-  --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
-  --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
-  --shadow-sm: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 1px 2px -1px hsl(0 0% 0% / 0.20);
-  --shadow: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 1px 2px -1px hsl(0 0% 0% / 0.20);
-  --shadow-md: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 2px 4px -1px hsl(0 0% 0% / 0.20);
-  --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 4px 6px -1px hsl(0 0% 0% / 0.20);
-  --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20), 0px 8px 10px -1px hsl(0 0% 0% / 0.20);
-  --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.20);
+  --shadow-2xs: 0px 2px 0px 0px hsl(40 16% 7% / 0.04);
+  --shadow-xs: 0px 2px 0px 0px hsl(40 16% 7% / 0.04);
+  --shadow-sm: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 1px 2px -1px hsl(40 16% 7% / 0.06);
+  --shadow: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 1px 2px -1px hsl(40 16% 7% / 0.06);
+  --shadow-md: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 2px 4px -1px hsl(40 16% 7% / 0.06);
+  --shadow-lg: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 4px 6px -1px hsl(40 16% 7% / 0.06);
+  --shadow-xl: 0px 2px 0px 0px hsl(40 16% 7% / 0.04), 0px 8px 10px -1px hsl(40 16% 7% / 0.06);
+  --shadow-2xl: 0px 2px 0px 0px hsl(40 16% 7% / 0.06);
+}
+
+@layer base {
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--app-font-sans);
+  }
+  h1, h2, h3, .font-display {
+    font-family: var(--app-font-heading);
+    letter-spacing: -0.02em;
+  }
 }
 
 /* ...rest of your CSS remains unchanged... */

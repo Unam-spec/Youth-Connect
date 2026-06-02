@@ -77,31 +77,33 @@ const MessageBubble = ({
       onTouchMove={handleTouchEnd}
     >
       {!isMe && (
-        <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-teal-300 bg-teal-500/10 border border-teal-500/20 shrink-0">
+        <div className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold text-primary bg-primary/10 border border-primary/20 shrink-0">
           {msg.sender_name?.charAt(0)?.toUpperCase() ?? "?"}
         </div>
       )}
       <div className="space-y-1">
         <div
-          className={`rounded-2xl px-4 py-2.5 text-sm shadow-md border relative ${
+          className={`rounded-2xl px-4 py-2.5 text-sm border relative ${
             isMe
-              ? "bg-gradient-to-br from-teal-600 to-cyan-600 text-white border-teal-500/20 rounded-tr-none"
-              : "bg-slate-800/90 text-slate-100 border-slate-700/60 rounded-tl-none"
+              ? "bg-primary text-primary-foreground border-primary rounded-tr-none"
+              : "bg-muted text-foreground border-border rounded-tl-none"
           }`}
         >
           {parentMsg && (
-            <div 
-              className="mb-2 pl-2 border-l-2 border-white/40 cursor-pointer hover:opacity-80 transition-opacity bg-black/10 rounded-r py-1 px-2"
+            <div
+              className={`mb-2 pl-2 border-l-2 cursor-pointer hover:opacity-80 transition-opacity rounded-r py-1 px-2 ${
+                isMe ? "border-primary-foreground/40 bg-primary-foreground/10" : "border-border bg-background/60"
+              }`}
               onClick={() => {
                 const el = document.getElementById(`msg-${parentMsg.id}`);
                 if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
               }}
             >
-              <div className="text-[10px] font-bold text-white/70 mb-0.5 flex items-center gap-1">
+              <div className="text-[10px] font-bold opacity-70 mb-0.5 flex items-center gap-1">
                 <CornerDownRight className="w-3 h-3" />
                 {parentMsg.sender_name}
               </div>
-              <p className="text-xs text-white/90 truncate opacity-80 max-w-[200px]">
+              <p className="text-xs truncate opacity-80 max-w-[200px]">
                 {parentMsg.deletedForEveryone ? "Original message deleted" : parentMsg.content}
               </p>
             </div>
@@ -113,7 +115,7 @@ const MessageBubble = ({
             isMe ? "justify-end" : "justify-start"
           }`}
         >
-          {!isMe && <span className="font-semibold text-slate-300">{msg.sender_name}</span>}
+          {!isMe && <span className="font-semibold text-foreground">{msg.sender_name}</span>}
           <RoleBadge role={msg.sender_role} />
           <span>{timeStr}</span>
         </div>
@@ -121,14 +123,14 @@ const MessageBubble = ({
 
       <div className={`absolute -top-2 ${isMe ? "left-1" : "right-1"} flex items-center gap-0.5 transition-opacity duration-200 ${showHover || menuOpen ? "opacity-100" : "opacity-100 md:opacity-0"}`}>
         <button
-          className="p-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-400 hidden md:block"
+          className="p-1.5 rounded-full bg-card border border-border hover:bg-muted text-muted-foreground hidden md:block"
           onClick={() => onReply(msg)}
         >
           <CornerDownRight className="w-4 h-4" />
         </button>
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
-            <button className="p-1.5 rounded-full bg-slate-900/80 hover:bg-slate-800 text-slate-400 block">
+            <button className="p-1.5 rounded-full bg-card border border-border hover:bg-muted text-muted-foreground block">
               <MoreVertical className="w-4 h-4" />
             </button>
           </DropdownMenuTrigger>
@@ -339,18 +341,18 @@ export function ChatPanel({
   const visibleMessages = chatMessages.filter(msg => !(msg.deletedForSender && msg.sender_id === sessionProfileId));
 
   return (
-    <div className="border border-border/50 rounded-2xl bg-card/40 backdrop-blur-sm overflow-hidden flex flex-col h-[650px] shadow-2xl relative">
-      <div className="p-4 border-b border-border/50 flex items-center justify-between bg-muted/10 shrink-0">
+    <div className="border border-border rounded-2xl bg-card overflow-hidden flex flex-col h-[650px] relative">
+      <div className="p-4 border-b border-border flex items-center justify-between bg-card shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-full bg-teal-500/10 flex items-center justify-center border border-teal-500/20 shadow-inner">
-            <MessageSquare className="h-4.5 w-4.5 text-teal-400" />
+          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+            <MessageSquare className="h-4.5 w-4.5 text-primary" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-foreground">Co-ordination Channel</h3>
+            <h3 className="font-[family-name:var(--app-font-heading)] text-sm font-bold text-foreground">Co-ordination Channel</h3>
             <p className="text-[10px] text-muted-foreground mt-0.5">Private channel for leaders & admins</p>
           </div>
         </div>
-        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-950/40 border border-slate-800/80 text-[10px] font-semibold tracking-wider uppercase">
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted border border-border text-[10px] font-semibold tracking-wider uppercase">
           <span className="relative flex h-2 w-2">
             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
               chatConnectionStatus === "connected" ? "bg-emerald-400" :
@@ -376,7 +378,7 @@ export function ChatPanel({
       </div>
       <div
         ref={chatMessagesContainerRef}
-        className="flex-grow overflow-y-auto p-4 space-y-4 bg-slate-950/20 scrollbar-thin scrollbar-thumb-slate-800"
+        className="flex-grow overflow-y-auto p-4 space-y-4 bg-background scrollbar-thin"
       >
         {visibleMessages.length > 0 ? (
           visibleMessages.map((msg) => (
@@ -393,10 +395,10 @@ export function ChatPanel({
           ))
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-center py-10 opacity-70">
-            <div className="h-16 w-16 rounded-full bg-stone-900 border border-slate-800 flex items-center justify-center mb-3">
-              <MessageSquare className="h-8 w-8 text-teal-500/30" />
+            <div className="h-16 w-16 rounded-full bg-muted border border-border flex items-center justify-center mb-3">
+              <MessageSquare className="h-8 w-8 text-primary/40" />
             </div>
-            <p className="text-sm font-semibold text-slate-300">Co-ordination Channel is empty</p>
+            <p className="text-sm font-semibold text-foreground">Co-ordination Channel is empty</p>
             <p className="text-xs text-muted-foreground max-w-xs mt-1">Be the first to post a coordination update or check-in note!</p>
           </div>
         )}
@@ -404,17 +406,17 @@ export function ChatPanel({
 
       <div className="flex flex-col shrink-0">
         {replyingTo && (
-          <div className="px-4 py-2 border-t border-border/50 bg-muted/20 flex items-center justify-between">
+          <div className="px-4 py-2 border-t border-border bg-muted/40 flex items-center justify-between">
             <div className="flex items-start gap-2 max-w-[85%]">
-              <CornerDownRight className="w-4 h-4 mt-0.5 text-teal-500 shrink-0" />
+              <CornerDownRight className="w-4 h-4 mt-0.5 text-primary shrink-0" />
               <div>
-                <p className="text-[10px] font-bold text-teal-400 mb-0.5">Replying to {replyingTo.sender_name}</p>
+                <p className="text-[10px] font-bold text-primary mb-0.5">Replying to {replyingTo.sender_name}</p>
                 <p className="text-xs text-muted-foreground truncate">{replyingTo.content}</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={() => setReplyingTo(null)}
-              className="p-1 rounded-full hover:bg-slate-800 text-slate-400 shrink-0"
+              className="p-1 rounded-full hover:bg-muted text-muted-foreground shrink-0"
             >
               <X className="w-4 h-4" />
             </button>
@@ -422,19 +424,19 @@ export function ChatPanel({
         )}
         <form
           onSubmit={handleSendChatMessage}
-          className="p-3 border-t border-border/50 bg-muted/10 flex items-center gap-2.5"
+          className="p-3 border-t border-border bg-card flex items-center gap-2.5"
         >
           <input
             type="text"
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
             placeholder="Type a message to leaders..."
-            className="flex-grow bg-background/50 border border-border/50 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500/50"
+            className="flex-grow bg-background border border-border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
           />
           <button
             type="submit"
             disabled={!chatInput.trim() || isSendingChatMessage}
-            className="bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-white rounded-xl px-4 py-2.5 font-medium text-sm transition-colors flex items-center justify-center"
+            className="bg-primary hover:bg-primary/90 disabled:opacity-50 text-primary-foreground rounded-xl px-4 py-2.5 font-medium text-sm transition-colors flex items-center justify-center"
           >
             {isSendingChatMessage ? "Sending..." : "Send"}
           </button>

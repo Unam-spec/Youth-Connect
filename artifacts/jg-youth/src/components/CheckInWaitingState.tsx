@@ -51,7 +51,7 @@ export function CheckInWaitingState({ requestId, memberName, onStatusChange }: C
 
   if (status === "approved") {
     return (
-      <div className="rounded-3xl bg-gradient-to-br from-[#30D158]/15 to-[#30D158]/5 border border-[#30D158]/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm animate-in zoom-in-95 duration-300">
+      <div className="rounded-3xl bg-card border border-[#30D158]/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm animate-in zoom-in-95 duration-300">
         <div className="w-20 h-20 rounded-full bg-[#30D158]/20 flex items-center justify-center">
           <CheckCircle2 className="w-10 h-10 text-[#30D158]" />
         </div>
@@ -70,7 +70,7 @@ export function CheckInWaitingState({ requestId, memberName, onStatusChange }: C
 
   if (status === "rejected") {
     return (
-      <div className="rounded-3xl bg-gradient-to-br from-destructive/15 to-destructive/5 border border-destructive/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm animate-in zoom-in-95 duration-300">
+      <div className="rounded-3xl bg-card border border-destructive/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm animate-in zoom-in-95 duration-300">
         <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center">
           <XCircle className="w-10 h-10 text-destructive" />
         </div>
@@ -87,7 +87,7 @@ export function CheckInWaitingState({ requestId, memberName, onStatusChange }: C
 
   if (status === "timeout") {
     return (
-      <div className="rounded-3xl bg-gradient-to-br from-destructive/15 to-destructive/5 border border-destructive/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm animate-in zoom-in-95 duration-300">
+      <div className="rounded-3xl bg-card border border-destructive/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm animate-in zoom-in-95 duration-300">
         <div className="w-20 h-20 rounded-full bg-destructive/20 flex items-center justify-center">
           <Clock className="w-10 h-10 text-destructive" />
         </div>
@@ -103,7 +103,7 @@ export function CheckInWaitingState({ requestId, memberName, onStatusChange }: C
 
   // Pending State
   return (
-    <div className="rounded-3xl bg-gradient-to-br from-[#FF9F0A]/15 to-[#FF9F0A]/5 border border-[#FF9F0A]/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm animate-in fade-in duration-300">
+    <div className="rounded-3xl bg-card border border-[#FF9F0A]/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm animate-in fade-in duration-300">
       <div className="relative w-20 h-20 flex items-center justify-center">
         <div className="absolute inset-0 rounded-full border-4 border-[#FF9F0A] animate-pulse"></div>
         <Clock className="w-8 h-8 text-[#FF9F0A] absolute" />

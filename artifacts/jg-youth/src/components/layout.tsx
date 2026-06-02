@@ -20,11 +20,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
-      <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex h-14 max-w-screen-2xl items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2 mr-6 hover:opacity-80 transition-opacity">
-            <span className="font-bold tracking-tight text-lg">Jeremiah Generation</span>
-            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">JG Youth AFM</span>
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background">
+        <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-2.5 mr-6 hover:opacity-80 transition-opacity">
+            <span className="font-[family-name:var(--app-font-heading)] font-semibold tracking-tight text-xl text-foreground">Jeremiah Generation</span>
+            <span className="hidden sm:inline-block px-2 py-0.5 rounded-full border border-border text-muted-foreground text-xs font-semibold uppercase tracking-wider">JG Youth AFM</span>
           </Link>
           <nav className="flex items-center gap-2 sm:gap-4">
             <Show when="signed-in">
@@ -66,7 +66,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 container mx-auto max-w-screen-2xl p-4 sm:p-6 lg:p-8">
         {children}
       </main>
-      <footer className="border-t border-border/40 py-6 md:py-0 bg-muted/20">
+      <footer className="border-t border-border py-6 md:py-0 bg-background">
         <div className="container mx-auto flex flex-col md:flex-row items-center justify-between gap-4 md:h-16 px-4">
           <p className="text-sm text-muted-foreground leading-loose text-center md:text-left">
             Built for Jeremiah Generation Youth AFM.

@@ -17,7 +17,7 @@ export function PinManagementPanel({
     <DashCard>
       <SectionTitle
         title="Leader PINs"
-        icon={<Shield className="h-4 w-4 text-purple-400" />}
+        icon={<Shield className="h-4 w-4 text-primary" />}
       />
       <p className="text-xs text-muted-foreground mb-4">
         Set or reveal the 4-digit PIN for each leader. This PIN is used for
@@ -30,7 +30,7 @@ export function PinManagementPanel({
           {leaderPins.map((l: any) => (
             <div
               key={l.id}
-              className="flex items-center justify-between p-4 border border-border/50 rounded-xl bg-card/30"
+              className="flex items-center justify-between p-4 border border-border rounded-xl bg-card"
             >
               <div>
                 <p className="font-semibold text-sm">{l.full_name}</p>

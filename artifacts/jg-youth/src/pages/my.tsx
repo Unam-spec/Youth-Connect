@@ -310,8 +310,8 @@ export default function MyDashboard() {
       <div className="max-w-4xl mx-auto space-y-10 py-6 px-4">
 
         {showServiceBanner && (
-          <div className="rounded-2xl border border-[#30D158]/30 bg-gradient-to-br from-[#30D158]/15 to-[#0A84FF]/10 p-4 flex items-center justify-between gap-3 animate-fade-in">
-            <p className="text-sm font-semibold">Thanks for coming tonight! 🙌</p>
+          <div className="rounded-2xl border border-border bg-card p-4 flex items-center justify-between gap-3 animate-fade-in">
+            <p className="text-sm font-semibold text-foreground">Thanks for coming tonight! 🙌</p>
             <button
               onClick={() => {
                 localStorage.setItem(serviceBannerKey(now), "1");
@@ -329,12 +329,12 @@ export default function MyDashboard() {
           {isProfileLoading ? (
             <Skeleton className="h-44 w-full max-w-md rounded-2xl" />
           ) : profile ? (
-            <Card className="max-w-md border-primary/20 bg-card/50 backdrop-blur rounded-2xl overflow-hidden shadow-lg hover:border-primary/45 transition-colors duration-300">
-              <div 
+            <Card className="max-w-md border-border bg-card rounded-2xl overflow-hidden hover:border-primary/40 transition-colors duration-300">
+              <div
                 className="h-24 relative bg-cover bg-center bg-no-repeat"
                 style={{ backgroundImage: "url('/youth-night-cover.jpg')", backgroundColor: "#10b981" }}
               >
-                <div className="absolute inset-0 bg-black/40" />
+                <div className="absolute inset-0 bg-foreground/20" />
               </div>
               <CardContent className="pt-0 relative px-6 pb-6">
                 <div className="flex justify-between items-end -mt-10 mb-4">
@@ -363,7 +363,7 @@ export default function MyDashboard() {
                           />
                         )
                       ) : (
-                        <div className="h-full w-full bg-gradient-to-br from-primary/40 to-teal-500/30 flex items-center justify-center text-xl font-bold text-white uppercase">
+                        <div className="h-full w-full bg-primary flex items-center justify-center text-xl font-bold text-primary-foreground uppercase">
                           {profile.full_name?.charAt(0)?.toUpperCase() ?? <User className="w-6 h-6" />}
                         </div>
                       )}
@@ -377,7 +377,7 @@ export default function MyDashboard() {
                   </div>
                   <button
                     onClick={() => setShowProfilePrompt(true)}
-                    className="text-xs text-primary hover:underline font-semibold border border-primary/25 px-3 py-1.5 rounded-full bg-background/80 backdrop-blur shadow-sm hover:bg-primary/5 transition-all"
+                    className="text-xs text-primary hover:underline font-semibold border border-border px-3 py-1.5 rounded-full bg-card hover:bg-primary/5 transition-all"
                   >
                     Edit Profile
                   </button>
@@ -385,7 +385,7 @@ export default function MyDashboard() {
 
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-xl font-bold tracking-tight">{profile.full_name}</h3>
+                    <h3 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight text-foreground">{profile.full_name}</h3>
                     <div className="capitalize flex items-center gap-2 mt-1">
                       <span className="px-2.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">
                         {profile?.role?.replace("_", " ")?.replace("-", " ")}
@@ -398,7 +398,7 @@ export default function MyDashboard() {
                     </div>
                   </div>
 
-                  <div className="text-sm text-muted-foreground space-y-2.5 pt-3.5 border-t border-border/40">
+                  <div className="text-sm text-muted-foreground space-y-2.5 pt-3.5 border-t border-border">
                     {profile.phone ? (
                       <p className="flex items-center gap-2 text-foreground/80">
                         <Phone className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -447,15 +447,15 @@ export default function MyDashboard() {
         {/* Check-In section */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold tracking-tight">Check-In</h2>
+            <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight text-foreground">Check-In</h2>
           </div>
           <Link href="/checkin">
-            <div className="rounded-2xl border border-[#0A84FF]/30 bg-gradient-to-br from-[#0A84FF]/10 to-[#32ADE6]/5 p-5 flex items-center gap-4 cursor-pointer hover:border-[#0A84FF]/50 transition-colors">
-              <div className="w-12 h-12 rounded-full bg-[#0A84FF]/15 flex items-center justify-center flex-shrink-0">
-                <QrCode className="w-6 h-6 text-[#0A84FF]" />
+            <div className="rounded-2xl border border-border bg-card p-5 flex items-center gap-4 cursor-pointer hover:border-primary/40 transition-colors">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <QrCode className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <p className="font-semibold text-sm">Check In</p>
+                <p className="font-semibold text-sm text-foreground">Check In</p>
                 <p className="text-xs text-muted-foreground mt-0.5">Scan the venue QR or search your name</p>
               </div>
             </div>
@@ -465,7 +465,7 @@ export default function MyDashboard() {
         {/* My Check-ins */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold tracking-tight">My Check-ins</h2>
+            <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight text-foreground">My Check-ins</h2>
             {myAttendance && myAttendance.length > 0 && (
               <span className="text-xs text-muted-foreground">{myAttendance.length} total</span>
             )}
@@ -475,17 +475,17 @@ export default function MyDashboard() {
           ) : myAttendance && myAttendance.length > 0 ? (
             <div className="space-y-2.5">
               {myAttendance.map((a) => (
-                <div key={a.id} className="flex items-center justify-between rounded-2xl border border-border/60 bg-card/40 px-4 py-3">
+                <div key={a.id} className="flex items-center justify-between rounded-2xl border border-border bg-card px-4 py-3">
                   <div>
-                    <p className="font-semibold text-sm">
+                    <p className="font-semibold text-sm text-foreground">
                       {a.session_date ? format(new Date(a.session_date), "EEEE, MMM d, yyyy") : "Session"}
                     </p>
                     {a.event_title && <p className="text-xs text-muted-foreground mt-0.5">{a.event_title}</p>}
                   </div>
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
-                    a.check_in_method === "qr" ? "bg-[#0A84FF]/10 text-[#0A84FF]" :
-                    a.check_in_method === "self" ? "bg-[#30D158]/10 text-[#30D158]" :
-                    "bg-[#FF9F0A]/10 text-[#FF9F0A]"
+                    a.check_in_method === "qr" ? "bg-primary/10 text-primary" :
+                    a.check_in_method === "self" ? "bg-emerald-600/10 text-emerald-700" :
+                    "bg-amber-600/10 text-amber-700"
                   }`}>
                     {a.check_in_method}
                   </span>
@@ -501,7 +501,7 @@ export default function MyDashboard() {
         <section>
           <Tabs value={eventsTab} onValueChange={(v) => setEventsTab(v as "upcoming" | "my-rsvps")}>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xl font-bold tracking-tight">Events</h2>
+              <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight text-foreground">Events</h2>
               <TabsList className="rounded-xl">
                 <TabsTrigger value="upcoming" className="rounded-lg text-xs">Upcoming</TabsTrigger>
                 <TabsTrigger value="my-rsvps" className="rounded-lg text-xs">My RSVPs</TabsTrigger>
@@ -518,9 +518,9 @@ export default function MyDashboard() {
                   events.map((event) => {
                     const status = getRsvpStatus(event.id);
                     return (
-                      <Card key={event.id} className="flex flex-col rounded-2xl border-border/60">
+                      <Card key={event.id} className="flex flex-col rounded-2xl border-border">
                         <CardHeader className="pb-3">
-                          <CardTitle className="line-clamp-1 text-base">{event.title}</CardTitle>
+                          <CardTitle className="font-[family-name:var(--app-font-heading)] line-clamp-1 text-lg font-semibold tracking-tight">{event.title}</CardTitle>
                           <CardDescription className="flex items-center gap-1.5 mt-1 text-xs">
                             <CalendarIcon className="h-3.5 w-3.5" />
                             {format(new Date(event.date), "EEEE, MMM d")}
@@ -541,7 +541,7 @@ export default function MyDashboard() {
                             <Button
                               size="sm"
                               variant={status === "going" ? "default" : "outline"}
-                              className={`flex-1 rounded-xl text-xs h-9 ${status === "going" ? "bg-[#30D158] hover:bg-[#30D158]/90 border-0" : ""}`}
+                              className={`flex-1 rounded-xl text-xs h-9 ${status === "going" ? "bg-emerald-600 hover:bg-emerald-600/90 text-white border-0" : ""}`}
                               onClick={() => handleRsvp(event.id, "going")}
                             >
                               <CheckCircle className="w-3.5 h-3.5 mr-1.5" /> Going
@@ -571,19 +571,19 @@ export default function MyDashboard() {
                   <Skeleton className="h-16 w-full rounded-2xl" />
                 ) : rsvps && rsvps.length > 0 ? (
                   rsvps.map((rsvp) => (
-                    <Card key={rsvp.id} className="rounded-2xl border-border/60">
+                    <Card key={rsvp.id} className="rounded-2xl border-border">
                       <CardContent className="p-4 flex items-center justify-between">
                         <div>
-                          <p className="font-semibold text-sm">{rsvp.event?.title || "Event"}</p>
+                          <p className="font-semibold text-sm text-foreground">{rsvp.event?.title || "Event"}</p>
                           <p className="text-xs text-muted-foreground">
                             {rsvp.event?.date ? format(new Date(rsvp.event.date), "MMM d, yyyy") : ""}
                           </p>
                         </div>
                         <div
                           className={`px-3 py-1 rounded-full text-xs font-semibold
-                            ${rsvp.status === "going" ? "bg-[#30D158]/10 text-[#30D158]" :
-                              rsvp.status === "not_going" ? "bg-red-500/10 text-red-500" :
-                              "bg-yellow-500/10 text-yellow-500"}`}
+                            ${rsvp.status === "going" ? "bg-emerald-600/10 text-emerald-700" :
+                              rsvp.status === "not_going" ? "bg-red-600/10 text-red-700" :
+                              "bg-amber-600/10 text-amber-700"}`}
                         >
                           {rsvp.status?.replace("_", " ")?.toUpperCase()}
                         </div>
@@ -601,9 +601,9 @@ export default function MyDashboard() {
 
       {/* Phone + name prompt dialog */}
       <Dialog open={showProfilePrompt} onOpenChange={(open) => { if (!open && !needsPhone && !needsName) { setShowProfilePrompt(false); localStorage.setItem("dismissed_school_prompt", "true"); } }}>
-        <DialogContent className="sm:max-w-md rounded-2xl bg-slate-800/95 border-slate-700 text-white shadow-2xl backdrop-blur-sm max-h-[85vh] overflow-y-auto overflow-x-hidden">
+        <DialogContent className="sm:max-w-md rounded-2xl bg-popover border border-border text-popover-foreground shadow-xl max-h-[85vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
-            <DialogTitle>Complete your profile</DialogTitle>
+            <DialogTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Complete your profile</DialogTitle>
             <DialogDescription>
               Your full name and phone number are required so leaders can identify you at sessions.
             </DialogDescription>
@@ -634,10 +634,10 @@ export default function MyDashboard() {
                 id="prompt-gender"
                 value={promptGender}
                 onChange={(e) => setPromptGender(e.target.value as "male" | "female")}
-                className="w-full bg-slate-950/50 border border-slate-700 rounded-xl h-10 px-3 text-sm text-white focus:border-teal-500 focus:ring-teal-500 cursor-pointer"
+                className="w-full bg-card border border-border rounded-xl h-10 px-3 text-sm text-foreground focus:border-primary focus:ring-primary cursor-pointer"
               >
-                <option value="male" className="bg-slate-800 text-white">Male</option>
-                <option value="female" className="bg-slate-800 text-white">Female</option>
+                <option value="male" className="bg-popover text-popover-foreground">Male</option>
+                <option value="female" className="bg-popover text-popover-foreground">Female</option>
               </select>
             </div>
             {/* Autocomplete School / University dropdown */}
@@ -655,7 +655,7 @@ export default function MyDashboard() {
                   }}
                   className="pr-10"
                 />
-                <div className="absolute right-3 top-2.5 text-slate-400">
+                <div className="absolute right-3 top-2.5 text-muted-foreground">
                   <GraduationCap className="w-4 h-4" />
                 </div>
               </div>
@@ -673,10 +673,10 @@ export default function MyDashboard() {
                 const showNone = "None / Completed Schooling".toLowerCase().includes(query);
 
                 return (
-                  <div className="absolute z-50 w-full mt-1 bg-slate-800/95 border border-slate-700 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
+                  <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-xl max-h-40 overflow-y-auto">
                     {filteredWaterberg.length > 0 && (
                       <>
-                        <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">
+                        <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted">
                           Waterberg Schools
                         </div>
                         {filteredWaterberg.map((schoolName) => (
@@ -686,25 +686,25 @@ export default function MyDashboard() {
                               setPromptSchool(schoolName);
                               setShowSchoolDropdown(false);
                             }}
-                            className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                            className="px-4 py-2 text-sm text-foreground hover:bg-primary/10 hover:text-primary cursor-pointer flex items-center justify-between transition-colors duration-150"
                           >
                             <span className="flex items-center gap-2">
-                              <BookOpen className="w-3.5 h-3.5 text-teal-500/60" />
+                              <BookOpen className="w-3.5 h-3.5 text-primary/60" />
                               {schoolName}
                             </span>
-                            {promptSchool === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                            {promptSchool === schoolName && <Check className="w-3.5 h-3.5 text-primary" />}
                           </div>
                         ))}
                       </>
                     )}
 
                     {filteredWaterberg.length > 0 && filteredUni.length > 0 && (
-                      <div className="h-px bg-slate-800 my-1" />
+                      <div className="h-px bg-border my-1" />
                     )}
 
                     {filteredUni.length > 0 && (
                       <>
-                        <div className="px-3 py-1.5 text-[10px] font-semibold text-slate-500 uppercase tracking-wider bg-slate-950/20">
+                        <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted">
                           South African Universities
                         </div>
                         {filteredUni.map((schoolName) => (
@@ -714,20 +714,20 @@ export default function MyDashboard() {
                               setPromptSchool(schoolName);
                               setShowSchoolDropdown(false);
                             }}
-                            className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                            className="px-4 py-2 text-sm text-foreground hover:bg-primary/10 hover:text-primary cursor-pointer flex items-center justify-between transition-colors duration-150"
                           >
                             <span className="flex items-center gap-2">
-                              <GraduationCap className="w-3.5 h-3.5 text-teal-550/60" />
+                              <GraduationCap className="w-3.5 h-3.5 text-primary/60" />
                               {schoolName}
                             </span>
-                            {promptSchool === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                            {promptSchool === schoolName && <Check className="w-3.5 h-3.5 text-primary" />}
                           </div>
                         ))}
                       </>
                     )}
 
                     {((filteredWaterberg.length > 0 || filteredUni.length > 0) && showNone) && (
-                      <div className="h-px bg-slate-800 my-1" />
+                      <div className="h-px bg-border my-1" />
                     )}
 
                     {showNone && (
@@ -736,13 +736,13 @@ export default function MyDashboard() {
                           setPromptSchool("None / Completed Schooling");
                           setShowSchoolDropdown(false);
                         }}
-                        className="px-4 py-2 text-sm text-slate-300 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                        className="px-4 py-2 text-sm text-foreground hover:bg-primary/10 hover:text-primary cursor-pointer flex items-center justify-between transition-colors duration-150"
                       >
                         <span className="flex items-center gap-2 font-medium">
-                          <XCircle className="w-3.5 h-3.5 text-slate-500/65" />
+                          <XCircle className="w-3.5 h-3.5 text-muted-foreground" />
                           None / Completed Schooling
                         </span>
-                        {promptSchool === "None / Completed Schooling" && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                        {promptSchool === "None / Completed Schooling" && <Check className="w-3.5 h-3.5 text-primary" />}
                       </div>
                     )}
 
@@ -756,7 +756,7 @@ export default function MyDashboard() {
                     ].includes(promptSchool) && (
                       <div
                         onClick={() => setShowSchoolDropdown(false)}
-                        className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2"
+                        className="px-4 py-2 text-sm text-primary hover:bg-primary/10 cursor-pointer italic flex items-center gap-2"
                       >
                         <Check className="w-3.5 h-3.5" />
                         Use Custom: "{promptSchool}"
@@ -768,14 +768,14 @@ export default function MyDashboard() {
             </div>
 
             {/* Parent / Guardian Isolated Details */}
-            <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-3 shadow-xs">
-              <div className="flex items-center gap-2 text-teal-400 font-semibold text-xs border-b border-slate-800/60 pb-1.5">
+            <div className="bg-muted border border-border rounded-xl p-4 space-y-3 shadow-xs">
+              <div className="flex items-center gap-2 text-primary font-semibold text-xs border-b border-border pb-1.5">
                 <User className="w-3.5 h-3.5" />
                 Parent / Guardian Details
               </div>
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <Label htmlFor="prompt-parent-name" className="text-xs text-slate-300">Parent/Guardian Name <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="prompt-parent-name" className="text-xs text-muted-foreground">Parent/Guardian Name <span className="text-destructive">*</span></Label>
                   <Input
                     id="prompt-parent-name"
                     placeholder="Mary Doe"
@@ -785,7 +785,7 @@ export default function MyDashboard() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="prompt-parent-phone" className="text-xs text-slate-300">Parent/Guardian Phone <span className="text-destructive">*</span></Label>
+                  <Label htmlFor="prompt-parent-phone" className="text-xs text-muted-foreground">Parent/Guardian Phone <span className="text-destructive">*</span></Label>
                   <Input
                     id="prompt-parent-phone"
                     type="tel"
@@ -799,19 +799,19 @@ export default function MyDashboard() {
             </div>
 
             {/* WhatsApp Group Opt-in checkbox */}
-            <div className="flex items-start space-x-3 space-y-0 rounded-xl border border-slate-850 bg-slate-950/30 p-3 shadow-xs">
+            <div className="flex items-start space-x-3 space-y-0 rounded-xl border border-border bg-muted p-3 shadow-xs">
               <input
                 type="checkbox"
                 id="prompt-whatsapp-opt-in"
                 checked={promptWhatsappOptIn}
                 onChange={(e) => setPromptWhatsappOptIn(e.target.checked)}
-                className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-700 bg-slate-950/50 cursor-pointer mt-0.5"
+                className="w-4 h-4 rounded text-primary focus:ring-primary border-border bg-card cursor-pointer mt-0.5"
               />
               <div className="space-y-1 leading-none cursor-pointer" onClick={() => setPromptWhatsappOptIn(!promptWhatsappOptIn)}>
-                <Label htmlFor="prompt-whatsapp-opt-in" className="text-xs font-semibold text-slate-200 cursor-pointer">
+                <Label htmlFor="prompt-whatsapp-opt-in" className="text-xs font-semibold text-foreground cursor-pointer">
                   Join JG Youth WhatsApp Group
                 </Label>
-                <p className="text-[10px] text-slate-400 mt-0.5">
+                <p className="text-[10px] text-muted-foreground mt-0.5">
                   Get sessions details and announcements directly on WhatsApp.
                 </p>
               </div>
@@ -833,7 +833,7 @@ export default function MyDashboard() {
             <Button
               onClick={handleSaveProfile}
               disabled={isSavingProfile}
-              className="flex-1 rounded-xl bg-gradient-to-r from-primary to-teal-500 border-0"
+              className="flex-1 rounded-xl"
             >
               {isSavingProfile ? "Saving…" : "Save Profile"}
             </Button>
@@ -843,9 +843,9 @@ export default function MyDashboard() {
 
       {/* Change Profile Picture Dialog */}
       <Dialog open={showAvatarDialog} onOpenChange={(open) => { setShowAvatarDialog(open); if (!open) stopCamera(); }}>
-        <DialogContent className="sm:max-w-md rounded-2xl bg-slate-800/95 border-slate-700 text-white shadow-2xl backdrop-blur-sm">
+        <DialogContent className="sm:max-w-md rounded-2xl bg-popover border border-border text-popover-foreground shadow-xl">
           <DialogHeader>
-            <DialogTitle>Update Profile Picture</DialogTitle>
+            <DialogTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Update Profile Picture</DialogTitle>
             <DialogDescription>
               Choose a stunning custom background gradient preset, upload your own photo, or take a live picture.
             </DialogDescription>
@@ -884,7 +884,7 @@ export default function MyDashboard() {
               <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Take Live Photo</label>
               {isCameraActive ? (
                 <div className="flex flex-col gap-3">
-                  <div className="relative w-full aspect-square max-w-[240px] rounded-2xl overflow-hidden bg-slate-950/50 border border-slate-700 mx-auto">
+                  <div className="relative w-full aspect-square max-w-[240px] rounded-2xl overflow-hidden bg-muted border border-border mx-auto">
                     <video
                       ref={videoRef}
                       className="w-full h-full object-cover transform -scale-x-100 animate-fade-in"
@@ -897,7 +897,7 @@ export default function MyDashboard() {
                     <Button
                       onClick={capturePhoto}
                       disabled={isSavingAvatar}
-                      className="flex-1 rounded-xl h-11 bg-teal-500 hover:bg-teal-400 text-white font-semibold shadow-md border-0"
+                      className="flex-1 rounded-xl h-11 font-semibold"
                     >
                       Capture Snapshot
                     </Button>
@@ -905,7 +905,7 @@ export default function MyDashboard() {
                       variant="outline"
                       onClick={stopCamera}
                       disabled={isSavingAvatar}
-                      className="rounded-xl h-11 px-4 border-border/80"
+                      className="rounded-xl h-11 px-4"
                     >
                       Cancel
                     </Button>
@@ -916,7 +916,7 @@ export default function MyDashboard() {
                   variant="outline"
                   onClick={startCamera}
                   disabled={isSavingAvatar}
-                  className="w-full rounded-xl hover:bg-muted/10 h-11 flex items-center justify-center gap-2 cursor-pointer border-border/80"
+                  className="w-full rounded-xl hover:bg-muted h-11 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Camera className="w-4 h-4" />
                   Use Device Camera
@@ -946,7 +946,7 @@ export default function MyDashboard() {
                 <Button
                   asChild
                   variant="outline"
-                  className="flex-1 rounded-xl cursor-pointer hover:bg-muted/10 h-11 border-border/80"
+                  className="flex-1 rounded-xl cursor-pointer hover:bg-muted h-11"
                   disabled={isSavingAvatar}
                 >
                   <label htmlFor="avatar-upload" className="flex items-center justify-center gap-2 cursor-pointer w-full h-full">
@@ -976,7 +976,7 @@ export default function MyDashboard() {
           {lightboxImage && (
             <img src={lightboxImage} alt="Profile" className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" />
           )}
-          <Button onClick={() => { setLightboxImage(null); setShowAvatarDialog(true); }} className="mt-4 bg-teal-500 hover:bg-teal-400">
+          <Button onClick={() => { setLightboxImage(null); setShowAvatarDialog(true); }} className="mt-4">
             <Camera className="w-4 h-4 mr-2" /> Change Photo
           </Button>
         </DialogContent>

@@ -20,16 +20,9 @@ export function KpiCard({
   lastUpdated?: string | null;
   accent?: "teal" | "cyan" | "blue" | "indigo";
 }) {
-  const borderMap = {
-    teal: "border-t-teal-500",
-    cyan: "border-t-cyan-500",
-    blue: "border-t-blue-500",
-    indigo: "border-t-indigo-500",
-  };
   return (
-    <Card
-      className={`border-t-2 ${borderMap[accent ?? "teal"]} bg-card/60 backdrop-blur-sm`}
-    >
+    <Card className="border border-border bg-card">
+
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4">
         <CardTitle className="text-xs font-medium text-muted-foreground">
           {title}
@@ -58,7 +51,7 @@ export function KpiCard({
 }
 export function DashCard({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`p-5 border border-border/50 rounded-2xl bg-card/40 backdrop-blur-sm ${className || ""}`}>
+    <div className={`p-6 border border-border rounded-2xl bg-card text-card-foreground ${className || ""}`}>
       {children}
     </div>
   );
@@ -68,7 +61,7 @@ export function SectionTitle({ title, icon }: { title: string; icon?: ReactNode 
   return (
     <div className="flex items-center gap-2 mb-4">
       {icon}
-      <h3 className="text-sm font-semibold">{title}</h3>
+      <h3 className="font-[family-name:var(--app-font-heading)] text-base font-semibold tracking-tight text-foreground">{title}</h3>
     </div>
   );
 }
@@ -95,16 +88,16 @@ export function RoleBadge({ role }: { role: string }) {
   let classes = "";
   switch (role) {
     case "super_admin":
-      classes = "bg-purple-500/12 text-purple-300 border-purple-500/25";
+      classes = "bg-primary/10 text-primary border-primary/25";
       break;
     case "leader":
-      classes = "bg-blue-500/12 text-blue-300 border-blue-500/25";
+      classes = "bg-blue-600/10 text-blue-700 border-blue-600/25";
       break;
     case "member":
-      classes = "bg-teal-500/12 text-teal-300 border-teal-500/25";
+      classes = "bg-muted text-foreground border-border";
       break;
     default:
-      classes = "bg-muted/60 text-muted-foreground border-border/50";
+      classes = "bg-muted text-muted-foreground border-border";
   }
   return (
     <Badge className={`${classes} text-xs`} variant="outline">
@@ -179,16 +172,16 @@ export function CheckInCard({
     <div
       className={`flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between transition-colors ${
         isFirstTimer
-          ? "border-amber-500/40 bg-amber-500/10 dark:border-amber-500/30 dark:bg-amber-500/5 hover:border-amber-500/60"
-          : "border-teal-500/40 bg-teal-500/10 dark:border-teal-500/30 dark:bg-teal-500/5 hover:border-teal-500/60"
+          ? "border-amber-500/40 bg-amber-500/5 hover:border-amber-500/60"
+          : "border-border bg-card hover:border-primary/40"
       }`}
     >
       <div className="flex items-start gap-3">
         <div
           className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
             isFirstTimer
-              ? "bg-amber-500/20 text-amber-700 dark:text-amber-300"
-              : "bg-teal-500/20 text-teal-700 dark:text-teal-300"
+              ? "bg-amber-500/15 text-amber-700"
+              : "bg-primary/10 text-primary"
           }`}
         >
           {req.name?.charAt(0)?.toUpperCase() ?? "?"}
@@ -199,7 +192,7 @@ export function CheckInCard({
             {isFirstTimer && (
               <Badge
                 variant="outline"
-                className="text-xs text-amber-700 dark:text-amber-300 border-amber-500/40 bg-amber-500/15 dark:bg-amber-500/10 py-0"
+                className="text-xs text-amber-700 border-amber-500/40 bg-amber-500/10 py-0"
               >
                 First Timer
               </Badge>
@@ -215,7 +208,7 @@ export function CheckInCard({
         <Button
           size="sm"
           onClick={onApprove}
-          className={`h-7 text-xs border-0 text-white font-medium ${isFirstTimer ? "bg-amber-600 hover:bg-amber-500 dark:bg-amber-500 dark:hover:bg-amber-400" : "bg-teal-600 hover:bg-teal-500 dark:bg-teal-500 dark:hover:bg-teal-400"}`}
+          className={`h-7 text-xs border-0 text-white font-medium ${isFirstTimer ? "bg-amber-600 hover:bg-amber-500" : "bg-primary hover:bg-primary/90 text-primary-foreground"}`}
         >
           Approve
         </Button>

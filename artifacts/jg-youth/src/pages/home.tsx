@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,82 +22,89 @@ function PublicHome() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-16 pb-16">
+      <div className="flex flex-col gap-20 pb-24">
         {/* Hero */}
-        <section className="pt-16 pb-12 flex flex-col items-center text-center max-w-3xl mx-auto">
-          <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-primary/15 text-primary border-transparent mb-6">
-            Jeremiah Generation AFM
+        <section className="pt-16 md:pt-24 grid grid-cols-1 lg:grid-cols-12 gap-10 items-end">
+          <div className="lg:col-span-9">
+            <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary mb-8">
+              <span className="h-px w-8 bg-primary" />
+              Jeremiah Generation AFM
+            </div>
+            <h1 className="font-[family-name:var(--app-font-heading)] text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold tracking-tight leading-[0.95] text-foreground">
+              Don&apos;t be the one
+              <br />
+              we ask{" "}
+              <span className="text-primary italic">&apos;where were you?&apos;</span>
+            </h1>
           </div>
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-4">
-            Don&apos;t be the one we ask{" "}
-            <span className="text-primary">&apos;where were you?&apos;</span>
-          </h1>
-          <p className="text-lg sm:text-xl text-muted-foreground mb-10 max-w-2xl">
-            Register, show up, be part of it.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <Button 
-              size="lg" 
-              className="w-full sm:w-auto h-12 px-8 text-base"
-              onClick={() => setLocation("/sign-up")}
-            >
-              <UserPlus className="mr-2 h-5 w-5" />
-              Sign Up
-            </Button>
-            <Button
-              size="lg"
-              variant="outline"
-              className="w-full sm:w-auto h-12 px-8 text-base"
-              onClick={() => setLocation("/sign-in")}
-            >
-              <LogIn className="mr-2 h-5 w-5" />
-              Sign In
-            </Button>
+          <div className="lg:col-span-3 lg:pb-2">
+            <p className="text-lg text-muted-foreground mb-7 max-w-sm">
+              Register, show up, be part of it.
+            </p>
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-3">
+              <Button
+                size="lg"
+                className="w-full h-12 px-8 text-base"
+                onClick={() => setLocation("/sign-up")}
+              >
+                <UserPlus className="mr-2 h-5 w-5" />
+                Register as First Timer
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="w-full h-12 px-8 text-base"
+                onClick={() => setLocation("/sign-in")}
+              >
+                <LogIn className="mr-2 h-5 w-5" />
+                Login
+              </Button>
+            </div>
           </div>
         </section>
+
         {/* KPIs */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader className="pb-2">
-              <CardDescription>Total Members</CardDescription>
-            </CardHeader>
-            <CardContent>
+        <section className="border-t border-border pt-12">
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border">
+            <div className="px-0 sm:px-8 first:pl-0 py-6 sm:py-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-3">Total Members</p>
               {isKpisLoading ? (
-                <Skeleton className="h-10 w-24" />
+                <Skeleton className="h-12 w-24" />
               ) : (
-                <div className="text-4xl font-bold">{kpis?.total_members || 0}</div>
+                <div className="font-[family-name:var(--app-font-heading)] text-5xl md:text-6xl font-semibold tracking-tight text-foreground">
+                  {kpis?.total_members || 0}
+                </div>
               )}
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 backdrop-blur border-primary/20">
-            <CardHeader className="pb-2">
-              <CardDescription className="text-primary font-medium">Today's Visitors</CardDescription>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div className="px-0 sm:px-8 py-6 sm:py-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary mb-3">Today&apos;s Visitors</p>
               {isKpisLoading ? (
-                <Skeleton className="h-10 w-24" />
+                <Skeleton className="h-12 w-24" />
               ) : (
-                <div className="text-4xl font-bold text-primary">{kpis?.today_new_visitors || 0}</div>
+                <div className="font-[family-name:var(--app-font-heading)] text-5xl md:text-6xl font-semibold tracking-tight text-primary">
+                  {kpis?.today_new_visitors || 0}
+                </div>
               )}
-            </CardContent>
-          </Card>
-          <Card className="bg-card/50 backdrop-blur">
-            <CardHeader className="pb-2">
-              <CardDescription>Today's Attendance</CardDescription>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div className="px-0 sm:px-8 py-6 sm:py-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-3">Today&apos;s Attendance</p>
               {isKpisLoading ? (
-                <Skeleton className="h-10 w-24" />
+                <Skeleton className="h-12 w-24" />
               ) : (
-                <div className="text-4xl font-bold">{kpis?.today_attendance || 0}</div>
+                <div className="font-[family-name:var(--app-font-heading)] text-5xl md:text-6xl font-semibold tracking-tight text-foreground">
+                  {kpis?.today_attendance || 0}
+                </div>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
         </section>
+
         {/* Events */}
-        <section>
-          <div className="flex items-center justify-between mb-8">
-            <h2 className="text-2xl font-bold tracking-tight">Upcoming Public Events</h2>
+        <section className="border-t border-border pt-12">
+          <div className="flex items-end justify-between mb-10">
+            <h2 className="font-[family-name:var(--app-font-heading)] text-3xl md:text-4xl font-semibold tracking-tight text-foreground">
+              Upcoming Public Events
+            </h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {isEventsLoading ? (
@@ -119,8 +126,10 @@ function PublicHome() {
               events.map((event) => (
                 <Card key={event.id} className="flex flex-col">
                   <CardHeader>
-                    <CardTitle className="line-clamp-1 text-xl">{event.title}</CardTitle>
-                    <CardDescription className="flex items-center gap-1.5 mt-2 text-foreground/80">
+                    <CardTitle className="font-[family-name:var(--app-font-heading)] line-clamp-1 text-2xl font-semibold tracking-tight">
+                      {event.title}
+                    </CardTitle>
+                    <CardDescription className="flex items-center gap-1.5 mt-2 text-primary font-medium">
                       <CalendarIcon className="h-4 w-4" />
                       {format(new Date(event.date), "EEEE, MMMM d, yyyy")}
                     </CardDescription>
@@ -143,9 +152,9 @@ function PublicHome() {
                 </Card>
               ))
             ) : (
-              <div className="col-span-full py-12 text-center border rounded-xl border-dashed">
+              <div className="col-span-full py-16 text-center border border-dashed border-border rounded-2xl bg-card">
                 <CalendarIcon className="h-10 w-10 mx-auto text-muted-foreground mb-4 opacity-50" />
-                <h3 className="text-lg font-medium text-foreground mb-1">No upcoming events</h3>
+                <h3 className="font-[family-name:var(--app-font-heading)] text-xl font-semibold text-foreground mb-1">No upcoming events</h3>
                 <p className="text-muted-foreground">Check back later for new events.</p>
               </div>
             )}

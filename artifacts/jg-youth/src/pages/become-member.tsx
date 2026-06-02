@@ -63,9 +63,9 @@ export default function BecomeMember() {
     return (
       <Layout>
         <div className="max-w-md mx-auto pt-10">
-          <Card className="border-primary/20 text-center">
+          <Card className="border border-border bg-card rounded-2xl text-center">
             <CardHeader>
-              <CardTitle>Create your account first</CardTitle>
+              <CardTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Create your account first</CardTitle>
               <CardDescription>
                 Membership requests are linked to your login so leaders can approve the right profile.
               </CardDescription>
@@ -88,7 +88,7 @@ export default function BecomeMember() {
     return (
       <Layout>
         <div className="max-w-md mx-auto pt-10 text-center">
-          <h2 className="text-xl font-bold mb-2">Finish your first-timer registration.</h2>
+          <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight mb-2">Finish your first-timer registration.</h2>
           <p className="text-muted-foreground mb-4">
             We need a profile before you can request membership.
           </p>
@@ -102,7 +102,7 @@ export default function BecomeMember() {
     return (
       <Layout>
         <div className="max-w-md mx-auto pt-10 text-center">
-          <h2 className="text-xl font-bold mb-2">You are already a member or leader.</h2>
+          <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight mb-2">You are already a member or leader.</h2>
           <Link href="/my"><Button>Return to Dashboard</Button></Link>
         </div>
       </Layout>
@@ -113,9 +113,9 @@ export default function BecomeMember() {
     return (
       <Layout>
         <div className="max-w-md mx-auto pt-10">
-          <Card className="border-primary/20 text-center">
+          <Card className="border border-border bg-card rounded-2xl text-center">
             <CardHeader>
-              <CardTitle>Request Submitted</CardTitle>
+              <CardTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Request Submitted</CardTitle>
               <CardDescription>
                 Thank you! The leadership team will review your membership request soon.
               </CardDescription>
@@ -141,9 +141,9 @@ export default function BecomeMember() {
           </Link>
         </div>
 
-        <Card>
+        <Card className="border border-border bg-card rounded-2xl">
           <CardHeader>
-            <CardTitle>Become a Member</CardTitle>
+            <CardTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Become a Member</CardTitle>
             <CardDescription>
               We're excited you want to join us fully! Let us know why you want to become a member of JG Youth.
             </CardDescription>

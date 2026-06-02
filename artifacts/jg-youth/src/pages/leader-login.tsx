@@ -279,13 +279,13 @@ export default function LeaderLogin() {
           </Link>
         </div>
 
-        <Card className="shadow-2xl border-primary/20 bg-card overflow-hidden">
+        <Card className="border border-border bg-card rounded-2xl overflow-hidden">
           <div className="h-1.5 w-full bg-primary" />
           <CardHeader className="text-center pt-8">
-            <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+            <div className="mx-auto w-12 h-12 bg-primary/10 border border-primary/20 rounded-full flex items-center justify-center mb-4">
               <Lock className="w-6 h-6 text-primary" />
             </div>
-            <CardTitle className="text-2xl">Leader Access</CardTitle>
+            <CardTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Leader Access</CardTitle>
             <CardDescription>
               {mode === "pin-only"
                 ? "Enter your PIN to access the leader dashboard. You can also view your member profile from the dashboard."

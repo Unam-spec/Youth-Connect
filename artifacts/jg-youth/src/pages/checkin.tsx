@@ -112,9 +112,9 @@ function SessionQrDisplay() {
   if (!sessionUrl) return null;
 
   return (
-    <div className="rounded-2xl border border-[#0A84FF]/20 bg-gradient-to-br from-[#0A84FF]/8 to-[#32ADE6]/5 p-5 flex flex-col items-center gap-4 mb-2">
-      <p className="text-sm font-semibold text-[#0A84FF]">Tonight's Session QR</p>
-      <div className="bg-white p-4 rounded-2xl shadow-sm">
+    <div className="rounded-2xl border border-border bg-card p-5 flex flex-col items-center gap-4 mb-2">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-primary">Tonight's Session QR</p>
+      <div className="bg-white p-4 rounded-2xl border border-border">
         <QRCodeSVGInline value={sessionUrl} size={200} />
       </div>
       <p className="text-xs text-muted-foreground text-center">Members can also scan this QR to check in</p>
@@ -131,38 +131,38 @@ function TimeWindowBanner() {
 
   const config = {
     before: {
-      icon: <LockIcon className="w-8 h-8 text-[#0A84FF]" />,
+      icon: <LockIcon className="w-8 h-8 text-primary" />,
       title: "Check-In Not Yet Open",
       message: "Friday night check-in opens at 18:30 SAST. See you then!",
-      bg: "bg-gradient-to-br from-[#0A84FF]/10 to-[#30D158]/5",
-      border: "border-[#0A84FF]/30",
-      text: "text-[#0A84FF]",
+      bg: "bg-primary/5",
+      border: "border-primary/30",
+      text: "text-primary",
     },
     after: {
-      icon: <MoonIcon className="w-8 h-8 text-[#5E5CE6]" />,
+      icon: <MoonIcon className="w-8 h-8 text-primary" />,
       title: "Check-In Has Closed",
       message: "Tonight's check-in closed at 22:00 SAST. See you next Friday!",
-      bg: "bg-gradient-to-br from-[#5E5CE6]/10 to-[#0A84FF]/5",
-      border: "border-[#5E5CE6]/30",
-      text: "text-[#5E5CE6]",
+      bg: "bg-primary/5",
+      border: "border-primary/30",
+      text: "text-primary",
     },
     wrong_day: {
-      icon: <Clock className="w-8 h-8 text-[#32ADE6]" />,
+      icon: <Clock className="w-8 h-8 text-primary" />,
       title: "Check-In is Fridays Only",
       message: "Friday night check-in runs every Friday from 18:30 to 22:00 SAST.",
-      bg: "bg-gradient-to-br from-[#32ADE6]/10 to-[#30D158]/5",
-      border: "border-[#32ADE6]/30",
-      text: "text-[#32ADE6]",
+      bg: "bg-primary/5",
+      border: "border-primary/30",
+      text: "text-primary",
     },
   }[state];
 
   return (
-    <div className={`rounded-2xl border ${config.border} ${config.bg} p-8 flex flex-col items-center text-center gap-4 shadow-sm`}>
+    <div className={`rounded-2xl border ${config.border} bg-card p-8 flex flex-col items-center text-center gap-4`}>
       <div className={`w-16 h-16 rounded-full flex items-center justify-center ${config.bg} border ${config.border}`}>
         {config.icon}
       </div>
       <div>
-        <h3 className={`text-xl font-semibold ${config.text}`}>{config.title}</h3>
+        <h3 className={`font-[family-name:var(--app-font-heading)] text-xl font-semibold tracking-tight ${config.text}`}>{config.title}</h3>
         <p className="text-muted-foreground mt-1 text-sm">{config.message}</p>
       </div>
       <Link href="/">
@@ -455,12 +455,12 @@ export default function CheckIn() {
     return (
       <Layout>
         <div className="max-w-sm mx-auto pt-12 px-4">
-          <div className="rounded-3xl bg-gradient-to-br from-[#30D158]/15 to-[#30D158]/5 border border-[#30D158]/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm">
-            <div className="w-20 h-20 rounded-full bg-[#30D158]/20 flex items-center justify-center">
-              <CheckCircle2 className="w-10 h-10 text-[#30D158]" />
+          <div className="rounded-3xl bg-card border border-emerald-500/40 p-10 flex flex-col items-center text-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+              <CheckCircle2 className="w-10 h-10 text-emerald-600" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-[#30D158]">Checked In!</h2>
+              <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight text-emerald-600">Checked In!</h2>
               <p className="text-muted-foreground mt-1">You're all set. Enjoy the service!</p>
             </div>
             <Link href="/">
@@ -486,12 +486,12 @@ export default function CheckIn() {
     return (
       <Layout>
         <div className="max-w-sm mx-auto pt-12 px-4">
-          <div className="rounded-3xl bg-gradient-to-br from-[#FF9F0A]/15 to-[#FF9F0A]/5 border border-[#FF9F0A]/30 p-10 flex flex-col items-center text-center gap-4 shadow-sm">
-            <div className="w-20 h-20 rounded-full bg-[#FF9F0A]/20 flex items-center justify-center">
-              <Clock className="w-10 h-10 text-[#FF9F0A]" />
+          <div className="rounded-3xl bg-card border border-amber-500/40 p-10 flex flex-col items-center text-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+              <Clock className="w-10 h-10 text-amber-600" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-[#FF9F0A]">Pending Approval</h2>
+              <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight text-amber-600">Pending Approval</h2>
               <p className="text-muted-foreground mt-1">Your check-in was submitted. A leader will approve it shortly.</p>
             </div>
             <Link href="/">
@@ -542,7 +542,7 @@ export default function CheckIn() {
 
         {/* Page title */}
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Friday Check-In</h1>
+          <h1 className="font-[family-name:var(--app-font-heading)] text-4xl font-semibold tracking-tight text-foreground">Friday Check-In</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             Check-in is available every Friday from 18:30 to 22:00 SAST
           </p>
@@ -557,13 +557,13 @@ export default function CheckIn() {
 
             {/* Not signed in */}
             {!isSignedIn && (
-              <div className="rounded-2xl border border-[#0A84FF]/30 bg-[#0A84FF]/8 px-5 py-4 text-sm text-[#0A84FF]">
+              <div className="rounded-2xl border border-primary/30 bg-primary/5 px-5 py-4 text-sm text-foreground">
                 Please{" "}
-                <Link href="/sign-in" className="underline underline-offset-4 font-semibold">
+                <Link href="/sign-in" className="text-primary underline underline-offset-4 font-semibold">
                   sign in
                 </Link>{" "}
                 to check in. First timer?{" "}
-                <Link href="/register" className="underline underline-offset-4 font-semibold">
+                <Link href="/register" className="text-primary underline underline-offset-4 font-semibold">
                   Register here
                 </Link>
                 .
@@ -608,18 +608,18 @@ export default function CheckIn() {
 
             {/* Flow A: QR Scanner */}
             {isSignedIn && flowMode === "qr" && (
-              <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-5">
+              <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
                 {!isScanning ? (
                   <div className="flex flex-col items-center gap-5 py-4">
-                    <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#0A84FF]/20 to-[#30D158]/10 flex items-center justify-center">
-                      <QrCode className="w-10 h-10 text-[#0A84FF]" />
+                    <div className="w-20 h-20 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                      <QrCode className="w-10 h-10 text-primary" />
                     </div>
                     <div className="text-center">
                       <p className="font-medium text-foreground">Scan Session QR</p>
                       <p className="text-sm text-muted-foreground mt-1">Point your camera at the QR code displayed at the venue</p>
                     </div>
                     <Button
-                      className="w-full h-12 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#0A84FF] to-[#32ADE6] hover:opacity-90 border-0"
+                      className="w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
                       onClick={startQRScanner}
                     >
                       <Camera className="w-4 h-4 mr-2" />
@@ -633,7 +633,7 @@ export default function CheckIn() {
                   <div className="space-y-4">
                     <div
                       id="qr-reader"
-                      className="rounded-xl overflow-hidden border-2 border-[#0A84FF]"
+                      className="rounded-xl overflow-hidden border-2 border-primary"
                     />
                     <Button variant="outline" className="w-full rounded-xl" onClick={stopQRScanner}>
                       Cancel Scan
@@ -645,14 +645,14 @@ export default function CheckIn() {
 
             {/* Flow B: Search */}
             {isSignedIn && flowMode === "search" && (
-              <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-4">
+              <div className="rounded-2xl border border-border bg-card p-6 space-y-4">
                 <div className="relative">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     placeholder="Search by name or phone..."
                     value={searchQuery}
                     onChange={(e) => handleSearch(e.target.value)}
-                    className="pl-10 h-11 rounded-xl bg-muted/40 border-transparent focus:border-[#0A84FF]/40"
+                    className="pl-10 h-11 rounded-xl bg-card border-border focus:border-primary"
                   />
                 </div>
 
@@ -663,16 +663,16 @@ export default function CheckIn() {
                 )}
 
                 {searchResults.length > 0 && (
-                  <div className="rounded-xl border border-border/60 divide-y overflow-hidden max-h-56 overflow-y-auto">
+                  <div className="rounded-xl border border-border divide-y divide-border overflow-hidden max-h-56 overflow-y-auto">
                     {searchResults.map((profile) => (
                       <button
                         key={profile.id}
                         onClick={() => handleProfileCheckIn(profile.id)}
                         disabled={checkInStatus === "loading"}
-                        className="w-full px-4 py-3.5 text-left hover:bg-muted/50 transition-colors disabled:opacity-50 flex items-center gap-3"
+                        className="w-full px-4 py-3.5 text-left hover:bg-muted transition-colors disabled:opacity-50 flex items-center gap-3"
                       >
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#0A84FF]/20 to-[#30D158]/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-xs font-bold text-[#0A84FF]">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-primary">
                             {profile.full_name.charAt(0).toUpperCase()}
                           </span>
                         </div>
@@ -693,10 +693,10 @@ export default function CheckIn() {
                   </p>
                 )}
 
-                <div className="pt-2 border-t border-border/40">
+                <div className="pt-2 border-t border-border">
                   <p className="text-xs text-muted-foreground text-center mb-3">Or check in directly with your account</p>
                   <Button
-                    className="w-full h-12 rounded-xl text-sm font-semibold bg-gradient-to-r from-[#0A84FF] to-[#32ADE6] hover:opacity-90 border-0"
+                    className="w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
                     onClick={handleMemberCheckIn}
                     disabled={checkInStatus === "loading"}
                   >
@@ -712,7 +712,7 @@ export default function CheckIn() {
 
             <p className="text-center text-xs text-muted-foreground">
               Not a member yet?{" "}
-              <Link href="/register" className="text-[#0A84FF] hover:underline font-medium">
+              <Link href="/register" className="text-primary hover:underline font-medium">
                 Register as a first-timer
               </Link>
             </p>
@@ -724,7 +724,7 @@ export default function CheckIn() {
       <Dialog open={showMemberDialog} onOpenChange={setShowMemberDialog}>
         <DialogContent className="rounded-2xl max-w-sm">
           <DialogHeader>
-            <DialogTitle>Welcome!</DialogTitle>
+            <DialogTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Welcome!</DialogTitle>
             <DialogDescription>
               Are you a returning member or is this your first time here?
             </DialogDescription>
@@ -733,7 +733,7 @@ export default function CheckIn() {
             <Button
               onClick={handleMemberCheckIn}
               disabled={checkInStatus === "loading"}
-              className="w-full h-12 rounded-xl bg-gradient-to-r from-[#0A84FF] to-[#32ADE6] hover:opacity-90 border-0"
+              className="w-full h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {checkInStatus === "loading" ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -757,12 +757,12 @@ export default function CheckIn() {
       <Dialog open={showQRGenerator} onOpenChange={setShowQRGenerator}>
         <DialogContent className="rounded-2xl max-w-sm">
           <DialogHeader>
-            <DialogTitle>Today's Check-In QR</DialogTitle>
+            <DialogTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Today's Check-In QR</DialogTitle>
             <DialogDescription>Display this for members to scan and check in</DialogDescription>
           </DialogHeader>
           <div className="flex justify-center py-6">
             {generatedQR && (
-              <div className="bg-white p-4 rounded-2xl shadow-sm">
+              <div className="bg-white p-4 rounded-2xl border border-border">
                 <QRCodeDisplay url={generatedQR} size={220} />
               </div>
             )}

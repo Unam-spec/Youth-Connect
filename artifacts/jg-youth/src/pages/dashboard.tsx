@@ -506,7 +506,7 @@ export default function Dashboard() {
       return (
         <Layout>
           <div className="max-w-md mx-auto py-12 flex flex-col items-center justify-center gap-4">
-            <div className="w-8 h-8 animate-spin rounded-full border-4 border-t-teal-500 border-r-transparent border-b-transparent border-l-transparent" />
+            <div className="w-8 h-8 animate-spin rounded-full border-4 border-t-primary border-r-transparent border-b-transparent border-l-transparent" />
             <p className="text-muted-foreground text-sm font-medium">Verifying leader credentials…</p>
           </div>
         </Layout>
@@ -952,20 +952,19 @@ export default function Dashboard() {
     <Layout>
       <div className="space-y-5 pb-12">
         {/* ── Header ── */}
-        <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 bg-gradient-to-br from-teal-500/10 via-cyan-500/8 to-blue-600/10 p-6">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_rgba(20,184,166,0.08),_transparent_60%)] pointer-events-none" />
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between relative z-10">
+        <div className="rounded-2xl border border-border bg-card p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-400" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
                 </span>
-                <span className="text-xs font-semibold text-teal-400 uppercase tracking-widest">
+                <span className="text-xs font-semibold text-primary uppercase tracking-widest">
                   Live
                 </span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+              <h1 className="font-[family-name:var(--app-font-heading)] text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                 Leader Dashboard
               </h1>
               <p className="text-muted-foreground mt-1 text-sm">
@@ -980,7 +979,7 @@ export default function Dashboard() {
                   onClick={handleGenerateSessionQrCode}
                   disabled={isGeneratingQr}
                   size="sm"
-                  className="bg-teal-500 hover:bg-teal-400 text-white border-0 shadow-lg shadow-teal-500/20"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
                 >
                   <QrCode className="h-4 w-4 mr-2" />
                   {isGeneratingQr ? "Generating…" : "Session QR"}
@@ -989,8 +988,8 @@ export default function Dashboard() {
               <Badge
                 className={
                   session.role === "super_admin"
-                    ? "bg-purple-500/15 text-purple-300 border-purple-500/30"
-                    : "bg-blue-500/15 text-blue-300 border-blue-500/30"
+                    ? "bg-primary/10 text-primary border-primary/25"
+                    : "bg-blue-600/10 text-blue-700 border-blue-600/25"
                 }
                 variant="outline"
               >
@@ -1006,7 +1005,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <KpiCard
               title="Total Members"
-              icon={<Users className="h-4 w-4 text-teal-400" />}
+              icon={<Users className="h-4 w-4 text-primary" />}
               value={
                 kpis?.total_members && kpis.total_members > 0
                   ? kpis.total_members
@@ -1018,7 +1017,7 @@ export default function Dashboard() {
             />
             <KpiCard
               title="Today's Attendance"
-              icon={<CheckCircle className="h-4 w-4 text-cyan-400" />}
+              icon={<CheckCircle className="h-4 w-4 text-primary" />}
               value={kpis?.today_attendance}
               loading={isKpisLoading}
               lastUpdated={kpisUpdatedAt}
@@ -1026,7 +1025,7 @@ export default function Dashboard() {
             />
             <KpiCard
               title="New Visitors"
-              icon={<UserPlus className="h-4 w-4 text-blue-400" />}
+              icon={<UserPlus className="h-4 w-4 text-primary" />}
               value={kpis?.today_new_visitors}
               loading={isKpisLoading}
               lastUpdated={kpisUpdatedAt}
@@ -1034,7 +1033,7 @@ export default function Dashboard() {
             />
             <KpiCard
               title="Upcoming Events"
-              icon={<Calendar className="h-4 w-4 text-indigo-400" />}
+              icon={<Calendar className="h-4 w-4 text-primary" />}
               value={kpis?.upcoming_events_count}
               loading={isKpisLoading}
               lastUpdated={kpisUpdatedAt}
@@ -1045,15 +1044,15 @@ export default function Dashboard() {
 
         {/* ── Today's Check-ins banner ── */}
         {session.can_view_attendance && (
-          <div className="rounded-xl border border-teal-500/20 bg-gradient-to-r from-teal-500/8 to-transparent p-4">
+          <div className="rounded-xl border border-border bg-card p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-teal-400" />
-                <span className="text-sm font-semibold text-teal-300">
+                <CheckCircle className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">
                   Today's Check-ins
                 </span>
               </div>
-              <span className="text-3xl font-bold text-teal-300 tabular-nums">
+              <span className="text-3xl font-bold text-primary tabular-nums">
                 {isAttendanceLoading ? "—" : (attendance?.length ?? 0)}
               </span>
             </div>
@@ -1064,13 +1063,13 @@ export default function Dashboard() {
                 {attendance.slice(0, 10).map((record: any, i: number) => (
                   <span
                     key={record.id ?? i}
-                    className="text-xs px-2.5 py-0.5 rounded-full bg-teal-500/12 text-teal-300 font-medium border border-teal-500/20"
+                    className="text-xs px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium border border-primary/20"
                   >
                     {record.profile?.full_name ?? "Unknown"}
                   </span>
                 ))}
                 {attendance.length > 10 && (
-                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/60">
+                  <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
                     +{attendance.length - 10} more
                   </span>
                 )}
@@ -1092,14 +1091,14 @@ export default function Dashboard() {
             if (val === "manage") fetchLeaderPins();
           }}
         >
-          <TabsList className="grid grid-cols-4 gap-2 mb-6 bg-card/60 p-2 rounded-xl backdrop-blur-sm">
-            <TabsTrigger value="session" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+          <TabsList className="grid grid-cols-4 gap-2 mb-6 bg-muted p-2 rounded-xl">
+            <TabsTrigger value="session" className="rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Activity className="h-4 w-4 mr-2 hidden sm:block" /> Session
             </TabsTrigger>
-            <TabsTrigger value="members" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white relative">
+            <TabsTrigger value="members" className="rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground relative">
               <Users className="h-4 w-4 mr-2 hidden sm:block" /> Members
               {(kpis?.total_members ?? 0) > 0 && (
-                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-teal-600 text-[10px] text-white shadow-sm">
+                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground shadow-sm">
                     {kpis?.total_members ?? 0}
                  </span>
               )}
@@ -1112,13 +1111,13 @@ export default function Dashboard() {
                  </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="events" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white">
+            <TabsTrigger value="events" className="rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               <Calendar className="h-4 w-4 mr-2 hidden sm:block" /> Events
             </TabsTrigger>
-            <TabsTrigger value="manage" className="rounded-lg py-2 data-[state=active]:bg-teal-500 data-[state=active]:text-white relative">
+            <TabsTrigger value="manage" className="rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground relative">
               <Settings className="h-4 w-4 mr-2 hidden sm:block" /> Manage
               {(leaders?.length ?? 0) > 0 && (
-                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-purple-500 text-[10px] text-white shadow-sm">
+                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground shadow-sm">
                     {leaders?.length}
                  </span>
               )}
