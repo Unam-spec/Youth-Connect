@@ -589,10 +589,15 @@ router.patch("/profiles/:id/role", requireLeaderSession("super_admin"), async (r
         })
         .onConflictDoNothing();
     }
-    
+
     return res.json(updated);
   } catch (err) {
     req.log.error(err);
+    // Surface a Postgres unique-violation (e.g. a super-admin limit index) as a
+    // clean client error instead of a blank 500.
+    if (err && typeof err === "object" && "code" in err && (err as { code?: string }).code === "23505") {
+      return res.status(409).json({ error: "Super admin limit reached" });
+    }
     return res.status(500).json({ error: "Internal server error" });
   }
 });
