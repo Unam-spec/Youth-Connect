@@ -20,7 +20,7 @@ export function LeaderManagementPanel({
     <DashCard>
       <SectionTitle
         title="Leader Permissions"
-        icon={<ShieldAlert className="h-4 w-4 text-purple-400" />}
+        icon={<ShieldAlert className="h-4 w-4 text-primary" />}
       />
       <p className="text-xs text-muted-foreground mb-4">
         Control what each leader can access on their dashboard.

@@ -63,21 +63,21 @@ export function MemberDirectoryPanel({
   return (
     <DashCard>
       {sessionRole === "super_admin" && (
-        <div className="mb-5 flex items-center justify-between rounded-xl bg-purple-500/10 border border-purple-500/20 px-4 py-3">
+        <div className="mb-5 flex items-center justify-between rounded-xl bg-primary/5 border border-primary/20 px-4 py-3">
           <div className="flex items-center gap-2">
-            <Star className="h-4 w-4 text-purple-400" />
-            <span className="text-sm font-semibold text-purple-300">
+            <Star className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold text-primary">
               Super Admin Slots: {superAdminCount} / 4
             </span>
           </div>
-          <span className="text-xs text-purple-400 font-medium">Max 4 allowed</span>
+          <span className="text-xs text-primary/80 font-medium">Max 4 allowed</span>
         </div>
       )}
       
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SectionTitle
           title="Member Directory"
-          icon={<Users className="h-4 w-4 text-teal-400" />}
+          icon={<Users className="h-4 w-4 text-primary" />}
         />
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -85,7 +85,7 @@ export function MemberDirectoryPanel({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search name or phone…"
-            className="pl-9 border-teal-500/20 focus-visible:ring-teal-500/40 bg-card/50"
+            className="pl-9 bg-card"
           />
         </div>
       </div>
@@ -118,7 +118,7 @@ export function MemberDirectoryPanel({
             return (
               <div
                 key={profile.id}
-                className="flex items-center justify-between rounded-xl border border-border/50 bg-card/30 p-4 hover:border-teal-500/30 hover:bg-teal-500/3 transition-all"
+                className="flex items-center justify-between rounded-xl border border-border bg-card p-4 hover:border-primary/30 hover:bg-muted/40 transition-all"
               >
                 <div className="flex items-center gap-4">
                   <div 
@@ -128,10 +128,10 @@ export function MemberDirectoryPanel({
                       }
                     }}
                     className={`h-12 w-12 rounded-full overflow-hidden flex items-center justify-center shrink-0 text-lg font-bold border ${profile.avatar_url ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''} ${
-                    targetRole === "super_admin" ? "bg-amber-100 text-amber-800 border-amber-200" :
-                    targetRole === "leader" ? "bg-teal-100 text-teal-800 border-teal-200" :
-                    targetRole === "member" ? "bg-slate-100 text-slate-700 border-slate-200" :
-                    "bg-gray-100 text-gray-500 border-gray-200"
+                    targetRole === "super_admin" ? "bg-primary/10 text-primary border-primary/20" :
+                    targetRole === "leader" ? "bg-blue-600/10 text-blue-700 border-blue-600/20" :
+                    targetRole === "member" ? "bg-muted text-foreground border-border" :
+                    "bg-muted text-muted-foreground border-border"
                   }`}>
                     {profile.avatar_url ? (
                       profile.avatar_url.startsWith("gradient:") ? (
@@ -284,7 +284,7 @@ export function MemberDirectoryPanel({
           <select
             value={mergeFromId}
             onChange={(e) => setMergeFromId(e.target.value)}
-            className="w-full bg-card/50 border border-border/60 rounded-xl h-10 px-3 text-sm mb-4"
+            className="w-full bg-card border border-border rounded-xl h-10 px-3 text-sm mb-4"
           >
             <option value="">Select profile to merge from…</option>
             {(profiles ?? []).filter((p: any) => p.id !== mergeKeep?.id).map((p: any) => (

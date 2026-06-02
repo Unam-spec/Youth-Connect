@@ -73,20 +73,20 @@ export function DeleteConfirmPanel({
         open={showWipeConfirm}
         onOpenChange={setShowWipeConfirm}
       >
-        <AlertDialogContent className="bg-stone-900 text-white border-slate-800">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-400 font-bold">Wipe All Test Data</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-300">
+            <AlertDialogTitle className="text-destructive font-bold">Wipe All Test Data</AlertDialogTitle>
+            <AlertDialogDescription>
               Are you absolutely sure you want to delete all events, check-ins, RSVPs, attendance, and non-admin members?
               This action cannot be undone and will completely wipe the database clean.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700">Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleWipeData}
               disabled={isWipingData}
-              className="bg-red-650 hover:bg-red-500 text-white font-semibold border-0"
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold border-0"
             >
               {isWipingData ? "Wiping Data..." : "Wipe Everything"}
             </AlertDialogAction>

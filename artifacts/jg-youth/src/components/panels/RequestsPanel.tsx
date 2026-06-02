@@ -45,7 +45,7 @@ export function RequestsPanel({
             {requests.map((req: any) => (
               <div
                 key={req.id}
-                className="flex flex-col gap-3 rounded-xl border border-border/50 bg-card/30 p-4 sm:flex-row sm:items-center sm:justify-between hover:border-amber-500/30 transition-colors"
+                className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-center sm:justify-between hover:border-amber-500/30 transition-colors"
               >
                 <div>
                   <p className="font-semibold text-sm">
@@ -55,7 +55,7 @@ export function RequestsPanel({
                     {req.profile?.phone ?? "No phone"}
                   </p>
                   {req.reason && (
-                    <p className="text-xs italic text-slate-400 mt-2 bg-black/20 p-2 rounded-md">
+                    <p className="text-xs italic text-muted-foreground mt-2 bg-muted p-2 rounded-md">
                       "{req.reason}"
                     </p>
                   )}
@@ -64,7 +64,7 @@ export function RequestsPanel({
                   <Button
                     size="sm"
                     onClick={() => mutateRequest("approve", req.id)}
-                    className="h-7 text-xs bg-teal-500 hover:bg-teal-400 text-white border-0"
+                    className="h-7 text-xs bg-primary hover:bg-primary/90 text-primary-foreground border-0"
                   >
                     Approve
                   </Button>
@@ -122,13 +122,13 @@ export function RequestsPanel({
 
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     {req.age && (
-                      <div className="flex flex-col bg-background/50 rounded-lg p-2 border border-border/50">
+                      <div className="flex flex-col bg-muted/40 rounded-lg p-2 border border-border">
                         <span className="text-muted-foreground font-medium mb-0.5">Age</span>
                         <span className="font-semibold">{req.age}</span>
                       </div>
                     )}
                     {req.school && (
-                      <div className="flex flex-col bg-background/50 rounded-lg p-2 border border-border/50">
+                      <div className="flex flex-col bg-muted/40 rounded-lg p-2 border border-border">
                         <span className="text-muted-foreground font-medium mb-0.5 flex items-center gap-1">
                           <GraduationCap className="w-3 h-3" /> School
                         </span>
@@ -136,7 +136,7 @@ export function RequestsPanel({
                       </div>
                     )}
                     {req.parent_phone && (
-                      <div className="flex flex-col bg-background/50 rounded-lg p-2 border border-border/50 col-span-2 sm:col-span-1">
+                      <div className="flex flex-col bg-muted/40 rounded-lg p-2 border border-border col-span-2 sm:col-span-1">
                         <span className="text-muted-foreground font-medium mb-0.5 flex items-center gap-1">
                           <Users className="w-3 h-3" /> Parent Phone
                         </span>
@@ -144,7 +144,7 @@ export function RequestsPanel({
                       </div>
                     )}
                     {req.how_did_you_hear && (
-                      <div className="flex flex-col bg-background/50 rounded-lg p-2 border border-border/50 col-span-2 sm:col-span-1">
+                      <div className="flex flex-col bg-muted/40 rounded-lg p-2 border border-border col-span-2 sm:col-span-1">
                         <span className="text-muted-foreground font-medium mb-0.5">Discovery</span>
                         <span className="font-semibold truncate" title={req.how_did_you_hear}>{req.how_did_you_hear}</span>
                       </div>

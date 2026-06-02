@@ -25,7 +25,7 @@ export function AdminSlotsPanel({
     <DashCard>
       <SectionTitle
         title="Super Admin Slots"
-        icon={<Star className="h-4 w-4 text-purple-400" />}
+        icon={<Star className="h-4 w-4 text-primary" />}
       />
       {isProfilesLoading ? (
         <SkeletonRows />
@@ -36,7 +36,7 @@ export function AdminSlotsPanel({
               {Array.from({ length: 4 }).map((_, i) => (
                 <div
                   key={i}
-                  className={`h-2 w-8 rounded-full ${i < superAdminCount ? "bg-purple-500" : "bg-muted"}`}
+                  className={`h-2 w-8 rounded-full ${i < superAdminCount ? "bg-primary" : "bg-muted"}`}
                 />
               ))}
             </div>
@@ -50,10 +50,10 @@ export function AdminSlotsPanel({
               .map((admin: any) => (
                 <div
                   key={admin.id}
-                  className="flex items-center justify-between rounded-xl border border-purple-500/20 bg-purple-500/5 p-4"
+                  className="flex items-center justify-between rounded-xl border border-primary/20 bg-primary/5 p-4"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-full overflow-hidden bg-purple-500/20 flex items-center justify-center text-sm font-bold text-purple-300">
+                    <div className="h-9 w-9 rounded-full overflow-hidden bg-primary/10 flex items-center justify-center text-sm font-bold text-primary">
                       {admin.avatar_url ? (
                         admin.avatar_url.startsWith("gradient:") ? (
                           <div
@@ -81,7 +81,7 @@ export function AdminSlotsPanel({
                     </div>
                   </div>
                   <Badge
-                    className="bg-purple-500/15 text-purple-300 border-purple-500/30"
+                    className="bg-primary/10 text-primary border-primary/25"
                     variant="outline"
                   >
                     Super Admin
@@ -89,7 +89,7 @@ export function AdminSlotsPanel({
                 </div>
               ))}
           </div>
-          <div className="border-t border-border/40 pt-4 flex flex-col gap-4">
+          <div className="border-t border-border pt-4 flex flex-col gap-4">
             <div>
               <p className="text-sm font-semibold mb-1">Your PIN</p>
               <p className="text-xs text-muted-foreground mb-3">
@@ -102,14 +102,14 @@ export function AdminSlotsPanel({
                 variant="outline"
                 size="sm"
                 onClick={() => setShowPinDialog(true)}
-                className="border-teal-500/30 hover:border-teal-500 hover:text-teal-300 transition-colors"
+                className="border-primary/30 hover:border-primary hover:text-primary transition-colors"
               >
                 {hasPin ? "Change PIN" : "Set PIN"}
               </Button>
             </div>
 
-            <div className="border-t border-border/40 pt-4">
-              <p className="text-sm font-semibold text-red-400 mb-1">Danger Zone</p>
+            <div className="border-t border-border pt-4">
+              <p className="text-sm font-semibold text-destructive mb-1">Danger Zone</p>
               <p className="text-xs text-muted-foreground mb-3">
                 Completely wipe all events, attendance records, RSVPs, check-ins, and non-admin members. This action is irreversible.
               </p>
@@ -118,7 +118,7 @@ export function AdminSlotsPanel({
                 variant="destructive"
                 size="sm"
                 onClick={() => setShowWipeConfirm(true)}
-                className="bg-red-950 hover:bg-red-900 border border-red-500/35 text-red-200"
+                className="bg-destructive/10 hover:bg-destructive/20 border border-destructive/35 text-destructive"
               >
                 Wipe All Test Data
               </Button>

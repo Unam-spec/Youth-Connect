@@ -23,7 +23,7 @@ export function RSVPPanel({
     <DashCard>
       <SectionTitle
         title="Event RSVPs"
-        icon={<Users className="h-4 w-4 text-teal-400" />}
+        icon={<Users className="h-4 w-4 text-primary" />}
       />
       {isEventsLoading ? (
         <SkeletonRows count={1} />
@@ -49,7 +49,7 @@ export function RSVPPanel({
             <SkeletonRows />
           ) : rsvps.length > 0 ? (
             <>
-              <div className="text-sm font-medium mb-2 text-teal-300">
+              <div className="text-sm font-medium mb-2 text-primary">
                 Total RSVPs: {rsvps.length}
               </div>
               <SimpleTable

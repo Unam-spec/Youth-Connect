@@ -44,7 +44,7 @@ export function AttendancePanel({
       <DashCard>
         <SectionTitle
           title="Today's Check-ins"
-          icon={<CheckCircle className="h-4 w-4 text-teal-400" />}
+          icon={<CheckCircle className="h-4 w-4 text-primary" />}
         />
         {isAttendanceLoading ? (
           <SkeletonRows />
@@ -68,7 +68,7 @@ export function AttendancePanel({
         <div className="flex items-center justify-between mb-1">
           <SectionTitle
             title="Member Check-in Approvals"
-            icon={<UserCheck className="h-4 w-4 text-teal-400" />}
+            icon={<UserCheck className="h-4 w-4 text-primary" />}
           />
           <Button
             id="btn-refresh-checkins"
@@ -76,7 +76,7 @@ export function AttendancePanel({
             size="sm"
             onClick={fetchPendingCheckIns}
             disabled={isPendingLoading}
-            className="text-muted-foreground hover:text-teal-400 -mt-4"
+            className="text-muted-foreground hover:text-primary -mt-4"
           >
             <RefreshCw
               className={`w-3.5 h-3.5 mr-1 ${isPendingLoading ? "animate-spin" : ""}`}

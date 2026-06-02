@@ -86,77 +86,77 @@ export function DialogManager(props: DialogManagerProps) {
       </Dialog>
 
       <Dialog open={props.showEditDialog} onOpenChange={props.setShowEditDialog}>
-        <DialogContent className="sm:max-w-lg rounded-2xl bg-slate-800/95 text-white border-slate-700 shadow-2xl backdrop-blur-sm overflow-y-auto max-h-[90vh]">
+        <DialogContent className="sm:max-w-lg rounded-2xl bg-popover text-popover-foreground border border-border overflow-y-auto max-h-[90vh]">
           <DialogHeader>
-            <DialogTitle className="text-white font-bold">Edit Profile Details</DialogTitle>
-            <DialogDescription className="text-slate-300">
+            <DialogTitle className="text-foreground font-bold">Edit Profile Details</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
               Update member details directly. Ensure all details are accurate.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="edit-name" className="text-slate-200">Full Name *</Label>
+              <Label htmlFor="edit-name" className="text-foreground">Full Name *</Label>
               <Input
                 id="edit-name"
                 value={props.editFullName}
                 onChange={(e) => props.setEditFullName(e.target.value)}
                 placeholder="John Doe"
-                className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                className="bg-card border-border rounded-xl"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="edit-phone" className="text-slate-200">Phone Number</Label>
+                <Label htmlFor="edit-phone" className="text-foreground">Phone Number</Label>
                 <Input
                   id="edit-phone"
                   value={props.editPhone}
                   onChange={(e) => props.setEditPhone(e.target.value)}
                   placeholder="082 123 4567"
-                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                  className="bg-card border-border rounded-xl"
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="edit-email" className="text-slate-200">Email</Label>
+                <Label htmlFor="edit-email" className="text-foreground">Email</Label>
                 <Input
                   id="edit-email"
                   type="email"
                   value={props.editEmail}
                   onChange={(e) => props.setEditEmail(e.target.value)}
                   placeholder="john@example.com"
-                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                  className="bg-card border-border rounded-xl"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label htmlFor="edit-gender" className="text-slate-200">Gender</Label>
+                <Label htmlFor="edit-gender" className="text-foreground">Gender</Label>
                 <select
                   id="edit-gender"
                   value={props.editGender}
                   onChange={(e: any) => props.setEditGender(e.target.value)}
-                  className="flex h-9 w-full rounded-md border border-slate-700 bg-slate-950/50 px-3 py-1 text-sm text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-teal-500 rounded-xl"
+                  className="flex h-9 w-full rounded-md border border-border bg-card px-3 py-1 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-xl"
                 >
-                  <option value="male" className="bg-slate-800 text-white">Male</option>
-                  <option value="female" className="bg-slate-800 text-white">Female</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="edit-age" className="text-slate-200">Age</Label>
+                <Label htmlFor="edit-age" className="text-foreground">Age</Label>
                 <Input
                   id="edit-age"
                   type="number"
                   value={props.editAge}
                   onChange={(e) => props.setEditAge(parseInt(e.target.value) || 0)}
-                  className="bg-slate-950/50 border-slate-700 text-white focus:border-teal-500 focus:ring-teal-500 rounded-xl"
+                  className="bg-card border-border rounded-xl"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5 relative">
-              <Label htmlFor="edit-school" className="text-slate-200">School / University</Label>
+              <Label htmlFor="edit-school" className="text-foreground">School / University</Label>
               <div className="relative">
                 <Input
                   id="edit-school"
@@ -168,14 +168,14 @@ export function DialogManager(props: DialogManagerProps) {
                     props.setEditShowSchoolDropdown(true);
                   }}
                   placeholder="Start typing school or university..."
-                  className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl pr-10"
+                  className="bg-card border-border rounded-xl pr-10"
                 />
-                <div className="absolute right-3 top-2.5 text-slate-400">
+                <div className="absolute right-3 top-2.5 text-muted-foreground">
                   <GraduationCap className="w-4 h-4" />
                 </div>
               </div>
               {props.editShowSchoolDropdown && (
-                <div className="absolute z-50 w-full mt-1 bg-slate-800/95 border border-slate-700 rounded-xl shadow-xl max-h-40 overflow-y-auto backdrop-blur-md">
+                <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-xl max-h-40 overflow-y-auto">
                   {[
                     "University of Namibia (UNAM)",
                     "Namibia University of Science and Technology (NUST)",
@@ -190,13 +190,13 @@ export function DialogManager(props: DialogManagerProps) {
                         props.setEditSchool(schoolName);
                         props.setEditShowSchoolDropdown(false);
                       }}
-                      className="px-4 py-2 text-sm text-slate-200 hover:bg-teal-500/20 hover:text-teal-400 cursor-pointer flex items-center justify-between transition-colors duration-150"
+                      className="px-4 py-2 text-sm text-popover-foreground hover:bg-primary/10 hover:text-primary cursor-pointer flex items-center justify-between transition-colors duration-150"
                     >
                       <span className="flex items-center gap-2">
                         <BookOpen className="w-3.5 h-3.5" />
                         {schoolName}
                       </span>
-                      {props.editSchool === schoolName && <Check className="w-3.5 h-3.5 text-teal-400" />}
+                      {props.editSchool === schoolName && <Check className="w-3.5 h-3.5 text-primary" />}
                     </div>
                   ))}
                   {props.editSchool && ![
@@ -209,7 +209,7 @@ export function DialogManager(props: DialogManagerProps) {
                   ].includes(props.editSchool) && (
                     <div
                       onClick={() => props.setEditShowSchoolDropdown(false)}
-                      className="px-4 py-2 text-sm text-teal-400 hover:bg-teal-500/10 cursor-pointer italic flex items-center gap-2"
+                      className="px-4 py-2 text-sm text-primary hover:bg-primary/10 cursor-pointer italic flex items-center gap-2"
                     >
                       <Check className="w-3.5 h-3.5" />
                       Use Custom: "{props.editSchool}"
@@ -219,48 +219,48 @@ export function DialogManager(props: DialogManagerProps) {
               )}
             </div>
 
-            <div className="bg-slate-950/40 border border-slate-800/80 rounded-xl p-4 space-y-3 shadow-xs">
-              <div className="flex items-center gap-2 text-teal-400 font-semibold text-xs border-b border-slate-800/60 pb-1.5">
+            <div className="bg-muted/40 border border-border rounded-xl p-4 space-y-3 shadow-xs">
+              <div className="flex items-center gap-2 text-primary font-semibold text-xs border-b border-border pb-1.5">
                 <User className="w-3.5 h-3.5" />
                 Parent / Guardian Details
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="edit-parent-name" className="text-xs text-slate-300">Parent/Guardian Name</Label>
+                  <Label htmlFor="edit-parent-name" className="text-xs text-muted-foreground">Parent/Guardian Name</Label>
                   <Input
                     id="edit-parent-name"
                     value={props.editParentName}
                     onChange={(e) => props.setEditParentName(e.target.value)}
                     placeholder="Mary Doe"
-                    className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-9 text-sm"
+                    className="bg-card border-border rounded-xl h-9 text-sm"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="edit-parent-phone" className="text-xs text-slate-300">Parent/Guardian Phone</Label>
+                  <Label htmlFor="edit-parent-phone" className="text-xs text-muted-foreground">Parent/Guardian Phone</Label>
                   <Input
                     id="edit-parent-phone"
                     value={props.editParentPhone}
                     onChange={(e) => props.setEditParentPhone(e.target.value)}
                     placeholder="081 123 4567"
-                    className="bg-slate-950/50 border-slate-700 text-white placeholder:text-slate-500 focus:border-teal-500 focus:ring-teal-500 rounded-xl h-9 text-sm"
+                    className="bg-card border-border rounded-xl h-9 text-sm"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex items-start space-x-3 space-y-0 rounded-xl border border-slate-850 bg-slate-950/30 p-3 shadow-xs">
+            <div className="flex items-start space-x-3 space-y-0 rounded-xl border border-border bg-muted/40 p-3 shadow-xs">
               <input
                 type="checkbox"
                 id="edit-whatsapp-opt-in"
                 checked={props.editWhatsappOptIn}
                 onChange={(e) => props.setEditWhatsappOptIn(e.target.checked)}
-                className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-700 bg-slate-950/50 cursor-pointer mt-0.5"
+                className="w-4 h-4 rounded text-primary focus:ring-ring border-border bg-card cursor-pointer mt-0.5"
               />
               <div className="space-y-1 leading-none cursor-pointer" onClick={() => props.setEditWhatsappOptIn(!props.editWhatsappOptIn)}>
-                <Label htmlFor="edit-whatsapp-opt-in" className="text-xs font-semibold text-slate-200 cursor-pointer">
+                <Label htmlFor="edit-whatsapp-opt-in" className="text-xs font-semibold text-foreground cursor-pointer">
                   Join the Youth Connect WhatsApp Group
                 </Label>
-                <p className="text-[10px] text-slate-400 mt-0.5">
+                <p className="text-[10px] text-muted-foreground mt-0.5">
                   Get session details and announcements directly on WhatsApp.
                 </p>
               </div>
@@ -272,14 +272,14 @@ export function DialogManager(props: DialogManagerProps) {
               variant="outline"
               onClick={() => props.setShowEditDialog(false)}
               disabled={props.isSavingEdit}
-              className="rounded-xl border-slate-700 hover:bg-slate-800 text-slate-200"
+              className="rounded-xl"
             >
               Cancel
             </Button>
             <Button
               onClick={props.handleSaveEdit}
               disabled={props.isSavingEdit}
-              className="rounded-xl bg-teal-500 hover:bg-teal-400 text-white font-semibold border-0"
+              className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold border-0"
             >
               {props.isSavingEdit ? "Saving…" : "Save Changes"}
             </Button>
@@ -330,7 +330,7 @@ export function DialogManager(props: DialogManagerProps) {
             <Button
               onClick={props.handleSetLeaderPin}
               disabled={props.leaderPinInput.length !== 4}
-              className="bg-teal-500 hover:bg-teal-400 text-white border-0"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
             >
               Set PIN
             </Button>
@@ -369,7 +369,7 @@ export function DialogManager(props: DialogManagerProps) {
               id="btn-save-pin"
               onClick={props.handleSavePin}
               disabled={props.pin.length !== 4}
-              className="bg-teal-500 hover:bg-teal-400 text-white border-0"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
             >
               {props.hasPin ? "Update PIN" : "Set PIN"}
             </Button>
