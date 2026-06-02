@@ -12,6 +12,8 @@
   "dependencies": {
     "@clerk/react": "^6.6.1",
     "@clerk/themes": "^2.4.57",
+    "@fontsource-variable/fraunces": "^5.2.5",
+    "@fontsource-variable/hanken-grotesk": "^5.2.5",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/sora": "^5.2.8",
     "@sentry/react": "^8.0.0",
