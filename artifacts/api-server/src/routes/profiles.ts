@@ -26,6 +26,7 @@ import { parseMembersDirectoryQuery } from "../lib/membersDirectoryQuery";
 import { normalizePhone } from "../lib/phone";
 import { deleteProfileCascade } from "../lib/deleteProfileCascade";
 import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembershipRequest";
+import { mergeProfiles } from "../lib/mergeProfiles";
 
 const router = Router();
 
@@ -746,6 +747,45 @@ router.post("/profiles/avatar/upload", upload.single("file"), async (req: Reques
     }
     req.log.error(err);
     return res.status(500).json({ error: err.message || "Failed to upload avatar" });
+  }
+});
+
+// POST /profiles/merge - merge a duplicate profile into another (super admin only)
+router.post("/profiles/merge", requireLeaderSession("super_admin"), async (req: Request, res: Response) => {
+  try {
+    const { keepId, mergeId } = req.body ?? {};
+    if (typeof keepId !== "string" || typeof mergeId !== "string") {
+      return res.status(400).json({ error: "keepId and mergeId are required" });
+    }
+    if (keepId === mergeId) {
+      return res.status(400).json({ error: "Cannot merge a profile into itself" });
+    }
+
+    let mergeClerkId: string | null = null;
+    try {
+      ({ mergeClerkId } = await mergeProfiles(keepId, mergeId));
+    } catch (err) {
+      if (err instanceof Error && err.message === "PROFILE_NOT_FOUND") {
+        return res.status(404).json({ error: "Profile not found" });
+      }
+      throw err;
+    }
+
+    if (mergeClerkId && process.env.CLERK_SECRET_KEY) {
+      try {
+        await fetch(`https://api.clerk.com/v1/users/${mergeClerkId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+        });
+      } catch (clerkErr) {
+        req.log.warn({ clerkErr }, "Failed to delete merged Clerk user — DB merge already done");
+      }
+    }
+
+    return res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 });
 
