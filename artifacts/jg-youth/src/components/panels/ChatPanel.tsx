@@ -170,6 +170,7 @@ export function ChatPanel({
     let isMounted = true;
     let eventSource: EventSource | null = null;
     let pollingInterval: ReturnType<typeof setInterval> | null = null;
+    let connectTimer: ReturnType<typeof setTimeout> | null = null;
 
     async function fetchHistory() {
       try {
@@ -223,7 +224,21 @@ export function ChatPanel({
 
         eventSource = new EventSource(url);
 
+        // If the stream neither opens nor errors within a few seconds (e.g. it
+        // hangs behind a proxy), fall back to polling so history still loads.
+        connectTimer = setTimeout(() => {
+          if (isMounted && eventSource && eventSource.readyState !== EventSource.OPEN) {
+            console.warn("SSE connect timeout — falling back to polling");
+            cleanupSSE();
+            startPolling();
+          }
+        }, 4000);
+
         eventSource.onopen = () => {
+          if (connectTimer) {
+            clearTimeout(connectTimer);
+            connectTimer = null;
+          }
           if (isMounted) setChatConnectionStatus("connected");
         };
 
@@ -281,6 +296,10 @@ export function ChatPanel({
 
         eventSource.onerror = () => {
           if (!isMounted) return;
+          if (connectTimer) {
+            clearTimeout(connectTimer);
+            connectTimer = null;
+          }
           console.warn("SSE connection error — falling back to polling");
           cleanupSSE();
           startPolling();
@@ -293,6 +312,7 @@ export function ChatPanel({
 
     function startPolling() {
       if (!isMounted) return;
+      if (pollingInterval) return; // already polling — don't stack intervals
       setChatConnectionStatus("polling");
       fetchHistory();
       pollingInterval = setInterval(fetchHistory, 5000);
@@ -312,6 +332,7 @@ export function ChatPanel({
     return () => {
       isMounted = false;
       cleanupSSE();
+      if (connectTimer) clearTimeout(connectTimer);
       if (pollingInterval) clearInterval(pollingInterval);
     };
   }, [activeTab, isSignedIn, getToken]);
@@ -342,6 +363,19 @@ export function ChatPanel({
       });
 
       if (!response.ok) throw new Error("Failed to send message");
+
+      // Optimistically append the created message so the sender sees it
+      // immediately, instead of waiting for the SSE echo (which may be down).
+      const created = await response.json();
+      const mapped: ChatMessage = {
+        ...created,
+        deletedForEveryone: created.deletedForEveryone ?? created.deleted_for_everyone ?? false,
+        deletedForSender: created.deletedForSender ?? created.deleted_for_sender ?? false,
+        replyToId: created.replyToId ?? created.reply_to_id ?? null,
+      };
+      setChatMessages((prev) =>
+        prev.some((m) => m.id === mapped.id) ? prev : [...prev, mapped],
+      );
 
       setTimeout(() => {
         if (chatMessagesContainerRef.current) {

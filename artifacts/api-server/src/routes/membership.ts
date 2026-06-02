@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db, membershipRequestsTable, profilesTable, pendingEmailsTable } from "@workspace/db";
 import { CreateMembershipRequestBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembershipRequest";
 
 const router = Router();
 
@@ -67,6 +68,9 @@ router.post("/membership-requests", async (req, res) => {
         status: "pending",
       })
       .returning();
+
+    await notifyLeadersOfMembershipRequest(profile.full_name, parsed.data.reason);
+
     return res.status(201).json({ ...request, profile });
   } catch (err) {
     req.log.error(err);
