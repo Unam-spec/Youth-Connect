@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
-import { eq, ilike, or, and, count, inArray } from "drizzle-orm";
+import { eq, ilike, or, and, count, inArray, sql, ne } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import {
@@ -23,8 +23,31 @@ import {
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { resolveAuth } from "../lib/permissions";
 import { parseMembersDirectoryQuery } from "../lib/membersDirectoryQuery";
+import { normalizePhone } from "../lib/phone";
 
 const router = Router();
+
+/**
+ * Returns true if another profile already uses this phone (normalized).
+ * `excludeId` lets a self-update skip its own row.
+ */
+async function phoneInUse(phone: unknown, excludeId?: string): Promise<boolean> {
+  const norm = normalizePhone(phone);
+  if (!norm) return false;
+  const rows = await db
+    .select({ id: profilesTable.id })
+    .from(profilesTable)
+    .where(
+      excludeId
+        ? and(
+            sql`lower(btrim(${profilesTable.phone})) = ${norm}`,
+            ne(profilesTable.id, excludeId),
+          )
+        : sql`lower(btrim(${profilesTable.phone})) = ${norm}`,
+    )
+    .limit(1);
+  return rows.length > 0;
+}
 
 // GET /profiles/me - Retrieve current logged in Clerk user's profile
 router.get("/profiles/me", async (req: Request, res: Response) => {
@@ -113,6 +136,9 @@ router.patch("/profiles/me", async (req: Request, res: Response) => {
       where: eq(profilesTable.clerk_id, clerkId),
     });
     if (!existing) return res.status(404).json({ error: "Profile not found" });
+    if (parsed.data.phone !== undefined && (await phoneInUse(parsed.data.phone, existing.id))) {
+      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    }
     const [updated] = await db
       .update(profilesTable)
       .set(parsed.data)
@@ -185,6 +211,10 @@ router.post("/profiles/register/first-timer", async (req: Request, res: Response
       return res.status(400).json({ error: parsed.error.flatten() });
 
     const { clerk_id, ...rest } = parsed.data;
+
+    if (await phoneInUse(parsed.data.phone)) {
+      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    }
 
     // Generate secure 32-byte hexadecimal link verification token
     const token = crypto.randomBytes(32).toString("hex");
@@ -301,6 +331,9 @@ router.post("/profiles/register", async (req: Request, res: Response) => {
       return res.status(400).json({ error: parsed.error.flatten() });
     const auth = getAuth(req);
     const { clerk_id, ...rest } = parsed.data;
+    if (await phoneInUse(parsed.data.phone)) {
+      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    }
     const linkedClerkId = auth?.userId ?? clerk_id ?? null;
     const [profile] = await db
       .insert(profilesTable)
@@ -617,6 +650,10 @@ router.patch("/profiles/:id", requireLeaderSession("leader"), async (req: Reques
     if (parent_name !== undefined) updateData.parent_name = parent_name;
     if (whatsapp_opt_in !== undefined) updateData.whatsapp_opt_in = whatsapp_opt_in;
     if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
+
+    if (updateData.phone !== undefined && (await phoneInUse(updateData.phone, req.params.id as string))) {
+      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    }
 
     const [updated] = await db
       .update(profilesTable)
