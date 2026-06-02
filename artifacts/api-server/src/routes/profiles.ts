@@ -24,6 +24,7 @@ import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { resolveAuth } from "../lib/permissions";
 import { parseMembersDirectoryQuery } from "../lib/membersDirectoryQuery";
 import { normalizePhone } from "../lib/phone";
+import { deleteProfileCascade } from "../lib/deleteProfileCascade";
 
 const router = Router();
 
@@ -680,21 +681,18 @@ router.delete("/profiles/:id", requireLeaderSession("super_admin"), async (req: 
       return res.status(404).json({ error: "Profile not found" });
     }
 
-    // Delete the profile (which should cascade or be handled)
-    await db.delete(profilesTable).where(eq(profilesTable.id, req.params.id as string));
+    await deleteProfileCascade(profile.id);
 
-    if (profile.clerk_id) {
+    if (profile.clerk_id && process.env.CLERK_SECRET_KEY) {
       try {
-        if (process.env.CLERK_SECRET_KEY) {
-          await fetch(`https://api.clerk.com/v1/users/${profile.clerk_id}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
-          });
-        }
+        await fetch(`https://api.clerk.com/v1/users/${profile.clerk_id}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
+        });
       } catch (clerkErr) {
         req.log.error(
           { clerkErr, orphanedClerkId: profile.clerk_id, profileId: req.params.id },
-          "Failed to delete Clerk user in post-delete-clerk-sync"
+          "Failed to delete Clerk user after profile cascade"
         );
       }
     }

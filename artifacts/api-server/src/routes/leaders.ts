@@ -9,6 +9,7 @@ import {
   VerifyLeaderPinBody,
 } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { deleteProfileCascade } from "../lib/deleteProfileCascade";
 
 const router = Router();
 
@@ -142,7 +143,8 @@ router.delete("/leaders/:profileId/account", requireLeaderSession("super_admin")
     });
     if (!target) return res.status(404).json({ error: "Profile not found" });
 
-    // Delete from Clerk if they have a clerk_id
+    await deleteProfileCascade(target.id);
+
     if (target.clerk_id && process.env.CLERK_SECRET_KEY) {
       try {
         await fetch(`https://api.clerk.com/v1/users/${target.clerk_id}`, {
@@ -150,12 +152,9 @@ router.delete("/leaders/:profileId/account", requireLeaderSession("super_admin")
           headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` },
         });
       } catch (clerkErr) {
-        req.log.warn({ clerkErr }, "Failed to delete Clerk user — continuing with DB delete");
+        req.log.warn({ clerkErr }, "Failed to delete Clerk user — DB row already removed");
       }
     }
-
-    await db.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, req.params.profileId as string));
-    await db.delete(profilesTable).where(eq(profilesTable.id, req.params.profileId as string));
 
     return res.status(204).send();
   } catch (err) {
