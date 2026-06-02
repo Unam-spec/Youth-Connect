@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
-import { eq, ilike, or, and, count } from "drizzle-orm";
+import { eq, ilike, or, and, count, inArray } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import {
@@ -22,6 +22,7 @@ import {
 } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { resolveAuth } from "../lib/permissions";
+import { parseMembersDirectoryQuery } from "../lib/membersDirectoryQuery";
 
 const router = Router();
 
@@ -317,6 +318,62 @@ router.post("/profiles/register", async (req: Request, res: Response) => {
 });
 
 // GET /profiles - Enforced Paginated profiles listing (protected: leaders and super_admins)
+// GET /profiles/members-directory - member|leader|super_admin only (protected: leaders)
+router.get(
+  "/profiles/members-directory",
+  requireLeaderSession("leader"),
+  async (req: Request, res: Response) => {
+    try {
+      const { search, role, page, limit, offset } = parseMembersDirectoryQuery(req.query);
+
+      const roleFilter = role
+        ? eq(profilesTable.role, role)
+        : inArray(profilesTable.role, ["member", "leader", "super_admin"]);
+      const searchFilter = search
+        ? or(
+            ilike(profilesTable.full_name, `%${search}%`),
+            ilike(profilesTable.phone, `%${search}%`),
+          )
+        : undefined;
+      const whereClause = searchFilter ? and(roleFilter, searchFilter) : roleFilter;
+
+      const [countResult] = await db
+        .select({ value: count() })
+        .from(profilesTable)
+        .where(whereClause);
+      const total = countResult?.value ? Number(countResult.value) : 0;
+
+      const data = await db
+        .select({
+          id: profilesTable.id,
+          full_name: profilesTable.full_name,
+          role: profilesTable.role,
+          phone: profilesTable.phone,
+          email: profilesTable.email,
+          school: profilesTable.school,
+          parent_phone: profilesTable.parent_phone,
+          parent_name: profilesTable.parent_name,
+          whatsapp_opt_in: profilesTable.whatsapp_opt_in,
+          avatar_url: profilesTable.avatar_url,
+          created_at: profilesTable.created_at,
+          can_create_events: profilesTable.can_create_events,
+          can_view_kpis: profilesTable.can_view_kpis,
+          can_view_members: profilesTable.can_view_members,
+          can_view_attendance: profilesTable.can_view_attendance,
+        })
+        .from(profilesTable)
+        .where(whereClause)
+        .limit(limit)
+        .offset(offset);
+
+      return res.json({ data, total, page, limit });
+    } catch (err) {
+      req.log.error(err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
 router.get("/profiles", requireLeaderSession("leader"), async (req: Request, res: Response) => {
   try {
     const search = typeof req.query.search === "string" ? req.query.search : undefined;
