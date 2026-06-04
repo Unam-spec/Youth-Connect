@@ -1,0 +1,12 @@
+{
+  "imports": {
+    "hono": "npm:hono@4",
+    "hono/cors": "npm:hono@4/cors",
+    "postgres": "npm:postgres@3",
+    "drizzle-orm": "npm:drizzle-orm@0.45.2",
+    "drizzle-orm/postgres-js": "npm:drizzle-orm@0.45.2/postgres-js",
+    "drizzle-orm/pg-core": "npm:drizzle-orm@0.45.2/pg-core",
+    "@clerk/backend": "npm:@clerk/backend@1",
+    "bcryptjs": "npm:bcryptjs@2"
+  }
+}
