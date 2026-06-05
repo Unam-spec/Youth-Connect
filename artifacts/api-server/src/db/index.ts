@@ -47,6 +47,12 @@ ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "link_token_used" boolean NOT NU
 -- Ensure session_token column exists
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "session_token" uuid;
 
+-- Ensure attendance.type column exists. Prod was missing it while the code inserts
+-- type:"member" on every check-in → "column type does not exist" → 500 on all
+-- check-ins. Stored as text to match check_in_requests.type (prod uses text, not the
+-- enum the ORM schema declares).
+ALTER TABLE "attendance" ADD COLUMN IF NOT EXISTS "type" text NOT NULL DEFAULT 'member';
+
 -- Ensure pending_emails table exists
 CREATE TABLE IF NOT EXISTS "pending_emails" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),

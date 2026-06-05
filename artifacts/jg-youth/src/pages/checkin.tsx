@@ -407,7 +407,9 @@ export default function CheckIn() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({}),
+        // Send the clicked member's id so the request targets the selected person
+        // (the backend still verifies it matches the signed-in account).
+        body: JSON.stringify({ profile_id: profileId }),
       });
       const data = await response.json();
       if (!response.ok) {
