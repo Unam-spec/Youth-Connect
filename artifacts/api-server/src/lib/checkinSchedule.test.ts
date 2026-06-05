@@ -1,4 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+// Stub @workspace/db so the module-level DB connection attempt doesn't throw
+// when running unit tests without a real DATABASE_URL.
+vi.mock("@workspace/db", () => ({
+  db: { query: { checkinSettingsTable: { findFirst: vi.fn() } }, select: vi.fn() },
+  checkinSettingsTable: {},
+  checkinWindowsTable: {},
+}));
+
 import { evaluateCheckinOpen, type CheckinWindow } from "./checkinSchedule";
 
 const friday: CheckinWindow[] = [
