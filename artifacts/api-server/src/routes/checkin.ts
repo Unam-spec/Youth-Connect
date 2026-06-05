@@ -30,13 +30,6 @@ async function resolveClerkProfile(req: Request): Promise<Profile | null> {
 
 // ── Time-window helpers ───────────────────────────────────────────────────────
 
-function isCheckinWindowOpen(): boolean {
-  const sast = toZonedTime(new Date(), "Africa/Johannesburg");
-  const day = sast.getDay(); // 0 = Sunday, 5 = Friday
-  const totalMinutes = sast.getHours() * 60 + sast.getMinutes();
-  return day === 5 && totalMinutes >= 18 * 60 + 30 && totalMinutes < 22 * 60;
-}
-
 function getSastToday(): string {
   const sast = toZonedTime(new Date(), "Africa/Johannesburg");
   const y = sast.getFullYear();
@@ -161,30 +154,19 @@ router.post("/checkin/requests", async (req, res) => {
         .json({ error: "Unauthorized. Please sign in to check in." });
     }
 
-    if (!isCheckinWindowOpen()) {
-      const sast = toZonedTime(new Date(), "Africa/Johannesburg");
-      const day = sast.getDay();
-      if (day !== 5) {
-        return res.status(403).json({
-          error:
-            "Check-in is only available on Fridays between 18:30 and 22:00 SAST.",
-        });
-      }
-      const totalMinutes = sast.getHours() * 60 + sast.getMinutes();
-      if (totalMinutes < 18 * 60 + 30) {
-        return res.status(403).json({
-          error: "Check-in opens at 18:30 SAST on Fridays.",
-        });
-      }
-      return res.status(403).json({
-        error: "Check-in has closed for tonight (closes at 22:00 SAST).",
-      });
-    }
-
     const profile = await resolveClerkProfile(req);
     if (!profile) {
       return res.status(404).json({
         error: "Profile not found. Please complete your registration first.",
+      });
+    }
+
+    // Leaders & super-admins may check in any time; everyone else is limited
+    // to the configured schedule.
+    const isLeader = profile.role === "leader" || profile.role === "super_admin";
+    if (!isLeader && !(await isCheckinOpenNow())) {
+      return res.status(403).json({
+        error: "Check-in is closed right now. Please check in during the scheduled times.",
       });
     }
 
