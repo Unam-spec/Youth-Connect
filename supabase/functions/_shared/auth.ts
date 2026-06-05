@@ -35,7 +35,13 @@ export async function validateLeaderSession(header: string | null): Promise<Prof
   if (typeof profile_id !== "string" || typeof session_token !== "string") return null;
   const exp = typeof expires_at === "number" ? expires_at : typeof expires_at === "string" ? Date.parse(expires_at) : NaN;
   if (!Number.isFinite(exp) || Date.now() >= exp) return null;
-  const profile = await db.query.profilesTable.findFirst({ where: eq(profilesTable.id, profile_id) });
+  // Project only the columns this path needs. A bare findFirst is SELECT *, which
+  // drags the caller's multi-MB base64 avatar_url DB→function over the pooler on
+  // every authenticated request (and the chat polls this every 4s) — huge egress.
+  const profile = await db.query.profilesTable.findFirst({
+    where: eq(profilesTable.id, profile_id),
+    columns: { id: true, clerk_id: true, role: true, full_name: true, session_token: true },
+  }) as Profile | undefined;
   if (!profile || !profile.session_token || profile.session_token !== session_token) return null;
   return profile;
 }
@@ -51,7 +57,10 @@ export interface ResolvedAuth {
 export async function resolveAuth(req: Request): Promise<ResolvedAuth | null> {
   const clerkId = await getClerkUserId(req);
   if (clerkId) {
-    const profile = await db.query.profilesTable.findFirst({ where: eq(profilesTable.clerk_id, clerkId) });
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, clerkId),
+      columns: { id: true, clerk_id: true, role: true, full_name: true, session_token: true },
+    }) as Profile | undefined;
     if (profile) return { type: "clerk", profileId: profile.id, role: profile.role, profile };
   }
   const sessionProfile = await validateLeaderSession(req.headers.get("x-leader-session"));

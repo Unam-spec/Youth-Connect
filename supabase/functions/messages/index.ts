@@ -27,6 +27,10 @@ async function resolveLeaderOrSuperAdmin(c: Context, next: Next) {
     if (uid) {
       const profile = await db.query.profilesTable.findFirst({
         where: eq(profilesTable.clerk_id, uid),
+        // Only the columns the auth check needs — never avatar_url (multi-MB
+        // base64). This route is polled every 4s, so SELECT * here is the main
+        // pooler-egress drain.
+        columns: { clerk_id: true, role: true, full_name: true },
       });
       if (profile && ["leader", "super_admin"].includes(profile.role as string)) {
         c.set("senderId", uid);
@@ -61,6 +65,10 @@ async function resolveSuperAdmin(c: Context, next: Next) {
     if (uid) {
       const profile = await db.query.profilesTable.findFirst({
         where: eq(profilesTable.clerk_id, uid),
+        // Only the columns the auth check needs — never avatar_url (multi-MB
+        // base64). This route is polled every 4s, so SELECT * here is the main
+        // pooler-egress drain.
+        columns: { clerk_id: true, role: true, full_name: true },
       });
       if (profile && profile.role === "super_admin") {
         c.set("senderId", uid);
