@@ -92,6 +92,7 @@ import { LeaderManagementPanel } from "@/components/panels/LeaderManagementPanel
 import { PinManagementPanel } from "@/components/panels/PinManagementPanel";
 import { AdminSlotsPanel } from "@/components/panels/AdminSlotsPanel";
 import { ChatPanel } from "@/components/panels/ChatPanel";
+import { CheckInSchedulePanel } from "@/components/panels/CheckInSchedulePanel";
 import { DeleteConfirmPanel } from "@/components/panels/DeleteConfirmPanel";
 import { DialogManager } from "@/components/panels/DialogManager";
 import { KpiCard } from "@/components/panels/shared";
@@ -1132,6 +1133,7 @@ export default function Dashboard() {
               handleApproveCheckIn={handleApproveCheckIn}
               handleRejectCheckIn={handleRejectCheckIn}
             />
+            <CheckInSchedulePanel />
             <ChatPanel
               sessionRole={session.role}
               sessionProfileId={session.profile_id ?? ""}
