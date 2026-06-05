@@ -127,6 +127,9 @@ router.put("/checkin/schedule", requireLeaderSession("leader"), async (req, res)
           .values({ restrict_to_schedule: restrict, updated_by: req.leaderId });
       }
       await tx.delete(checkinWindowsTable);
+      // Only persist rows with real "HH:MM" times. Disabled/blank days are
+      // intentionally not stored; getSchedule() synthesises them as
+      // { enabled:false, start_time:"", end_time:"" } on read-back.
       const toInsert = windows.filter((w) => HHMM.test(w.start_time) && HHMM.test(w.end_time));
       if (toInsert.length > 0) {
         await tx.insert(checkinWindowsTable).values(
