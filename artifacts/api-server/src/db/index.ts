@@ -84,6 +84,30 @@ CREATE TABLE IF NOT EXISTS "messages" (
 	"content" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
 );
+
+-- Configurable check-in schedule (added 2026-06): single-row settings + per-weekday windows.
+CREATE TABLE IF NOT EXISTS "checkin_settings" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "restrict_to_schedule" boolean NOT NULL DEFAULT true,
+  "updated_at" timestamp with time zone DEFAULT now(),
+  "updated_by" uuid
+);
+
+CREATE TABLE IF NOT EXISTS "checkin_windows" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "day_of_week" integer NOT NULL UNIQUE,
+  "start_time" text NOT NULL,
+  "end_time" text NOT NULL,
+  "enabled" boolean NOT NULL DEFAULT true
+);
+
+-- Seed defaults only when empty (never overwrites leader edits).
+INSERT INTO "checkin_settings" ("restrict_to_schedule")
+  SELECT true WHERE NOT EXISTS (SELECT 1 FROM "checkin_settings");
+
+INSERT INTO "checkin_windows" ("day_of_week", "start_time", "end_time", "enabled")
+  SELECT 5, '18:30', '22:00', true
+  WHERE NOT EXISTS (SELECT 1 FROM "checkin_windows");
 `;
 
 export async function runMigrations() {
