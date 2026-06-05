@@ -9,9 +9,12 @@ import {
   attendanceTable,
   visitorsTable,
   pendingEmailsTable,
+  checkinSettingsTable,
+  checkinWindowsTable,
   type Profile,
 } from "@workspace/db";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { getSchedule, isCheckinOpenNow, type CheckinWindow } from "../lib/checkinSchedule";
 
 const router = Router();
 
@@ -62,6 +65,83 @@ router.get("/checkin/search", async (req, res) => {
       )
       .limit(20);
     return res.json(profiles);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /api/checkin/schedule - current schedule (public read)
+router.get("/checkin/schedule", async (req, res) => {
+  try {
+    const schedule = await getSchedule();
+    return res.json(schedule);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+const HHMM = /^\d{2}:\d{2}$/;
+
+// PUT /api/checkin/schedule - update schedule (leaders & super-admins)
+router.put("/checkin/schedule", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as {
+      restrict_to_schedule?: unknown;
+      windows?: unknown;
+    };
+    const restrict = body.restrict_to_schedule !== false; // default true
+    const rawWindows = Array.isArray(body.windows) ? body.windows : [];
+
+    const windows: CheckinWindow[] = [];
+    for (const w of rawWindows as Record<string, unknown>[]) {
+      const day = Number(w.day_of_week);
+      const enabled = w.enabled === true;
+      const start = String(w.start_time ?? "");
+      const end = String(w.end_time ?? "");
+      if (!Number.isInteger(day) || day < 0 || day > 6) {
+        return res.status(400).json({ error: `Invalid day_of_week: ${w.day_of_week}` });
+      }
+      if (enabled) {
+        if (!HHMM.test(start) || !HHMM.test(end)) {
+          return res.status(400).json({ error: `Times must be "HH:MM" for day ${day}` });
+        }
+        if (start >= end) {
+          return res.status(400).json({ error: `Start must be before end for day ${day}` });
+        }
+      }
+      windows.push({ day_of_week: day, start_time: start, end_time: end, enabled });
+    }
+
+    await db.transaction(async (tx) => {
+      const existing = await tx.query.checkinSettingsTable.findFirst();
+      if (existing) {
+        await tx
+          .update(checkinSettingsTable)
+          .set({ restrict_to_schedule: restrict, updated_at: new Date(), updated_by: req.leaderId })
+          .where(eq(checkinSettingsTable.id, existing.id));
+      } else {
+        await tx
+          .insert(checkinSettingsTable)
+          .values({ restrict_to_schedule: restrict, updated_by: req.leaderId });
+      }
+      await tx.delete(checkinWindowsTable);
+      const toInsert = windows.filter((w) => HHMM.test(w.start_time) && HHMM.test(w.end_time));
+      if (toInsert.length > 0) {
+        await tx.insert(checkinWindowsTable).values(
+          toInsert.map((w) => ({
+            day_of_week: w.day_of_week,
+            start_time: w.start_time,
+            end_time: w.end_time,
+            enabled: w.enabled,
+          })),
+        );
+      }
+    });
+
+    const saved = await getSchedule();
+    return res.json(saved);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
