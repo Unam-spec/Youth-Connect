@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "dev": "pnpm --filter=@workspace/jg-youth dev",
+    "start": "pnpm --filter=@workspace/api-server run start",
+    "dev": "concurrently \"pnpm --filter=@workspace/api-server dev\" \"pnpm --filter=@workspace/jg-youth dev\"",
     "build": "pnpm run typecheck && pnpm --recursive --if-present run build",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm --recursive --if-present run typecheck"
