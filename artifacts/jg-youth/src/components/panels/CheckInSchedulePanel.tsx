@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { DashCard, SectionTitle } from "./shared";
 
-interface Window {
+interface ScheduleWindow {
   day_of_week: number;
   start_time: string;
   end_time: string;
@@ -18,7 +18,7 @@ export function CheckInSchedulePanel() {
   const apiFetch = useApiFetch();
   const { toast } = useToast();
   const [restrict, setRestrict] = useState(true);
-  const [windows, setWindows] = useState<Window[]>([]);
+  const [windows, setWindows] = useState<ScheduleWindow[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -27,18 +27,25 @@ export function CheckInSchedulePanel() {
     (async () => {
       try {
         const res = await fetch("/api/checkin/schedule");
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled) {
-            setRestrict(data.restrict_to_schedule !== false);
-            setWindows(
-              (data.windows ?? []).map((w: Window) => ({
-                ...w,
-                start_time: w.start_time || "18:30",
-                end_time: w.end_time || "22:00",
-              })),
-            );
-          }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setRestrict(data.restrict_to_schedule !== false);
+          setWindows(
+            (data.windows ?? []).map((w: ScheduleWindow) => ({
+              ...w,
+              start_time: w.start_time || "18:30",
+              end_time: w.end_time || "22:00",
+            })),
+          );
+        }
+      } catch {
+        if (!cancelled) {
+          toast({
+            title: "Couldn't load schedule",
+            description: "Please refresh to try again.",
+            variant: "destructive",
+          });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -49,7 +56,7 @@ export function CheckInSchedulePanel() {
     };
   }, []);
 
-  function updateDay(day: number, patch: Partial<Window>) {
+  function updateDay(day: number, patch: Partial<ScheduleWindow>) {
     setWindows((prev) => prev.map((w) => (w.day_of_week === day ? { ...w, ...patch } : w)));
   }
 
