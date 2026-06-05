@@ -75,7 +75,7 @@ router.get("/checkin/schedule", async (req, res) => {
   }
 });
 
-const HHMM = /^\d{2}:\d{2}$/;
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 // PUT /api/checkin/schedule - update schedule (leaders & super-admins)
 router.put("/checkin/schedule", requireLeaderSession("leader"), async (req, res) => {
