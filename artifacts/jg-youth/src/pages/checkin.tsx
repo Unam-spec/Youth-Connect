@@ -84,17 +84,6 @@ function getSastTime(): { dayOfWeek: number; hours: number; minutes: number } {
 
 type WindowState = "before" | "open" | "after" | "wrong_day";
 
-function getCheckinWindowState(): WindowState {
-  const { dayOfWeek, hours, minutes } = getSastTime();
-  if (dayOfWeek !== 5) return "wrong_day";
-  const totalMins = hours * 60 + minutes;
-  const start = 18 * 60 + 30; // 18:30
-  const end = 22 * 60;         // 22:00
-  if (totalMins < start) return "before";
-  if (totalMins >= end) return "after";
-  return "open";
-}
-
 // ── Session QR Display (shown on check-in page) ─────────────────────────────
 
 function SessionQrDisplay() {
@@ -257,6 +246,36 @@ export default function CheckIn() {
       }
     };
   }, []);
+
+  const [schedule, setSchedule] = useState<{
+    restrict_to_schedule: boolean;
+    windows: { day_of_week: number; start_time: string; end_time: string; enabled: boolean }[];
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/checkin/schedule")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setSchedule(d))
+      .catch(() => setSchedule(null));
+  }, []);
+
+  function getCheckinWindowState(): WindowState {
+    // No schedule loaded yet, or restriction off → treat as open.
+    if (!schedule || schedule.restrict_to_schedule === false) return "open";
+    const { dayOfWeek, hours, minutes } = getSastTime();
+    const nowMins = hours * 60 + minutes;
+    const today = schedule.windows.find(
+      (w) => w.day_of_week === dayOfWeek && w.enabled && w.start_time && w.end_time,
+    );
+    if (!today) return "wrong_day";
+    const [sh, sm] = today.start_time.split(":").map(Number);
+    const [eh, em] = today.end_time.split(":").map(Number);
+    const start = sh * 60 + sm;
+    const end = eh * 60 + em;
+    if (nowMins < start) return "before";
+    if (nowMins >= end) return "after";
+    return "open";
+  }
 
   if (!isLoaded) {
     return (
