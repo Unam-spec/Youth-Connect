@@ -1,0 +1,12 @@
+# Force the Node toolchain for the Railway build.
+#
+# The repo also contains Supabase Edge Function sources (supabase/functions/*.ts
+# + deno.json). Nixpacks' auto-detection sees those and picks the Deno provider,
+# which omits Node/pnpm and makes the `pnpm --filter=@workspace/api-server`
+# build command fail with "pnpm: command not found" (exit 127). Pinning the
+# provider to node — and explicitly installing node + pnpm — keeps the api-server
+# build working regardless of the Deno files in-tree.
+providers = ["node"]
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "nodePackages.pnpm"]
