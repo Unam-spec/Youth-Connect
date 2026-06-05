@@ -113,9 +113,7 @@ function SessionQrDisplay() {
 
 // ── Time Window Banner ────────────────────────────────────────────────────────
 
-function TimeWindowBanner() {
-  const state = getCheckinWindowState();
-
+function TimeWindowBanner({ state }: { state: WindowState }) {
   if (state === "open") return null;
 
   const config = {
@@ -570,7 +568,7 @@ export default function CheckIn() {
         </div>
 
         {/* Time window banner — shown before/after/wrong day unless bypassed */}
-        {windowState !== "open" && !canBypassWindow && <TimeWindowBanner />}
+        {windowState !== "open" && !canBypassWindow && <TimeWindowBanner state={windowState} />}
 
         {/* Check-in form — always shown for leaders/admins, otherwise only during open window */}
         {(windowState === "open" || canBypassWindow) && (
