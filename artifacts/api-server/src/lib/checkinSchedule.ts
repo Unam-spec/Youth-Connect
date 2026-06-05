@@ -37,8 +37,10 @@ const TZ = "Africa/Johannesburg";
 
 /** Reads the schedule, normalizing windows to all 7 weekdays (0..6). */
 export async function getSchedule(): Promise<CheckinSchedule> {
-  const settings = await db.query.checkinSettingsTable.findFirst();
-  const rows = await db.select().from(checkinWindowsTable);
+  const [settings, rows] = await Promise.all([
+    db.query.checkinSettingsTable.findFirst(),
+    db.select().from(checkinWindowsTable),
+  ]);
   const byDay = new Map<number, (typeof rows)[number]>(
     rows.map((r) => [r.day_of_week, r]),
   );
@@ -65,12 +67,17 @@ export function sastNow(now: Date = new Date()): { dayOfWeek: number; hhmm: stri
 
 /** True if a non-leader may check in right now. Fails safe to closed on error. */
 export async function isCheckinOpenNow(): Promise<boolean> {
-  const schedule = await getSchedule();
-  const { dayOfWeek, hhmm } = sastNow();
-  return evaluateCheckinOpen(
-    schedule.restrict_to_schedule,
-    schedule.windows.filter((w) => w.enabled && w.start_time && w.end_time),
-    dayOfWeek,
-    hhmm,
-  );
+  try {
+    const schedule = await getSchedule();
+    const { dayOfWeek, hhmm } = sastNow();
+    return evaluateCheckinOpen(
+      schedule.restrict_to_schedule,
+      schedule.windows.filter((w) => w.enabled && w.start_time && w.end_time),
+      dayOfWeek,
+      hhmm,
+    );
+  } catch (err) {
+    console.error("[checkin] isCheckinOpenNow failed; treating as closed:", err);
+    return false;
+  }
 }
