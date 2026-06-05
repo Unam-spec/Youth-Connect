@@ -288,3 +288,22 @@ export const insertPendingEmailSchema = createInsertSchema(pendingEmailsTable).o
 export type PendingEmail = typeof pendingEmailsTable.$inferSelect;
 export type InsertPendingEmail = z.infer<typeof insertPendingEmailSchema>;
 
+// ── Check-in schedule tables ───────────────────────────────────────────────────
+export const checkinSettingsTable = pgTable("checkin_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  restrict_to_schedule: boolean("restrict_to_schedule").notNull().default(true),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  updated_by: uuid("updated_by"),
+});
+
+export const checkinWindowsTable = pgTable("checkin_windows", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  day_of_week: integer("day_of_week").notNull().unique(),
+  start_time: text("start_time").notNull(),
+  end_time: text("end_time").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+});
+
+export type CheckinSettingsRow = typeof checkinSettingsTable.$inferSelect;
+export type CheckinWindowRow = typeof checkinWindowsTable.$inferSelect;
+

@@ -84,17 +84,6 @@ function getSastTime(): { dayOfWeek: number; hours: number; minutes: number } {
 
 type WindowState = "before" | "open" | "after" | "wrong_day";
 
-function getCheckinWindowState(): WindowState {
-  const { dayOfWeek, hours, minutes } = getSastTime();
-  if (dayOfWeek !== 5) return "wrong_day";
-  const totalMins = hours * 60 + minutes;
-  const start = 18 * 60 + 30; // 18:30
-  const end = 22 * 60;         // 22:00
-  if (totalMins < start) return "before";
-  if (totalMins >= end) return "after";
-  return "open";
-}
-
 // ── Session QR Display (shown on check-in page) ─────────────────────────────
 
 function SessionQrDisplay() {
@@ -124,16 +113,14 @@ function SessionQrDisplay() {
 
 // ── Time Window Banner ────────────────────────────────────────────────────────
 
-function TimeWindowBanner() {
-  const state = getCheckinWindowState();
-
+function TimeWindowBanner({ state }: { state: WindowState }) {
   if (state === "open") return null;
 
   const config = {
     before: {
       icon: <LockIcon className="w-8 h-8 text-primary" />,
       title: "Check-In Not Yet Open",
-      message: "Friday night check-in opens at 18:30 SAST. See you then!",
+      message: "Check-in hasn't opened yet. Please come back during the scheduled time.",
       bg: "bg-primary/5",
       border: "border-primary/30",
       text: "text-primary",
@@ -141,15 +128,15 @@ function TimeWindowBanner() {
     after: {
       icon: <MoonIcon className="w-8 h-8 text-primary" />,
       title: "Check-In Has Closed",
-      message: "Tonight's check-in closed at 22:00 SAST. See you next Friday!",
+      message: "Check-in has closed for now. See you at the next session!",
       bg: "bg-primary/5",
       border: "border-primary/30",
       text: "text-primary",
     },
     wrong_day: {
       icon: <Clock className="w-8 h-8 text-primary" />,
-      title: "Check-In is Fridays Only",
-      message: "Friday night check-in runs every Friday from 18:30 to 22:00 SAST.",
+      title: "Check-In Not Available Today",
+      message: "Check-in isn't open today. Please join us at the next scheduled session.",
       bg: "bg-primary/5",
       border: "border-primary/30",
       text: "text-primary",
@@ -257,6 +244,38 @@ export default function CheckIn() {
       }
     };
   }, []);
+
+  const [schedule, setSchedule] = useState<{
+    restrict_to_schedule: boolean;
+    windows: { day_of_week: number; start_time: string; end_time: string; enabled: boolean }[];
+  } | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/checkin/schedule")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setSchedule(d))
+      .catch(() => setSchedule(null))
+      .finally(() => setScheduleLoading(false));
+  }, []);
+
+  function getCheckinWindowState(): WindowState {
+    // No schedule loaded yet, or restriction off → treat as open.
+    if (!schedule || schedule.restrict_to_schedule === false) return "open";
+    const { dayOfWeek, hours, minutes } = getSastTime();
+    const nowMins = hours * 60 + minutes;
+    const today = schedule.windows.find(
+      (w) => w.day_of_week === dayOfWeek && w.enabled && w.start_time && w.end_time,
+    );
+    if (!today) return "wrong_day";
+    const [sh, sm] = today.start_time.split(":").map(Number);
+    const [eh, em] = today.end_time.split(":").map(Number);
+    const start = sh * 60 + sm;
+    const end = eh * 60 + em;
+    if (nowMins < start) return "before";
+    if (nowMins >= end) return "after";
+    return "open";
+  }
 
   if (!isLoaded) {
     return (
@@ -544,17 +563,24 @@ export default function CheckIn() {
 
         {/* Page title */}
         <div>
-          <h1 className="font-[family-name:var(--app-font-heading)] text-4xl font-semibold tracking-tight text-foreground">Friday Check-In</h1>
+          <h1 className="font-[family-name:var(--app-font-heading)] text-4xl font-semibold tracking-tight text-foreground">Check-In</h1>
           <p className="text-muted-foreground mt-1 text-sm">
-            Check-in is available every Friday from 18:30 to 22:00 SAST
+            Check-in is available during scheduled sessions
           </p>
         </div>
 
         {/* Time window banner — shown before/after/wrong day unless bypassed */}
-        {windowState !== "open" && !canBypassWindow && <TimeWindowBanner />}
+        {windowState !== "open" && !canBypassWindow && <TimeWindowBanner state={windowState} />}
+
+        {/* Spinner while schedule is still loading (non-leaders only) */}
+        {!canBypassWindow && scheduleLoading && (
+          <div className="flex items-center justify-center py-10">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
 
         {/* Check-in form — always shown for leaders/admins, otherwise only during open window */}
-        {(windowState === "open" || canBypassWindow) && (
+        {(canBypassWindow || (!scheduleLoading && windowState === "open")) && (
           <div className="space-y-5">
 
             {/* Not signed in */}

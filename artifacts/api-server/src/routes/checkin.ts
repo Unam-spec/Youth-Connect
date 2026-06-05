@@ -9,9 +9,12 @@ import {
   attendanceTable,
   visitorsTable,
   pendingEmailsTable,
+  checkinSettingsTable,
+  checkinWindowsTable,
   type Profile,
 } from "@workspace/db";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { getSchedule, isCheckinOpenNow, type CheckinWindow } from "../lib/checkinSchedule";
 
 const router = Router();
 
@@ -26,13 +29,6 @@ async function resolveClerkProfile(req: Request): Promise<Profile | null> {
 }
 
 // ── Time-window helpers ───────────────────────────────────────────────────────
-
-function isCheckinWindowOpen(): boolean {
-  const sast = toZonedTime(new Date(), "Africa/Johannesburg");
-  const day = sast.getDay(); // 0 = Sunday, 5 = Friday
-  const totalMinutes = sast.getHours() * 60 + sast.getMinutes();
-  return day === 5 && totalMinutes >= 18 * 60 + 30 && totalMinutes < 22 * 60;
-}
 
 function getSastToday(): string {
   const sast = toZonedTime(new Date(), "Africa/Johannesburg");
@@ -68,6 +64,86 @@ router.get("/checkin/search", async (req, res) => {
   }
 });
 
+// GET /api/checkin/schedule - current schedule (public read)
+router.get("/checkin/schedule", async (req, res) => {
+  try {
+    const schedule = await getSchedule();
+    return res.json(schedule);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// PUT /api/checkin/schedule - update schedule (leaders & super-admins)
+router.put("/checkin/schedule", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    const body = (req.body ?? {}) as {
+      restrict_to_schedule?: unknown;
+      windows?: unknown;
+    };
+    const restrict = body.restrict_to_schedule !== false; // default true
+    const rawWindows = Array.isArray(body.windows) ? body.windows : [];
+
+    const windows: CheckinWindow[] = [];
+    for (const w of rawWindows as Record<string, unknown>[]) {
+      const day = Number(w.day_of_week);
+      const enabled = w.enabled === true;
+      const start = String(w.start_time ?? "");
+      const end = String(w.end_time ?? "");
+      if (!Number.isInteger(day) || day < 0 || day > 6) {
+        return res.status(400).json({ error: `Invalid day_of_week: ${w.day_of_week}` });
+      }
+      if (enabled) {
+        if (!HHMM.test(start) || !HHMM.test(end)) {
+          return res.status(400).json({ error: `Times must be "HH:MM" for day ${day}` });
+        }
+        if (start >= end) {
+          return res.status(400).json({ error: `Start must be before end for day ${day}` });
+        }
+      }
+      windows.push({ day_of_week: day, start_time: start, end_time: end, enabled });
+    }
+
+    await db.transaction(async (tx) => {
+      const existing = await tx.query.checkinSettingsTable.findFirst();
+      if (existing) {
+        await tx
+          .update(checkinSettingsTable)
+          .set({ restrict_to_schedule: restrict, updated_at: new Date(), updated_by: req.leaderId })
+          .where(eq(checkinSettingsTable.id, existing.id));
+      } else {
+        await tx
+          .insert(checkinSettingsTable)
+          .values({ restrict_to_schedule: restrict, updated_by: req.leaderId });
+      }
+      await tx.delete(checkinWindowsTable);
+      // Only persist rows with real "HH:MM" times. Disabled/blank days are
+      // intentionally not stored; getSchedule() synthesises them as
+      // { enabled:false, start_time:"", end_time:"" } on read-back.
+      const toInsert = windows.filter((w) => HHMM.test(w.start_time) && HHMM.test(w.end_time));
+      if (toInsert.length > 0) {
+        await tx.insert(checkinWindowsTable).values(
+          toInsert.map((w) => ({
+            day_of_week: w.day_of_week,
+            start_time: w.start_time,
+            end_time: w.end_time,
+            enabled: w.enabled,
+          })),
+        );
+      }
+    });
+
+    const saved = await getSchedule();
+    return res.json(saved);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // POST /api/checkin/requests - Member self check-in request (Clerk-auth)
 router.post("/checkin/requests", async (req, res) => {
   try {
@@ -78,30 +154,19 @@ router.post("/checkin/requests", async (req, res) => {
         .json({ error: "Unauthorized. Please sign in to check in." });
     }
 
-    if (!isCheckinWindowOpen()) {
-      const sast = toZonedTime(new Date(), "Africa/Johannesburg");
-      const day = sast.getDay();
-      if (day !== 5) {
-        return res.status(403).json({
-          error:
-            "Check-in is only available on Fridays between 18:30 and 22:00 SAST.",
-        });
-      }
-      const totalMinutes = sast.getHours() * 60 + sast.getMinutes();
-      if (totalMinutes < 18 * 60 + 30) {
-        return res.status(403).json({
-          error: "Check-in opens at 18:30 SAST on Fridays.",
-        });
-      }
-      return res.status(403).json({
-        error: "Check-in has closed for tonight (closes at 22:00 SAST).",
-      });
-    }
-
     const profile = await resolveClerkProfile(req);
     if (!profile) {
       return res.status(404).json({
         error: "Profile not found. Please complete your registration first.",
+      });
+    }
+
+    // Leaders & super-admins may check in any time; everyone else is limited
+    // to the configured schedule.
+    const isLeader = profile.role === "leader" || profile.role === "super_admin";
+    if (!isLeader && !(await isCheckinOpenNow())) {
+      return res.status(403).json({
+        error: "Check-in is closed right now. Please check in during the scheduled times.",
       });
     }
 
