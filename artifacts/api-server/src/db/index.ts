@@ -1,17 +1,5 @@
 import { Pool } from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
 import { logger } from "../lib/logger";
-import { messagesTable, roleEnum } from "./schema/messages";
-
-// ── Messages DB (local schema) ─────────────────────────────────────────────────
-// Used only by messages.ts route.  Lazy pool — connects on first query.
-const messagesPool = process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL })
-  : null;
-
-export const db = messagesPool
-  ? drizzle(messagesPool, { schema: { messagesTable, roleEnum } })
-  : null as any;
 
 // ── Startup schema sync ────────────────────────────────────────────────────────
 // Instead of relying on Drizzle's migrator (which requires a correct _journal.json),
@@ -37,6 +25,9 @@ ALTER TABLE "visitors" ADD COLUMN IF NOT EXISTS "whatsapp_opt_in" boolean NOT NU
 
 -- Ensure avatar_url column exists (added in v0.9)
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "avatar_url" text;
+
+-- Ensure events.poster_url column exists (event poster image, stored as data URL)
+ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "poster_url" text;
 
 
 -- Ensure link verification columns exist
@@ -74,16 +65,6 @@ DROP INDEX IF EXISTS idx_super_admin_limit;
 CREATE INDEX IF NOT EXISTS idx_profiles_clerk_id ON profiles (clerk_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles (email);
 CREATE INDEX IF NOT EXISTS idx_profiles_phone ON profiles (phone);
-
--- Ensure messages table exists for chat
-CREATE TABLE IF NOT EXISTS "messages" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"sender_id" text NOT NULL,
-	"sender_name" text NOT NULL,
-	"sender_role" text NOT NULL,
-	"content" text NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
 
 -- Configurable check-in schedule (added 2026-06): single-row settings + per-weekday windows.
 CREATE TABLE IF NOT EXISTS "checkin_settings" (

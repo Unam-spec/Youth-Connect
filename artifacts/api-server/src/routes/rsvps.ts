@@ -80,11 +80,20 @@ router.get("/rsvps", requireLeaderSession("leader"), async (req, res) => {
     const { event_id, status } = req.query;
     const rsvps = await db
       .select({
-        member_name: profilesTable.full_name,
-        member_role: profilesTable.role,
+        id: rsvpsTable.id,
+        event_id: rsvpsTable.event_id,
+        profile_id: rsvpsTable.profile_id,
         event_name: eventsTable.title,
         status: rsvpsTable.status,
         created_at: rsvpsTable.created_at,
+        profile: {
+          id: profilesTable.id,
+          full_name: profilesTable.full_name,
+          role: profilesTable.role,
+          phone: profilesTable.phone,
+          email: profilesTable.email,
+          age: profilesTable.age,
+        },
       })
       .from(rsvpsTable)
       .leftJoin(profilesTable, eq(rsvpsTable.profile_id, profilesTable.id))

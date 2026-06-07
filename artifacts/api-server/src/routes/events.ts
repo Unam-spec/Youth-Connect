@@ -79,6 +79,7 @@ router.post("/events", requireLeaderSession("leader"), async (req: Request, res:
         date: eventDate,
         time: parsed.data.time,
         location: parsed.data.location,
+        poster_url: parsed.data.poster_url ?? null,
         age_min: parsed.data.age_min ?? null,
         age_max: parsed.data.age_max ?? null,
         custom_requirements: parsed.data.custom_requirements ?? null,

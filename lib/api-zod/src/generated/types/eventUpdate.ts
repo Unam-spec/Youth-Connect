@@ -14,6 +14,8 @@ export interface EventUpdate {
   time?: string;
   location?: string;
   /** @nullable */
+  poster_url?: string | null;
+  /** @nullable */
   age_min?: number | null;
   /** @nullable */
   age_max?: number | null;

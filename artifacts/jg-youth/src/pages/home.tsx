@@ -124,7 +124,14 @@ function PublicHome() {
               ))
             ) : events && events.length > 0 ? (
               events.map((event) => (
-                <Card key={event.id} className="flex flex-col">
+                <Card key={event.id} className="flex flex-col overflow-hidden">
+                  {event.poster_url && (
+                    <img
+                      src={event.poster_url}
+                      alt={`${event.title} poster`}
+                      className="w-full aspect-video object-cover"
+                    />
+                  )}
                   <CardHeader>
                     <CardTitle className="font-[family-name:var(--app-font-heading)] line-clamp-1 text-2xl font-semibold tracking-tight">
                       {event.title}

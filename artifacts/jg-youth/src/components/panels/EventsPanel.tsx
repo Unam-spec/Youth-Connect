@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { format } from "date-fns";
-import { Calendar, Trash2, MapPin, Users, Globe } from "lucide-react";
+import { Calendar, Trash2, MapPin, Users, Globe, ImagePlus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { DashCard, SectionTitle, SkeletonRows, EmptyState } from "./shared";
 
@@ -29,9 +30,29 @@ export function EventsPanel({
   setDeleteEventId,
   setDeleteEventName,
 }: EventsPanelProps) {
+  const { toast } = useToast();
   const { data: events, isLoading: isEventsLoading } = useListEvents(undefined, {
     query: { queryKey: getListEventsQueryKey() },
   });
+
+  const handlePosterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast({
+        title: "Image too large",
+        description: "Please choose a poster under 2MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEventForm({ ...eventForm, poster_url: reader.result as string });
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div className="space-y-6">
@@ -49,6 +70,13 @@ export function EventsPanel({
                 key={event.id}
                 className="rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/30 hover:bg-muted/40"
               >
+                {event.poster_url && (
+                  <img
+                    src={event.poster_url}
+                    alt={`${event.title} poster`}
+                    className="mb-3 w-full max-h-56 rounded-lg object-cover border border-border"
+                  />
+                )}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <h4 className="font-semibold text-base text-foreground flex items-center gap-2">
@@ -164,6 +192,45 @@ export function EventsPanel({
                 onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
                 placeholder="Main Auditorium"
                 className="bg-card border-border"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label className="text-xs text-muted-foreground">Event Poster</Label>
+              <p className="text-[11px] text-muted-foreground -mt-1">
+                Shown on the landing page and members' events. Optional, max 2MB.
+              </p>
+              {eventForm.poster_url ? (
+                <div className="relative w-full overflow-hidden rounded-xl border border-border">
+                  <img
+                    src={eventForm.poster_url}
+                    alt="Event poster preview"
+                    className="w-full max-h-56 object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setEventForm({ ...eventForm, poster_url: "" })}
+                    className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                    aria-label="Remove poster"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <label
+                  htmlFor="event-poster"
+                  className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card px-4 py-8 text-center text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted/40"
+                >
+                  <ImagePlus className="h-6 w-6 text-primary/70" />
+                  <span className="text-sm font-medium">Upload a poster image</span>
+                  <span className="text-[11px]">PNG or JPG, up to 2MB</span>
+                </label>
+              )}
+              <input
+                id="event-poster"
+                type="file"
+                accept="image/*"
+                onChange={handlePosterChange}
+                className="hidden"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">

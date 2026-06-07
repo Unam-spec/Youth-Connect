@@ -942,6 +942,8 @@ components:
           type: string
         location:
           type: string
+        poster_url:
+          type: ["string", "null"]
         created_by:
           type: ["string", "null"]
         age_min:
@@ -986,6 +988,8 @@ components:
           type: string
         location:
           type: string
+        poster_url:
+          type: ["string", "null"]
         age_min:
           type: ["integer", "null"]
         age_max:
@@ -1012,6 +1016,8 @@ components:
           type: string
         location:
           type: string
+        poster_url:
+          type: ["string", "null"]
         age_min:
           type: ["integer", "null"]
         age_max:

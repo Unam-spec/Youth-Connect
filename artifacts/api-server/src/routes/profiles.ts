@@ -15,7 +15,6 @@ import {
   pendingEmailsTable,
 } from "@workspace/db";
 import { z } from "zod";
-import { messagesTable } from "../db/schema/messages";
 import {
   RegisterVisitorBody,
   UpdateMyProfileBody,

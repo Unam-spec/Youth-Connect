@@ -90,6 +90,7 @@ export const eventsTable = pgTable("events", {
   date: date("date").notNull(),
   time: time("time").notNull(),
   location: text("location").notNull(),
+  poster_url: text("poster_url"),
   created_by: uuid("created_by").references(() => profilesTable.id),
   age_min: integer("age_min"),
   age_max: integer("age_max"),

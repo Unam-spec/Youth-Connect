@@ -11,8 +11,6 @@ import {
   eventsTable,
   visitorsTable,
 } from "@workspace/db";
-import { db as messagesDb } from "../db";
-import { messagesTable } from "../db/schema/messages";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 
 const router = Router();
@@ -47,9 +45,6 @@ router.post("/reset-data", requireLeaderSession("super_admin"), async (req: Requ
       // 8. Delete all profiles EXCEPT super admins
       await tx.delete(profilesTable).where(ne(profilesTable.role, "super_admin"));
     });
-
-    // 9. Delete all messages
-    await messagesDb.delete(messagesTable);
 
     return res.json({ success: true, message: "All test data has been successfully wiped." });
   } catch (err: any) {

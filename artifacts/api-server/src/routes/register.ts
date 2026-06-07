@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { db, visitorsTable, checkInRequestsTable } from "@workspace/db";
+import { isCheckinOpenNow } from "../lib/checkinSchedule";
 
 const router = Router();
 
@@ -20,6 +21,16 @@ const router = Router();
  */
 router.post("/register", async (req, res) => {
   try {
+    // First-timer registration is a self check-in: it creates a pending
+    // check-in request for today's session. Like the member self check-in
+    // (POST /checkin/requests), it must respect the schedule configured in the
+    // leader dashboard. Fails closed if the schedule can't be read.
+    if (!(await isCheckinOpenNow())) {
+      return res.status(403).json({
+        error: "Check-in is closed right now. Please register during the scheduled check-in times.",
+      });
+    }
+
     const { full_name, phone_number, email, gender, age, how_did_you_hear, school, parent_phone, parent_name, whatsapp_opt_in } =
       req.body;
 

@@ -518,7 +518,14 @@ export default function MyDashboard() {
                   events.map((event) => {
                     const status = getRsvpStatus(event.id);
                     return (
-                      <Card key={event.id} className="flex flex-col rounded-2xl border-border">
+                      <Card key={event.id} className="flex flex-col rounded-2xl border-border overflow-hidden">
+                        {event.poster_url && (
+                          <img
+                            src={event.poster_url}
+                            alt={`${event.title} poster`}
+                            className="w-full aspect-video object-cover"
+                          />
+                        )}
                         <CardHeader className="pb-3">
                           <CardTitle className="font-[family-name:var(--app-font-heading)] line-clamp-1 text-lg font-semibold tracking-tight">{event.title}</CardTitle>
                           <CardDescription className="flex items-center gap-1.5 mt-1 text-xs">

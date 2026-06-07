@@ -16,6 +16,8 @@ export interface Event {
   time: string;
   location: string;
   /** @nullable */
+  poster_url?: string | null;
+  /** @nullable */
   created_by?: string | null;
   /** @nullable */
   age_min?: number | null;

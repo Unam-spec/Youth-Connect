@@ -91,7 +91,6 @@ import { RSVPPanel } from "@/components/panels/RSVPPanel";
 import { LeaderManagementPanel } from "@/components/panels/LeaderManagementPanel";
 import { PinManagementPanel } from "@/components/panels/PinManagementPanel";
 import { AdminSlotsPanel } from "@/components/panels/AdminSlotsPanel";
-import { ChatPanel } from "@/components/panels/ChatPanel";
 import { CheckInSchedulePanel } from "@/components/panels/CheckInSchedulePanel";
 import { DeleteConfirmPanel } from "@/components/panels/DeleteConfirmPanel";
 import { DialogManager } from "@/components/panels/DialogManager";
@@ -329,6 +328,7 @@ export default function Dashboard() {
     date: today,
     time: "18:00",
     location: "",
+    poster_url: "",
     age_min: "",
     age_max: "",
     is_public: true,
@@ -593,6 +593,7 @@ export default function Dashboard() {
           date: eventForm.date,
           time: eventForm.time,
           location: eventForm.location,
+          poster_url: eventForm.poster_url || undefined,
           age_min: eventForm.age_min ? Number(eventForm.age_min) : null,
           age_max: eventForm.age_max ? Number(eventForm.age_max) : null,
           custom_requirements: [],
@@ -607,6 +608,7 @@ export default function Dashboard() {
             date: today,
             time: "18:00",
             location: "",
+            poster_url: "",
             age_min: "",
             age_max: "",
             is_public: true,
@@ -1134,13 +1136,6 @@ export default function Dashboard() {
               handleRejectCheckIn={handleRejectCheckIn}
             />
             <CheckInSchedulePanel />
-            <ChatPanel
-              sessionRole={session.role}
-              sessionProfileId={session.profile_id ?? ""}
-              activeTab={activeTab}
-              isSignedIn={!!isSignedIn}
-              getToken={getToken}
-            />
           </TabsContent>
 
           <TabsContent value="members" className="mt-0 space-y-6">

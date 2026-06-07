@@ -120,6 +120,8 @@ export interface Event {
   time: string;
   location: string;
   /** @nullable */
+  poster_url?: string | null;
+  /** @nullable */
   created_by?: string | null;
   /** @nullable */
   age_min?: number | null;
@@ -142,6 +144,8 @@ export interface EventInput {
   time: string;
   location: string;
   /** @nullable */
+  poster_url?: string | null;
+  /** @nullable */
   age_min?: number | null;
   /** @nullable */
   age_max?: number | null;
@@ -155,6 +159,8 @@ export interface EventUpdate {
   date?: string;
   time?: string;
   location?: string;
+  /** @nullable */
+  poster_url?: string | null;
   /** @nullable */
   age_min?: number | null;
   /** @nullable */
