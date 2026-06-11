@@ -1,7 +1,7 @@
 import { Router } from "express";
 import crypto from "node:crypto";
 import bcrypt from "bcrypt";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, isNotNull, desc } from "drizzle-orm";
 import { db, profilesTable } from "@workspace/db";
 import { validateUsername } from "../lib/username";
 import { validatePin } from "../lib/pin";
@@ -237,6 +237,30 @@ router.patch("/auth/pin", async (req, res) => {
       .where(eq(profilesTable.id, profile.id));
 
     return res.json({ success: true });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /pin-accounts — leader list of username+PIN accounts (visitors & members).
+router.get("/pin-accounts", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: profilesTable.id,
+        full_name: profilesTable.full_name,
+        username: profilesTable.username,
+        pin_plain: profilesTable.pin_plain,
+        age: profilesTable.age,
+        role: profilesTable.role,
+        parent_phone: profilesTable.parent_phone,
+        parent_name: profilesTable.parent_name,
+      })
+      .from(profilesTable)
+      .where(isNotNull(profilesTable.username))
+      .orderBy(desc(profilesTable.created_at));
+    return res.json(rows);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
