@@ -9,7 +9,7 @@ import { profilesTable } from "../_shared/schema.ts";
 import { requireRole } from "../_shared/auth.ts";
 import { canGrantMembership, CONSENT_AGE } from "../_shared/membershipConsent.ts";
 import { validatePin } from "../_shared/pin.ts";
-import { eq } from "npm:drizzle-orm@0.45.2";
+import { eq, isNotNull, desc } from "npm:drizzle-orm@0.45.2";
 import bcrypt from "npm:bcryptjs@2";
 
 const app = createApp();
@@ -105,6 +105,30 @@ app.post("/pin-accounts/:id/reset-pin", requireRole("leader"), async (c) => {
       .where(eq(profilesTable.id, target.id));
 
     return c.json({ success: true, pin: newPin });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+// GET /pin-accounts — leader list of username+PIN accounts (visitors & members).
+app.get("/pin-accounts", requireRole("leader"), async (c) => {
+  try {
+    const rows = await db
+      .select({
+        id: profilesTable.id,
+        full_name: profilesTable.full_name,
+        username: profilesTable.username,
+        pin_plain: profilesTable.pin_plain,
+        age: profilesTable.age,
+        role: profilesTable.role,
+        parent_phone: profilesTable.parent_phone,
+        parent_name: profilesTable.parent_name,
+      })
+      .from(profilesTable)
+      .where(isNotNull(profilesTable.username))
+      .orderBy(desc(profilesTable.created_at));
+    return c.json(rows);
   } catch (err) {
     console.error(err);
     return c.json({ error: "Internal server error" }, 500);
