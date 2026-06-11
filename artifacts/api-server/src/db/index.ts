@@ -38,6 +38,18 @@ ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "link_token_used" boolean NOT NU
 -- Ensure session_token column exists
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "session_token" uuid;
 
+-- Ensure username + PIN-account columns exist (no-email username+PIN accounts, 2026-06).
+-- Mirrors lib/db/drizzle/0011_add_pin_accounts.sql. Without these, the ORM's
+-- full-table profile reads fail with "column does not exist" → 500 on every
+-- profile load. pin_plain may already exist from an older patch.
+ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "username" text;
+ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "pin_plain" text;
+ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "parental_consent_at" timestamp with time zone;
+ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "parental_consent_by" uuid;
+CREATE UNIQUE INDEX IF NOT EXISTS "profiles_username_unique"
+  ON "profiles" (lower(btrim("username")))
+  WHERE "username" IS NOT NULL AND btrim("username") <> '';
+
 -- Ensure attendance.type column exists. Prod was missing it while the code inserts
 -- type:"member" on every check-in → "column type does not exist" → 500 on all
 -- check-ins. Stored as text to match check_in_requests.type (prod uses text, not the
