@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useTransition } from "react";
 import { KeyRound, ArrowUpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,10 @@ export function PinAccountsPanel() {
   const [parentName, setParentName] = useState("");
   const [parentPhone, setParentPhone] = useState("");
   const [consent, setConsent] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // useTransition keeps the dialog responsive while the promote request is in
+  // flight; resettingId gives each Reset-PIN button its own pending state.
+  const [isPending, startTransition] = useTransition();
+  const [resettingId, setResettingId] = useState<string | null>(null);
 
   const [resetResult, setResetResult] = useState<{ name: string; pin: string } | null>(null);
 
@@ -56,42 +59,69 @@ export function PinAccountsPanel() {
 
   const needsConsent = promoteFor != null && (promoteFor.age == null || promoteFor.age < 13);
   const promoteDisabled =
-    busy || (needsConsent && (!parentName.trim() || !parentPhone.trim() || !consent));
+    isPending || (needsConsent && (!parentName.trim() || !parentPhone.trim() || !consent));
 
-  async function confirmPromote() {
+  function confirmPromote() {
     if (!promoteFor) return;
-    setBusy(true);
-    try {
-      const res = await apiFetch(`/api/pin-accounts/${promoteFor.id}/grant-membership`, {
-        method: "POST",
-        body: JSON.stringify({
-          parental_consent: needsConsent ? consent : true,
-          parent_name: parentName.trim() || undefined,
-          parent_phone: parentPhone.trim() || undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        toast({ title: "Promoted to member" });
-        setPromoteFor(null);
-        await load();
-      } else {
-        toast({ title: "Could not promote", description: data.error ?? "Please try again.", variant: "destructive" });
+    const target = promoteFor;
+    startTransition(async () => {
+      try {
+        const res = await apiFetch(`/api/pin-accounts/${target.id}/grant-membership`, {
+          method: "POST",
+          body: JSON.stringify({
+            parental_consent: needsConsent ? consent : true,
+            parent_name: parentName.trim() || undefined,
+            parent_phone: parentPhone.trim() || undefined,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          toast({ title: "Promoted to member" });
+          setPromoteFor(null);
+          // Update the row from the response the server already returned, instead
+          // of re-fetching the whole list (saves a full network round-trip).
+          if (data.profile) {
+            setAccounts((prev) =>
+              prev.map((p) =>
+                p.id === target.id
+                  ? {
+                      ...p,
+                      role: data.profile.role,
+                      parent_name: data.profile.parent_name,
+                      parent_phone: data.profile.parent_phone,
+                    }
+                  : p,
+              ),
+            );
+          }
+        } else {
+          toast({ title: "Could not promote", description: data.error ?? "Please try again.", variant: "destructive" });
+        }
+      } catch {
+        toast({ title: "Could not promote", description: "Please try again.", variant: "destructive" });
       }
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
-  async function resetPin(a: PinAccount) {
-    const res = await apiFetch(`/api/pin-accounts/${a.id}/reset-pin`, { method: "POST", body: JSON.stringify({}) });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok && data.pin) {
-      setResetResult({ name: a.full_name, pin: data.pin });
-      await load();
-    } else {
-      toast({ title: "Could not reset PIN", description: data.error ?? "Please try again.", variant: "destructive" });
-    }
+  function resetPin(a: PinAccount) {
+    setResettingId(a.id);
+    startTransition(async () => {
+      try {
+        const res = await apiFetch(`/api/pin-accounts/${a.id}/reset-pin`, { method: "POST", body: JSON.stringify({}) });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.pin) {
+          setResetResult({ name: a.full_name, pin: data.pin });
+          // Reflect the new PIN locally instead of re-fetching the whole list.
+          setAccounts((prev) => prev.map((p) => (p.id === a.id ? { ...p, pin_plain: data.pin } : p)));
+        } else {
+          toast({ title: "Could not reset PIN", description: data.error ?? "Please try again.", variant: "destructive" });
+        }
+      } catch {
+        toast({ title: "Could not reset PIN", description: "Please try again.", variant: "destructive" });
+      } finally {
+        setResettingId(null);
+      }
+    });
   }
 
   return (
@@ -119,8 +149,14 @@ export function PinAccountsPanel() {
                     <ArrowUpCircle className="w-3.5 h-3.5 mr-1" /> Promote
                   </Button>
                 )}
-                <Button variant="ghost" size="sm" className="h-8 text-xs px-3" onClick={() => resetPin(a)}>
-                  Reset PIN
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs px-3"
+                  onClick={() => resetPin(a)}
+                  disabled={resettingId === a.id}
+                >
+                  {resettingId === a.id ? "Resetting…" : "Reset PIN"}
                 </Button>
               </div>
             </div>
@@ -158,8 +194,8 @@ export function PinAccountsPanel() {
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPromoteFor(null)} disabled={busy}>Cancel</Button>
-            <Button onClick={confirmPromote} disabled={promoteDisabled}>{busy ? "Promoting..." : "Promote"}</Button>
+            <Button variant="outline" onClick={() => setPromoteFor(null)} disabled={isPending}>Cancel</Button>
+            <Button onClick={confirmPromote} disabled={promoteDisabled}>{isPending ? "Promoting..." : "Promote"}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
