@@ -6,6 +6,8 @@ import { db, profilesTable } from "@workspace/db";
 import { validateUsername } from "../lib/username";
 import { validatePin } from "../lib/pin";
 import { resolveAccount } from "../lib/resolveAccount";
+import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { canGrantMembership } from "../lib/membershipConsent";
 
 const router = Router();
 
@@ -122,6 +124,49 @@ router.post("/auth/pin-login", async (req, res) => {
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// POST /pin-accounts/:id/grant-membership — leader promotes a visitor to member.
+// Server-enforces the parental-consent gate for under-13s.
+router.post(
+  "/pin-accounts/:id/grant-membership",
+  requireLeaderSession("leader"),
+  async (req, res) => {
+    try {
+      const target = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, req.params.id as string),
+      });
+      if (!target) return res.status(404).json({ error: "Account not found" });
+
+      const consentProvided = (req.body ?? {}).parental_consent === true;
+      const gate = canGrantMembership(
+        {
+          role: target.role,
+          age: target.age,
+          parent_phone: target.parent_phone,
+          parent_name: target.parent_name,
+        },
+        consentProvided,
+      );
+      if (!gate.ok) return res.status(400).json({ error: gate.error });
+
+      const needsConsent = target.age === null || target.age < 13;
+      const [updated] = await db
+        .update(profilesTable)
+        .set({
+          role: "member",
+          parental_consent_at: needsConsent ? new Date() : null,
+          parental_consent_by: needsConsent ? req.leaderId : null,
+        })
+        .where(eq(profilesTable.id, target.id))
+        .returning();
+
+      return res.json({ success: true, profile: updated });
+    } catch (err) {
+      req.log.error(err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 // PATCH /auth/pin — authenticated account changes its own PIN.
 router.patch("/auth/pin", async (req, res) => {
