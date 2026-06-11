@@ -8,7 +8,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import { DashCard, SectionTitle, SkeletonRows, EmptyState } from "./shared";
-import { useApiFetch } from "@/lib/api";
+import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface PinAccount {
@@ -23,7 +23,6 @@ interface PinAccount {
 }
 
 export function PinAccountsPanel() {
-  const apiFetch = useApiFetch();
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<PinAccount[]>([]);
   const [loading, setLoading] = useState(true);
