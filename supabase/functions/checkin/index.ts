@@ -5,7 +5,7 @@
 //   - GET  /checkin/search                       → public (no auth)
 //   - GET  /checkin/schedule                     → public read (no auth)
 //   - PUT  /checkin/schedule                     → requireLeaderSession("leader") → requireRole("leader")
-//   - POST /checkin/requests                     → Clerk auth (getAuth(req).userId → getClerkUserId)
+//   - POST /checkin/requests                     → Clerk OR PIN-session auth (resolveAuth)
 //   - GET  /checkin/requests                     → requireLeaderSession("leader") → requireRole("leader")
 //   - PATCH /checkin/requests/:id/approve        → requireLeaderSession("leader") → requireRole("leader")
 //   - PATCH /checkin/requests/:id/reject         → requireLeaderSession("leader") → requireRole("leader")
@@ -21,23 +21,12 @@ import {
   pendingEmailsTable,
   checkinSettingsTable,
   checkinWindowsTable,
-  type Profile,
 } from "../_shared/schema.ts";
-import { getClerkUserId, requireRole } from "../_shared/auth.ts";
+import { requireRole, resolveAuth } from "../_shared/auth.ts";
 import { and, desc, eq, ilike, or } from "npm:drizzle-orm@0.45.2";
 import { toZonedTime } from "npm:date-fns-tz@3";
 
 const app = createApp();
-
-// ── Local helper: resolve profile from Clerk token ───────────────────────────
-async function resolveClerkProfile(req: Request): Promise<Profile | null> {
-  const userId = await getClerkUserId(req);
-  if (!userId) return null;
-  const profile = await db.query.profilesTable.findFirst({
-    where: eq(profilesTable.clerk_id, userId),
-  });
-  return profile ?? null;
-}
 
 // ── Check-in schedule helpers ──────────────────────────────────────────────────
 // Ported from artifacts/api-server/src/lib/checkinSchedule.ts.
@@ -243,24 +232,14 @@ app.put("/checkin/schedule", requireRole("leader"), async (c) => {
 // POST /checkin/requests - Member self check-in request (Clerk-auth)
 app.post("/checkin/requests", async (c) => {
   try {
-    const userId = await getClerkUserId(c.req.raw);
-    if (!userId) {
+    const auth = await resolveAuth(c.req.raw);
+    if (!auth) {
       return c.json(
         { error: "Unauthorized. Please sign in to check in." },
         401,
       );
     }
-
-    const profile = await resolveClerkProfile(c.req.raw);
-    if (!profile) {
-      return c.json(
-        {
-          error:
-            "Profile not found. Please complete your registration first.",
-        },
-        404,
-      );
-    }
+    const profile = auth.profile;
 
     // Leaders & super-admins may check in any time; everyone else is limited
     // to the configured schedule.
