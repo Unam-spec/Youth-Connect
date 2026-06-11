@@ -19,6 +19,9 @@ import CheckIn from "@/pages/checkin";
 import LeaderLogin from "@/pages/leader-login";
 import MyDashboard from "@/pages/my";
 import BecomeMember from "@/pages/become-member";
+import PinSignup from "@/pages/pin-signup";
+import PinLogin from "@/pages/pin-login";
+import AccountHome from "@/pages/account";
 import Dashboard from "@/pages/dashboard";
 import LeaderQr from "@/pages/leader-qr";
 import SessionQr from "@/pages/session-qr";
@@ -197,6 +200,9 @@ function ClerkProviderWithRoutes() {
           <Route path="/register" component={Register} />
           <Route path="/checkin" component={CheckIn} />
           <Route path="/leader-login" component={LeaderLogin} />
+          <Route path="/pin-signup" component={PinSignup} />
+          <Route path="/pin-login" component={PinLogin} />
+          <Route path="/account" component={AccountHome} />
 
           <Route path="/my" component={MyDashboard} />
           <Route path="/become-member" component={BecomeMember} />

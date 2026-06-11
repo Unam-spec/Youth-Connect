@@ -59,6 +59,14 @@ function PublicHome() {
                 <LogIn className="mr-2 h-5 w-5" />
                 Login
               </Button>
+              <Button
+                size="lg"
+                variant="ghost"
+                className="w-full h-12 px-8 text-base"
+                onClick={() => setLocation("/pin-signup")}
+              >
+                No email? Use a username
+              </Button>
             </div>
           </div>
         </section>
