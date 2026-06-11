@@ -243,4 +243,22 @@ router.patch("/auth/pin", async (req, res) => {
   }
 });
 
+// GET /auth/me — the caller's own minimal profile (Clerk OR PIN session).
+router.get("/auth/me", async (req, res) => {
+  try {
+    const profile = await resolveAccount(req);
+    if (!profile) return res.status(401).json({ error: "Unauthorized" });
+    return res.json({
+      id: profile.id,
+      full_name: profile.full_name,
+      username: profile.username,
+      role: profile.role,
+      age: profile.age,
+    });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default router;
