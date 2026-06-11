@@ -153,6 +153,9 @@ router.post(
       );
       if (!gate.ok) return res.status(400).json({ error: gate.error });
 
+      // For 13+ no consent is required, so the audit columns are explicitly
+      // nulled. Safe: the gate above only lets visitors through, so this never
+      // clears an existing member's recorded consent.
       const needsConsent = target.age === null || target.age < CONSENT_AGE;
       const [updated] = await db
         .update(profilesTable)
@@ -184,6 +187,12 @@ router.post(
         where: eq(profilesTable.id, req.params.id as string),
       });
       if (!target) return res.status(404).json({ error: "Account not found" });
+      // Scope to PIN accounts (have a username). A promoted member keeps their
+      // username, so this still covers them; it just blocks setting a PIN on a
+      // Clerk/email-only account that never had one.
+      if (!target.username) {
+        return res.status(400).json({ error: "This account has no PIN to reset." });
+      }
 
       const provided = (req.body ?? {}).pin;
       let newPin: string;

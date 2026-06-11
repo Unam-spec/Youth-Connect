@@ -10,7 +10,6 @@ import {
   pendingEmailsTable,
   checkinSettingsTable,
   checkinWindowsTable,
-  type Profile,
 } from "@workspace/db";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { getSchedule, isCheckinOpenNow, type CheckinWindow } from "../lib/checkinSchedule";
