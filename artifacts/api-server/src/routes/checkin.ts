@@ -1,5 +1,4 @@
-import { Router, type Request } from "express";
-import { getAuth } from "@clerk/express";
+import { Router } from "express";
 import { ilike, or, eq, and, desc } from "drizzle-orm";
 import { toZonedTime } from "date-fns-tz";
 import {
@@ -15,18 +14,9 @@ import {
 } from "@workspace/db";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { getSchedule, isCheckinOpenNow, type CheckinWindow } from "../lib/checkinSchedule";
+import { resolveAccount } from "../lib/resolveAccount";
 
 const router = Router();
-
-// Resolve profile from Clerk token
-async function resolveClerkProfile(req: Request): Promise<Profile | null> {
-  const auth = getAuth(req);
-  if (!auth?.userId) return null;
-  const profile = await db.query.profilesTable.findFirst({
-    where: eq(profilesTable.clerk_id, auth.userId),
-  });
-  return profile ?? null;
-}
 
 // ── Time-window helpers ───────────────────────────────────────────────────────
 
@@ -147,18 +137,11 @@ router.put("/checkin/schedule", requireLeaderSession("leader"), async (req, res)
 // POST /api/checkin/requests - Member self check-in request (Clerk-auth)
 router.post("/checkin/requests", async (req, res) => {
   try {
-    const clerkAuth = getAuth(req);
-    if (!clerkAuth?.userId) {
+    const profile = await resolveAccount(req);
+    if (!profile) {
       return res
         .status(401)
         .json({ error: "Unauthorized. Please sign in to check in." });
-    }
-
-    const profile = await resolveClerkProfile(req);
-    if (!profile) {
-      return res.status(404).json({
-        error: "Profile not found. Please complete your registration first.",
-      });
     }
 
     // Leaders & super-admins may check in any time; everyone else is limited
