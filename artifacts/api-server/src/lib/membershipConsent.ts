@@ -7,7 +7,7 @@ export interface ConsentSubject {
 
 export type ConsentResult = { ok: true } | { ok: false; error: string };
 
-const CONSENT_AGE = 13; // under 13 requires parental consent (COPPA line)
+export const CONSENT_AGE = 13; // under 13 requires parental consent (COPPA line)
 
 function nonBlank(v: string | null): boolean {
   return typeof v === "string" && v.trim().length > 0;

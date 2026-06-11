@@ -7,7 +7,7 @@ import { validateUsername } from "../lib/username";
 import { validatePin } from "../lib/pin";
 import { resolveAccount } from "../lib/resolveAccount";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
-import { canGrantMembership } from "../lib/membershipConsent";
+import { canGrantMembership, CONSENT_AGE } from "../lib/membershipConsent";
 
 const router = Router();
 
@@ -103,6 +103,10 @@ router.post("/auth/pin-login", async (req, res) => {
     if (!normalized || !pin) {
       return res.status(400).json({ error: "Username and PIN are required." });
     }
+    // Fast-reject implausibly long input so bcrypt.compare never runs on it.
+    if (pin.length > 8) {
+      return res.status(401).json({ error: "Invalid username or PIN" });
+    }
 
     const profile = await findByUsername(normalized);
     if (!profile || !profile.pin_hash) {
@@ -149,7 +153,7 @@ router.post(
       );
       if (!gate.ok) return res.status(400).json({ error: gate.error });
 
-      const needsConsent = target.age === null || target.age < 13;
+      const needsConsent = target.age === null || target.age < CONSENT_AGE;
       const [updated] = await db
         .update(profilesTable)
         .set({
