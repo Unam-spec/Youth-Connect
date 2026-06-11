@@ -3,6 +3,8 @@
 //
 // Auth mapping (matches source exactly):
 //   - GET  /checkin/search                       → public (no auth)
+//   - GET  /checkin/schedule                     → public read (no auth)
+//   - PUT  /checkin/schedule                     → requireLeaderSession("leader") → requireRole("leader")
 //   - POST /checkin/requests                     → Clerk auth (getAuth(req).userId → getClerkUserId)
 //   - GET  /checkin/requests                     → requireLeaderSession("leader") → requireRole("leader")
 //   - PATCH /checkin/requests/:id/approve        → requireLeaderSession("leader") → requireRole("leader")
@@ -17,6 +19,8 @@ import {
   attendanceTable,
   visitorsTable,
   pendingEmailsTable,
+  checkinSettingsTable,
+  checkinWindowsTable,
   type Profile,
 } from "../_shared/schema.ts";
 import { getClerkUserId, requireRole } from "../_shared/auth.ts";
@@ -35,13 +39,88 @@ async function resolveClerkProfile(req: Request): Promise<Profile | null> {
   return profile ?? null;
 }
 
-// ── Time-window helpers ───────────────────────────────────────────────────────
+// ── Check-in schedule helpers ──────────────────────────────────────────────────
+// Ported from artifacts/api-server/src/lib/checkinSchedule.ts.
 
-function isCheckinWindowOpen(): boolean {
-  const sast = toZonedTime(new Date(), "Africa/Johannesburg");
-  const day = sast.getDay(); // 0 = Sunday, 5 = Friday
-  const totalMinutes = sast.getHours() * 60 + sast.getMinutes();
-  return day === 5 && totalMinutes >= 18 * 60 + 30 && totalMinutes < 22 * 60;
+const TZ = "Africa/Johannesburg";
+
+interface CheckinWindow {
+  day_of_week: number; // 0=Sun … 6=Sat (matches JS Date.getDay())
+  start_time: string; // "HH:MM" 24h SAST
+  end_time: string; // "HH:MM" 24h SAST
+  enabled: boolean;
+}
+
+interface CheckinSchedule {
+  restrict_to_schedule: boolean;
+  windows: CheckinWindow[];
+}
+
+/**
+ * Pure open/closed decision. `nowHHMM` must be zero-padded "HH:MM".
+ * Time comparison is a lexical string compare, valid for equal-length "HH:MM".
+ */
+function evaluateCheckinOpen(
+  restrict: boolean,
+  windows: CheckinWindow[],
+  dayOfWeek: number,
+  nowHHMM: string,
+): boolean {
+  if (!restrict) return true;
+  return windows.some(
+    (w) =>
+      w.enabled &&
+      w.day_of_week === dayOfWeek &&
+      nowHHMM >= w.start_time &&
+      nowHHMM < w.end_time,
+  );
+}
+
+/** Reads the schedule, normalizing windows to all 7 weekdays (0..6). */
+async function getSchedule(): Promise<CheckinSchedule> {
+  const [settings, rows] = await Promise.all([
+    db.query.checkinSettingsTable.findFirst(),
+    db.select().from(checkinWindowsTable),
+  ]);
+  const byDay = new Map<number, (typeof rows)[number]>(
+    rows.map((r) => [r.day_of_week, r]),
+  );
+  const windows: CheckinWindow[] = [];
+  for (let d = 0; d < 7; d++) {
+    const r = byDay.get(d);
+    windows.push({
+      day_of_week: d,
+      start_time: r?.start_time ?? "",
+      end_time: r?.end_time ?? "",
+      enabled: r?.enabled ?? false,
+    });
+  }
+  return { restrict_to_schedule: settings?.restrict_to_schedule ?? true, windows };
+}
+
+/** Current SAST { dayOfWeek, hhmm } as zero-padded "HH:MM". */
+function sastNow(now: Date = new Date()): { dayOfWeek: number; hhmm: string } {
+  const z = toZonedTime(now, TZ);
+  const hh = String(z.getHours()).padStart(2, "0");
+  const mm = String(z.getMinutes()).padStart(2, "0");
+  return { dayOfWeek: z.getDay(), hhmm: `${hh}:${mm}` };
+}
+
+/** True if a non-leader may check in right now. Fails safe to closed on error. */
+async function isCheckinOpenNow(): Promise<boolean> {
+  try {
+    const schedule = await getSchedule();
+    const { dayOfWeek, hhmm } = sastNow();
+    return evaluateCheckinOpen(
+      schedule.restrict_to_schedule,
+      schedule.windows.filter((w) => w.enabled && w.start_time && w.end_time),
+      dayOfWeek,
+      hhmm,
+    );
+  } catch (err) {
+    console.error("[checkin] isCheckinOpenNow failed; treating as closed:", err);
+    return false;
+  }
 }
 
 function getSastToday(): string {
@@ -79,6 +158,88 @@ app.get("/checkin/search", async (c) => {
   }
 });
 
+// GET /checkin/schedule - current schedule (public read)
+app.get("/checkin/schedule", async (c) => {
+  try {
+    const schedule = await getSchedule();
+    return c.json(schedule);
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// PUT /checkin/schedule - update schedule (leaders & super-admins)
+app.put("/checkin/schedule", requireRole("leader"), async (c) => {
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as {
+      restrict_to_schedule?: unknown;
+      windows?: unknown;
+    };
+    const restrict = body.restrict_to_schedule !== false; // default true
+    const rawWindows = Array.isArray(body.windows) ? body.windows : [];
+
+    const windows: CheckinWindow[] = [];
+    for (const w of rawWindows as Record<string, unknown>[]) {
+      const day = Number(w.day_of_week);
+      const enabled = w.enabled === true;
+      const start = String(w.start_time ?? "");
+      const end = String(w.end_time ?? "");
+      if (!Number.isInteger(day) || day < 0 || day > 6) {
+        return c.json({ error: `Invalid day_of_week: ${w.day_of_week}` }, 400);
+      }
+      if (enabled) {
+        if (!HHMM.test(start) || !HHMM.test(end)) {
+          return c.json({ error: `Times must be "HH:MM" for day ${day}` }, 400);
+        }
+        if (start >= end) {
+          return c.json({ error: `Start must be before end for day ${day}` }, 400);
+        }
+      }
+      windows.push({ day_of_week: day, start_time: start, end_time: end, enabled });
+    }
+
+    const leaderId = c.get("leaderId") as string | undefined;
+
+    await db.transaction(async (tx) => {
+      const existing = await tx.query.checkinSettingsTable.findFirst();
+      if (existing) {
+        await tx
+          .update(checkinSettingsTable)
+          .set({ restrict_to_schedule: restrict, updated_at: new Date(), updated_by: leaderId })
+          .where(eq(checkinSettingsTable.id, existing.id));
+      } else {
+        await tx
+          .insert(checkinSettingsTable)
+          .values({ restrict_to_schedule: restrict, updated_by: leaderId });
+      }
+      await tx.delete(checkinWindowsTable);
+      // Only persist rows with real "HH:MM" times. Disabled/blank days are
+      // intentionally not stored; getSchedule() synthesises them as
+      // { enabled:false, start_time:"", end_time:"" } on read-back.
+      const toInsert = windows.filter((w) => HHMM.test(w.start_time) && HHMM.test(w.end_time));
+      if (toInsert.length > 0) {
+        await tx.insert(checkinWindowsTable).values(
+          toInsert.map((w) => ({
+            day_of_week: w.day_of_week,
+            start_time: w.start_time,
+            end_time: w.end_time,
+            enabled: w.enabled,
+          })),
+        );
+      }
+    });
+
+    const saved = await getSchedule();
+    return c.json(saved);
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
 // POST /checkin/requests - Member self check-in request (Clerk-auth)
 app.post("/checkin/requests", async (c) => {
   try {
@@ -90,31 +251,6 @@ app.post("/checkin/requests", async (c) => {
       );
     }
 
-    if (!isCheckinWindowOpen()) {
-      const sast = toZonedTime(new Date(), "Africa/Johannesburg");
-      const day = sast.getDay();
-      if (day !== 5) {
-        return c.json(
-          {
-            error:
-              "Check-in is only available on Fridays between 18:30 and 22:00 SAST.",
-          },
-          403,
-        );
-      }
-      const totalMinutes = sast.getHours() * 60 + sast.getMinutes();
-      if (totalMinutes < 18 * 60 + 30) {
-        return c.json(
-          { error: "Check-in opens at 18:30 SAST on Fridays." },
-          403,
-        );
-      }
-      return c.json(
-        { error: "Check-in has closed for tonight (closes at 22:00 SAST)." },
-        403,
-      );
-    }
-
     const profile = await resolveClerkProfile(c.req.raw);
     if (!profile) {
       return c.json(
@@ -123,6 +259,19 @@ app.post("/checkin/requests", async (c) => {
             "Profile not found. Please complete your registration first.",
         },
         404,
+      );
+    }
+
+    // Leaders & super-admins may check in any time; everyone else is limited
+    // to the configured schedule.
+    const isLeader = profile.role === "leader" || profile.role === "super_admin";
+    if (!isLeader && !(await isCheckinOpenNow())) {
+      return c.json(
+        {
+          error:
+            "Check-in is closed right now. Please check in during the scheduled times.",
+        },
+        403,
       );
     }
 
