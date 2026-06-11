@@ -62,9 +62,8 @@ app.post("/auth/pin-signup", async (c) => {
     const pinHash = await bcrypt.hash(pin.value, 12);
     const sessionToken = crypto.randomUUID();
 
-    let inserted;
     try {
-      [inserted] = await db
+      const [inserted] = await db
         .insert(profilesTable)
         .values({
           full_name: fullName,
@@ -84,12 +83,11 @@ app.post("/auth/pin-signup", async (c) => {
           session_token: sessionToken,
         })
         .returning();
+      return c.json(sessionPayload(inserted.id, sessionToken), 201);
     } catch (_e) {
       // Unique-index race: another signup took the username between check and insert.
       return c.json({ error: "That username is already taken." }, 409);
     }
-
-    return c.json(sessionPayload(inserted.id, sessionToken), 201);
   } catch (err) {
     console.error(err);
     return c.json({ error: "Internal server error" }, 500);
