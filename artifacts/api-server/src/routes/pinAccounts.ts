@@ -5,6 +5,7 @@ import { eq, sql } from "drizzle-orm";
 import { db, profilesTable } from "@workspace/db";
 import { validateUsername } from "../lib/username";
 import { validatePin } from "../lib/pin";
+import { resolveAccount } from "../lib/resolveAccount";
 
 const router = Router();
 
@@ -116,6 +117,28 @@ router.post("/auth/pin-login", async (req, res) => {
       .where(eq(profilesTable.id, profile.id));
 
     return res.json({ ...sessionPayload(profile.id, sessionToken), role: profile.role });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PATCH /auth/pin — authenticated account changes its own PIN.
+router.patch("/auth/pin", async (req, res) => {
+  try {
+    const profile = await resolveAccount(req);
+    if (!profile) return res.status(401).json({ error: "Unauthorized" });
+
+    const pin = validatePin((req.body ?? {}).pin);
+    if (!pin.ok) return res.status(400).json({ error: pin.error });
+
+    const pinHash = await bcrypt.hash(pin.value, 12);
+    await db
+      .update(profilesTable)
+      .set({ pin_hash: pinHash, pin_plain: pin.value })
+      .where(eq(profilesTable.id, profile.id));
+
+    return res.json({ success: true });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
