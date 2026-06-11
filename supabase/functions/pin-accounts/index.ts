@@ -34,12 +34,23 @@ app.post("/pin-accounts/:id/grant-membership", requireRole("leader"), async (c) 
 
     const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
     const consentProvided = body.parental_consent === true;
+    // Effective parent info: a non-blank value in the request overrides the
+    // stored one (lets the under-13 promote dialog supply it in one call).
+    const parentName =
+      typeof body.parent_name === "string" && body.parent_name.trim()
+        ? body.parent_name.trim()
+        : target.parent_name;
+    const parentPhone =
+      typeof body.parent_phone === "string" && body.parent_phone.trim()
+        ? body.parent_phone.trim()
+        : target.parent_phone;
+
     const gate = canGrantMembership(
       {
         role: target.role,
         age: target.age,
-        parent_phone: target.parent_phone,
-        parent_name: target.parent_name,
+        parent_phone: parentPhone,
+        parent_name: parentName,
       },
       consentProvided,
     );
@@ -54,6 +65,8 @@ app.post("/pin-accounts/:id/grant-membership", requireRole("leader"), async (c) 
       .update(profilesTable)
       .set({
         role: "member",
+        parent_name: parentName,
+        parent_phone: parentPhone,
         parental_consent_at: needsConsent ? new Date() : null,
         parental_consent_by: needsConsent ? leaderId : null,
       })
