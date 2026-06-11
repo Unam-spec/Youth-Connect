@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/react";
 import { getLeaderSession } from "./auth";
+import { getPinSession } from "./pinSession";
 
 interface ClerkGlobal {
   loaded?: boolean;
@@ -39,10 +40,21 @@ export async function apiFetch(
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // Add leader session for super admin authentication
+  // Attach a PIN session header: leaders use the leader session; username+PIN
+  // kids use the pin session. The backend validates either against
+  // profiles.session_token.
   const leaderSession = getLeaderSession();
   if (leaderSession) {
     headers["x-leader-session"] = JSON.stringify(leaderSession);
+  } else {
+    const pinSession = getPinSession();
+    if (pinSession) {
+      headers["x-leader-session"] = JSON.stringify({
+        profile_id: pinSession.profile_id,
+        session_token: pinSession.session_token,
+        expires_at: pinSession.expires_at,
+      });
+    }
   }
 
   return fetch(url, {
@@ -67,10 +79,21 @@ export function useApiFetch() {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
-    // Add leader session for super admin authentication
+    // Attach a PIN session header: leaders use the leader session; username+PIN
+    // kids use the pin session. The backend validates either against
+    // profiles.session_token.
     const leaderSession = getLeaderSession();
     if (leaderSession) {
       headers["x-leader-session"] = JSON.stringify(leaderSession);
+    } else {
+      const pinSession = getPinSession();
+      if (pinSession) {
+        headers["x-leader-session"] = JSON.stringify({
+          profile_id: pinSession.profile_id,
+          session_token: pinSession.session_token,
+          expires_at: pinSession.expires_at,
+        });
+      }
     }
 
     return fetch(url, {
