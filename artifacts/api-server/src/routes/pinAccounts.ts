@@ -168,6 +168,46 @@ router.post(
   },
 );
 
+// POST /pin-accounts/:id/reset-pin — leader resets a kid's PIN to a provided
+// or generated value, returned once so the leader can hand it over. Stores
+// pin_plain so the dashboard shows the current PIN (product decision).
+router.post(
+  "/pin-accounts/:id/reset-pin",
+  requireLeaderSession("leader"),
+  async (req, res) => {
+    try {
+      const target = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, req.params.id as string),
+      });
+      if (!target) return res.status(404).json({ error: "Account not found" });
+
+      const provided = (req.body ?? {}).pin;
+      let newPin: string;
+      if (provided !== undefined) {
+        const check = validatePin(provided);
+        if (!check.ok) return res.status(400).json({ error: check.error });
+        newPin = check.value;
+      } else {
+        // Generate a non-trivial 4-digit PIN.
+        do {
+          newPin = String(crypto.randomInt(1000, 10000));
+        } while (!validatePin(newPin).ok);
+      }
+
+      const pinHash = await bcrypt.hash(newPin, 12);
+      await db
+        .update(profilesTable)
+        .set({ pin_hash: pinHash, pin_plain: newPin, session_token: null })
+        .where(eq(profilesTable.id, target.id));
+
+      return res.json({ success: true, pin: newPin });
+    } catch (err) {
+      req.log.error(err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
 // PATCH /auth/pin — authenticated account changes its own PIN.
 router.patch("/auth/pin", async (req, res) => {
   try {
