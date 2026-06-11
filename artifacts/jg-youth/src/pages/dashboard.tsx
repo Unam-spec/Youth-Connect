@@ -85,6 +85,7 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { AttendancePanel } from "@/components/panels/AttendancePanel";
 import { MemberDirectoryPanel } from "@/components/panels/MemberDirectoryPanel";
+import { PinAccountsPanel } from "@/components/panels/PinAccountsPanel";
 import { EventsPanel } from "@/components/panels/EventsPanel";
 import { RequestsPanel } from "@/components/panels/RequestsPanel";
 import { RSVPPanel } from "@/components/panels/RSVPPanel";
@@ -1139,6 +1140,7 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="members" className="mt-0 space-y-6">
+            <PinAccountsPanel />
             <RequestsPanel
               pendingFirstTimers={pendingFirstTimers}
               isPendingLoading={isPendingLoading}
