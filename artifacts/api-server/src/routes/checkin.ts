@@ -134,7 +134,7 @@ router.put("/checkin/schedule", requireLeaderSession("leader"), async (req, res)
   }
 });
 
-// POST /api/checkin/requests - Member self check-in request (Clerk-auth)
+// POST /api/checkin/requests - Member self check-in request (Clerk or PIN-session auth)
 router.post("/checkin/requests", async (req, res) => {
   try {
     const profile = await resolveAccount(req);
