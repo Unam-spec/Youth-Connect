@@ -78,6 +78,10 @@ export const profilesTable = pgTable("profiles", {
   link_token_expires_at: timestamp("link_token_expires_at", { withTimezone: true }),
   link_token_used: boolean("link_token_used").notNull().default(false),
   session_token: uuid("session_token"),
+  username: text("username"),
+  pin_plain: text("pin_plain"),
+  parental_consent_at: timestamp("parental_consent_at", { withTimezone: true }),
+  parental_consent_by: uuid("parental_consent_by"),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
