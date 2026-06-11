@@ -10,12 +10,14 @@ import checkinRouter from "./checkin";
 import qrcodesRouter from "./qrcodes";
 import dashboardRouter from "./dashboard";
 import registerRouter from "./register";
+import pinAccountsRouter from "./pinAccounts";
 import adminRouter from "./admin";
 
 const router: IRouter = Router();
 
 // Public endpoint — must be mounted BEFORE any auth-gated routers
 router.use(registerRouter);
+router.use(pinAccountsRouter);
 
 router.use(healthRouter);
 router.use(profilesRouter);
