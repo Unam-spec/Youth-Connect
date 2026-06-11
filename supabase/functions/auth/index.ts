@@ -153,4 +153,23 @@ app.patch("/auth/pin", async (c) => {
   }
 });
 
+// GET /auth/me — the caller's own minimal profile (Clerk OR PIN session).
+app.get("/auth/me", async (c) => {
+  try {
+    const auth = await resolveAuth(c.req.raw);
+    if (!auth) return c.json({ error: "Unauthorized" }, 401);
+    const p = auth.profile;
+    return c.json({
+      id: p.id,
+      full_name: p.full_name,
+      username: p.username,
+      role: p.role,
+      age: p.age,
+    });
+  } catch (err) {
+    console.error(err);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+});
+
 Deno.serve(app.fetch);
