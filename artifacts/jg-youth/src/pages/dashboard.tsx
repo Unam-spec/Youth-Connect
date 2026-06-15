@@ -27,7 +27,6 @@ import {
   useListProfiles,
   usePromoteToMember,
   useRejectMembershipRequest,
-  useRevokeMembership,
 } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
 import { getLeaderSession, setLeaderSession, LeaderSession } from "@/lib/auth";
@@ -378,7 +377,6 @@ export default function Dashboard() {
 
   const createEvent = useCreateEvent();
   const promoteToMember = usePromoteToMember();
-  const revokeMembership = useRevokeMembership();
   const approveRequest = useApproveMembershipRequest();
   const rejectRequest = useRejectMembershipRequest();
 
@@ -796,17 +794,40 @@ export default function Dashboard() {
   }
 
   function mutateProfileRole(action: "promote" | "revoke", profileId: string) {
-    const mutation = action === "promote" ? promoteToMember : revokeMembership;
-    mutation.mutate(
+    if (action === "revoke") {
+      // "Demote to Member": strip the leader role but keep the person a member.
+      // The revoke-membership endpoint downgrades member→visitor (which drops
+      // them from the directory entirely) — not what demotion means. Use the
+      // dedicated leaders/demote endpoint, which sets role: "member" and clears
+      // the leader's PIN/session.
+      void (async () => {
+        try {
+          const res = await apiFetch(`/api/leaders/${profileId}/demote`, {
+            method: "POST",
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error ?? "Please try again.");
+          }
+          toast({ title: "Demoted to member" });
+          refreshDashboard();
+        } catch (error) {
+          toast({
+            title: "Profile update failed",
+            description:
+              error instanceof Error ? error.message : "Please try again.",
+            variant: "destructive",
+          });
+        }
+      })();
+      return;
+    }
+
+    promoteToMember.mutate(
       { id: profileId },
       {
         onSuccess: () => {
-          toast({
-            title:
-              action === "promote"
-                ? "Promoted to member"
-                : "Membership revoked",
-          });
+          toast({ title: "Promoted to member" });
           refreshDashboard();
         },
         onError: (error: Error) =>
