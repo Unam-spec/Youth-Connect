@@ -793,8 +793,8 @@ export default function Dashboard() {
     }
   }
 
-  function mutateProfileRole(action: "promote" | "revoke", profileId: string) {
-    if (action === "revoke") {
+  function mutateProfileRole(action: "promote" | "demote", profileId: string) {
+    if (action === "demote") {
       // "Demote to Member": strip the leader role but keep the person a member.
       // The revoke-membership endpoint downgrades member→visitor (which drops
       // them from the directory entirely) — not what demotion means. Use the

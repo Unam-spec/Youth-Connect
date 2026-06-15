@@ -18,7 +18,7 @@ interface MemberDirectoryPanelProps {
   canManageMembers?: boolean;
   superAdminCount: number;
   openEditDialog: (profile: any) => void;
-  mutateProfileRole: (action: "promote" | "revoke", profileId: string) => void;
+  mutateProfileRole: (action: "promote" | "demote", profileId: string) => void;
   setRoleConfirm: (confirm: { profile: any; targetRole: "leader" | "super_admin" }) => void;
   handlePermissionChange: (profileId: string, key: string, value: boolean) => void;
   setDeleteMemberId: (id: string) => void;
@@ -334,7 +334,7 @@ export function MemberDirectoryPanel({
               className="bg-red-600 hover:bg-red-700 text-white border-0"
               onClick={() => {
                 if (demoteAlert.profile) {
-                  mutateProfileRole("revoke", demoteAlert.profile.id);
+                  mutateProfileRole("demote", demoteAlert.profile.id);
                 }
               }}
             >
