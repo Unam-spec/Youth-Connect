@@ -39,7 +39,8 @@
     "onlyBuiltDependencies": [
       "bcrypt",
       "esbuild",
-      "@clerk/shared"
+      "@clerk/shared",
+      "core-js"
     ]
   }
 }

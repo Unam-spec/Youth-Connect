@@ -14,7 +14,11 @@ Sentry.init({
 
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { initPostHog } from "./lib/posthog";
 import "./index.css";
+
+// Initialize product analytics. No-ops gracefully when VITE_POSTHOG_KEY is unset.
+initPostHog();
 
 window.addEventListener("unhandledrejection", (event) => {
   if (event.reason?.message?.includes("No session was found")) {

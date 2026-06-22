@@ -35,10 +35,30 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@clerk/react";
+import { Settings2 } from "lucide-react";
+import { FeedbackModal } from "@/components/member/FeedbackModal";
+import { PreferencesModal } from "@/components/member/PreferencesModal";
+import { StreakWidget } from "@/components/member/StreakWidget";
+import { OnboardingTour, type TourStep } from "@/components/member/OnboardingTour";
 
 export default function MyDashboard() {
   const { isLoaded, isSignedIn } = useAuth();
   const [, setLocation] = useLocation();
+
+  // ── Member-experience features: feedback / preferences / streak / tour ───────
+  const profileSectionRef = useRef<HTMLElement>(null);
+  const checkInSectionRef = useRef<HTMLElement>(null);
+  const eventsSectionRef = useRef<HTMLElement>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [prefsOpen, setPrefsOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [feedbackSettings, setFeedbackSettings] = useState<{
+    enabled: boolean;
+    interval_days: number;
+    title: string;
+    body: string;
+    examples?: string[];
+  } | null>(null);
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -87,6 +107,82 @@ export default function MyDashboard() {
   const { data: myAttendance, isLoading: isAttendanceLoading } = useGetMyAttendance({
     query: { enabled: !!profile, queryKey: getGetMyAttendanceQueryKey() },
   });
+
+  // Fetch the editable feedback prompt config (public endpoint).
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/feedbacks/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d) setFeedbackSettings(d);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Recurring member feedback (all roles): welcome once for a new account, then at
+  // most once per `interval_days` — and only after they've checked in since the
+  // last prompt. Cadence is tracked per-profile in localStorage.
+  useEffect(() => {
+    if (!profile || !feedbackSettings || feedbackSettings.enabled === false) return;
+    const pid = profile.id;
+    if (!pid) return;
+
+    const key = `jg_feedback_last_${pid}`;
+    const lastRaw = localStorage.getItem(key);
+    const last = lastRaw ? parseInt(lastRaw, 10) : null;
+    const intervalMs = (feedbackSettings.interval_days ?? 14) * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    // Most recent check-in (ms) from attendance session dates.
+    const latestCheckin = (myAttendance ?? []).reduce<number>((max, a) => {
+      const t = a.session_date ? new Date(a.session_date).getTime() : NaN;
+      return Number.isNaN(t) ? max : Math.max(max, t);
+    }, 0);
+
+    const due =
+      last == null
+        ? true // first time → welcome prompt
+        : now - last >= intervalMs && latestCheckin > last; // cadence + fresh check-in
+
+    if (due) {
+      localStorage.setItem(key, String(now));
+      setFeedbackOpen(true);
+    }
+  }, [profile, feedbackSettings, myAttendance]);
+
+  // First-time onboarding tour: starts once the feedback modal isn't in the way.
+  useEffect(() => {
+    if (!profile || feedbackOpen) return;
+    if (localStorage.getItem("jg_tour_completed")) return;
+    const t = setTimeout(() => setTourOpen(true), 600);
+    return () => clearTimeout(t);
+  }, [profile, feedbackOpen]);
+
+  const tourSteps: TourStep[] = [
+    {
+      target: checkInSectionRef,
+      title: "Check in each week",
+      body: "Tap here on session nights to check in — scan the venue QR or search your name.",
+    },
+    {
+      target: eventsSectionRef,
+      title: "Browse & RSVP to events",
+      body: "See what's coming up and let us know if you're going. Your RSVPs live under this section.",
+    },
+    {
+      target: profileSectionRef,
+      title: "Your profile",
+      body: "Update your details, add a photo, and manage your notification preferences here.",
+    },
+  ];
+
+  function closeTour() {
+    setTourOpen(false);
+    localStorage.setItem("jg_tour_completed", "1");
+  }
 
   const now = new Date();
   const [bannerDismissed, setBannerDismissed] = useState(
@@ -325,7 +421,7 @@ export default function MyDashboard() {
         )}
 
         {/* Profile card */}
-        <section>
+        <section ref={profileSectionRef}>
           {isProfileLoading ? (
             <Skeleton className="h-44 w-full max-w-md rounded-2xl" />
           ) : profile ? (
@@ -375,12 +471,21 @@ export default function MyDashboard() {
                       <Camera className="w-5 h-5 text-white" />
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowProfilePrompt(true)}
-                    className="text-xs text-primary hover:underline font-semibold border border-border px-3 py-1.5 rounded-full bg-card hover:bg-primary/5 transition-all"
-                  >
-                    Edit Profile
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setPrefsOpen(true)}
+                      aria-label="Preferences"
+                      className="text-muted-foreground hover:text-primary border border-border p-1.5 rounded-full bg-card hover:bg-primary/5 transition-all"
+                    >
+                      <Settings2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setShowProfilePrompt(true)}
+                      className="text-xs text-primary hover:underline font-semibold border border-border px-3 py-1.5 rounded-full bg-card hover:bg-primary/5 transition-all"
+                    >
+                      Edit Profile
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-4">
@@ -445,7 +550,7 @@ export default function MyDashboard() {
         </section>
 
         {/* Check-In section */}
-        <section>
+        <section ref={checkInSectionRef}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight text-foreground">Check-In</h2>
           </div>
@@ -460,6 +565,9 @@ export default function MyDashboard() {
               </div>
             </div>
           </Link>
+          <div className="mt-4">
+            <StreakWidget sessionDates={(myAttendance ?? []).map((a) => a.session_date)} />
+          </div>
         </section>
 
         {/* My Check-ins */}
@@ -498,7 +606,7 @@ export default function MyDashboard() {
         </section>
 
         {/* Events */}
-        <section>
+        <section ref={eventsSectionRef}>
           <Tabs value={eventsTab} onValueChange={(v) => setEventsTab(v as "upcoming" | "my-rsvps")}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight text-foreground">Events</h2>
@@ -988,6 +1096,22 @@ export default function MyDashboard() {
           </Button>
         </DialogContent>
       </Dialog>
+
+      {/* Member-experience features */}
+      <FeedbackModal
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        userId={profile?.id}
+        title={feedbackSettings?.title}
+        body={feedbackSettings?.body}
+        examples={feedbackSettings?.examples}
+      />
+      <PreferencesModal
+        open={prefsOpen}
+        onOpenChange={setPrefsOpen}
+        whatsappOptIn={!!(profile as any)?.whatsapp_opt_in}
+      />
+      <OnboardingTour steps={tourSteps} open={tourOpen} onClose={closeTour} />
     </Layout>
   );
 }

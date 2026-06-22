@@ -12,6 +12,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
+import { CommandPalette } from "@/components/command-palette";
+import { capturePageview, identifyUser, resetPostHog } from "@/lib/posthog";
 
 import Home from "@/pages/home";
 import Register from "@/pages/register";
@@ -23,6 +25,7 @@ import PinSignup from "@/pages/pin-signup";
 import PinLogin from "@/pages/pin-login";
 import AccountHome from "@/pages/account";
 import Dashboard from "@/pages/dashboard";
+import Analytics from "@/pages/analytics";
 import LeaderQr from "@/pages/leader-qr";
 import SessionQr from "@/pages/session-qr";
 import QrResolver from "@/pages/qr-resolver";
@@ -165,6 +168,28 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+// Emits a PostHog $pageview on every route change and keeps PostHog identity in
+// sync with the signed-in Clerk user. Renders nothing.
+function AnalyticsTracker() {
+  const [location] = useLocation();
+  const { isLoaded, isSignedIn, userId } = useAuth();
+
+  useEffect(() => {
+    capturePageview(location);
+  }, [location]);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (isSignedIn && userId) {
+      identifyUser(userId);
+    } else {
+      resetPostHog();
+    }
+  }, [isLoaded, isSignedIn, userId]);
+
+  return null;
+}
+
 function ClerkProviderWithRoutes() {
   const [, setLocation] = useLocation();
 
@@ -194,6 +219,8 @@ function ClerkProviderWithRoutes() {
       <QueryClientProvider client={queryClient}>
         <ApiClientAuthBridge />
         <ClerkQueryClientCacheInvalidator />
+        <AnalyticsTracker />
+        <CommandPalette />
 
         <Switch>
           <Route path="/" component={Home} />
@@ -206,6 +233,7 @@ function ClerkProviderWithRoutes() {
 
           <Route path="/my" component={MyDashboard} />
           <Route path="/become-member" component={BecomeMember} />
+          <Route path="/dashboard/analytics" component={Analytics} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/leader-qr" component={LeaderQr} />
           <Route path="/session-qr" component={SessionQr} />

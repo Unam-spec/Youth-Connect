@@ -101,6 +101,46 @@ INSERT INTO "checkin_settings" ("restrict_to_schedule")
 INSERT INTO "checkin_windows" ("day_of_week", "start_time", "end_time", "enabled")
   SELECT 5, '18:30', '22:00', true
   WHERE NOT EXISTS (SELECT 1 FROM "checkin_windows");
+
+-- Feedback table (2026-06): free-text feedback, optionally anonymous and/or tied
+-- to a profile. Mirrors lib/db/drizzle/0012_add_feedbacks_whatsapp_templates.sql.
+CREATE TABLE IF NOT EXISTS "feedbacks" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "content" text NOT NULL,
+  "anonymous" boolean NOT NULL DEFAULT false,
+  "user_id" uuid REFERENCES "profiles"("id"),
+  "created_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- WhatsApp templates table (2026-06): reusable message templates for automations.
+CREATE TABLE IF NOT EXISTS "whatsapp_templates" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "template_type" text NOT NULL,
+  "stage_weeks" integer,
+  "message_text" text NOT NULL,
+  "color_hex" text NOT NULL DEFAULT '#2A9D8F',
+  "created_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+
+-- Feedback prompt settings (2026-06): single-row, editable copy + cadence for the
+-- recurring member feedback prompt. Seeded with defaults only when empty.
+CREATE TABLE IF NOT EXISTS "feedback_settings" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "enabled" boolean NOT NULL DEFAULT true,
+  "interval_days" integer NOT NULL DEFAULT 14,
+  "title" text NOT NULL,
+  "body" text NOT NULL,
+  "examples" jsonb,
+  "updated_at" timestamp with time zone DEFAULT now(),
+  "updated_by" uuid
+);
+
+INSERT INTO "feedback_settings" ("title", "body", "examples")
+  SELECT
+    'How''s your JG Youth experience?',
+    'We''d love a quick word — what''s going well, or what could be better?',
+    '["What''s something you loved recently? 🙌","Anything we could do better at sessions?","An event or topic you''d love to see"]'::jsonb
+  WHERE NOT EXISTS (SELECT 1 FROM "feedback_settings");
 `;
 
 export async function runMigrations() {

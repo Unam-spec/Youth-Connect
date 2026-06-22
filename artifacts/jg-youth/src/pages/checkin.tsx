@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "@clerk/react";
 import { getLeaderSession } from "@/lib/auth";
 import { Link } from "wouter";
@@ -476,18 +477,44 @@ export default function CheckIn() {
     return (
       <Layout>
         <div className="max-w-sm mx-auto pt-12 px-4">
-          <div className="rounded-3xl bg-card border border-emerald-500/40 p-10 flex flex-col items-center text-center gap-4">
-            <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
-              <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+          <motion.div
+            initial={{ opacity: 0, y: 24, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: "spring", stiffness: 260, damping: 22 }}
+            className="rounded-3xl bg-card border border-emerald-500/40 p-10 flex flex-col items-center text-center gap-4"
+          >
+            <div className="relative flex items-center justify-center">
+              {/* Radiating celebration rings */}
+              {[0, 0.25, 0.5].map((delay) => (
+                <motion.span
+                  key={delay}
+                  className="absolute h-20 w-20 rounded-full border-2 border-emerald-500/50"
+                  initial={{ scale: 0.6, opacity: 0.7 }}
+                  animate={{ scale: 2.1, opacity: 0 }}
+                  transition={{ duration: 1.4, repeat: Infinity, delay, ease: "easeOut" }}
+                />
+              ))}
+              <motion.div
+                initial={{ scale: 0, rotate: -20 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 360, damping: 14, delay: 0.1 }}
+                className="relative w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center"
+              >
+                <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+              </motion.div>
             </div>
-            <div>
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.25 }}
+            >
               <h2 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight text-emerald-600">Checked In!</h2>
-              <p className="text-muted-foreground mt-1">You're all set. Enjoy the service!</p>
-            </div>
-            <Link href="/">
-              <Button variant="outline" className="mt-2 rounded-xl px-8">Return Home</Button>
+              <p className="text-muted-foreground mt-1">You're all set. Enjoy the service! 🔥</p>
+            </motion.div>
+            <Link href="/my">
+              <Button variant="outline" className="mt-2 rounded-xl px-8">View my streak</Button>
             </Link>
-          </div>
+          </motion.div>
         </div>
       </Layout>
     );

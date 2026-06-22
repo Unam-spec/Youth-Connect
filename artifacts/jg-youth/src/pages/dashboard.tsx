@@ -29,6 +29,11 @@ import {
   useRejectMembershipRequest,
 } from "@workspace/api-client-react";
 import { Layout } from "@/components/layout";
+import {
+  DashboardLayout,
+  useDashboardSection,
+  type DashboardSectionKey,
+} from "@/components/dashboard-layout";
 import { getLeaderSession, setLeaderSession, LeaderSession } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
@@ -246,7 +251,7 @@ export default function Dashboard() {
   const [editShowSchoolDropdown, setEditShowSchoolDropdown] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
-  const [activeTab, setActiveTab] = useState("attendance");
+  const [section, setSection] = useDashboardSection();
 
 
 
@@ -489,6 +494,12 @@ export default function Dashboard() {
   useEffect(() => {
     if (session?.role === "super_admin") fetchLeaderPins();
   }, [fetchLeaderPins]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh leader pins when the Manage section is opened (the sidebar/command
+  // palette can deep-link straight here, so we can't rely on a tab click).
+  useEffect(() => {
+    if (section === "manage") fetchLeaderPins();
+  }, [section, fetchLeaderPins]);
 
   // Split check-in requests by type
   const pendingMemberCheckIns = useMemo(
@@ -974,7 +985,7 @@ export default function Dashboard() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <Layout>
+    <DashboardLayout active={section}>
       <div className="space-y-5 pb-12">
         {/* ── Header ── */}
         <div className="rounded-2xl border border-border bg-card p-6">
@@ -1110,45 +1121,9 @@ export default function Dashboard() {
         
         {/* ── Tabs ── */}
         <Tabs
-          defaultValue="session"
-          onValueChange={(val) => {
-            setActiveTab(val);
-            if (val === "manage") fetchLeaderPins();
-          }}
+          value={section}
+          onValueChange={(val) => setSection(val as DashboardSectionKey)}
         >
-          <TabsList className="grid grid-cols-4 gap-2 mb-6 bg-muted p-2 rounded-xl">
-            <TabsTrigger value="session" className="rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Activity className="h-4 w-4 mr-2 hidden sm:block" /> Session
-            </TabsTrigger>
-            <TabsTrigger value="members" className="rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground relative">
-              <Users className="h-4 w-4 mr-2 hidden sm:block" /> Members
-              {(kpis?.total_members ?? 0) > 0 && (
-                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground shadow-sm">
-                    {kpis?.total_members ?? 0}
-                 </span>
-              )}
-              {totalRequestBadge > 0 && (
-                 <span
-                   title={`${totalRequestBadge} pending approval${totalRequestBadge === 1 ? "" : "s"}`}
-                   className="absolute -top-1 -left-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-[#FF9F0A] text-[10px] font-bold text-white shadow-sm"
-                 >
-                    {totalRequestBadge}
-                 </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="events" className="rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-              <Calendar className="h-4 w-4 mr-2 hidden sm:block" /> Events
-            </TabsTrigger>
-            <TabsTrigger value="manage" className="rounded-lg py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground relative">
-              <Settings className="h-4 w-4 mr-2 hidden sm:block" /> Manage
-              {(leaders?.length ?? 0) > 0 && (
-                 <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] px-1 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground shadow-sm">
-                    {leaders?.length}
-                 </span>
-              )}
-            </TabsTrigger>
-          </TabsList>
-
           <TabsContent value="session" className="mt-0 space-y-6">
             <AttendancePanel
               pendingCheckIns={pendingCheckIns}
@@ -1287,7 +1262,7 @@ export default function Dashboard() {
         setPin={setPin}
         handleSavePin={handleSavePin}
       />
-    </Layout>
+    </DashboardLayout>
   );
 }
 

@@ -6,4 +6,5 @@ packages:
 allowBuilds:
   '@clerk/shared': set this to true or false
   bcrypt: true
+  core-js: set this to true or false
   esbuild: true

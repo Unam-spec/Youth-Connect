@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useListProfiles, getListProfilesQueryKey, useMergeProfiles } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDebouncedValue } from "@/lib/useDebounce";
 import { DashCard, SectionTitle, SkeletonRows, RoleBadge, EmptyState } from "./shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -38,15 +39,19 @@ export function MemberDirectoryPanel({
   setDeleteMemberName,
 }: MemberDirectoryPanelProps) {
   const [search, setSearch] = useState("");
+  // Debounce so each keystroke doesn't fire a profiles request (300ms idle).
+  const debouncedSearch = useDebouncedValue(search, 300);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const {
     data: profiles,
     isLoading: isProfilesLoading,
     isError: isProfilesError,
     refetch: refetchProfiles,
-  } = useListProfiles(search ? { search } : undefined, {
+  } = useListProfiles(debouncedSearch ? { search: debouncedSearch } : undefined, {
     query: {
-      queryKey: getListProfilesQueryKey(search ? { search } : undefined),
+      queryKey: getListProfilesQueryKey(
+        debouncedSearch ? { search: debouncedSearch } : undefined,
+      ),
     },
   });
 

@@ -312,3 +312,70 @@ export const checkinWindowsTable = pgTable("checkin_windows", {
 export type CheckinSettingsRow = typeof checkinSettingsTable.$inferSelect;
 export type CheckinWindowRow = typeof checkinWindowsTable.$inferSelect;
 
+// ── Feedback table ─────────────────────────────────────────────────────────────
+// Free-text feedback submitted by members/visitors. When `anonymous` is true the
+// submitter's identity is hidden in the UI; `user_id` is still optional so that
+// genuinely account-less submissions are supported.
+export const feedbacksTable = pgTable("feedbacks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  content: text("content").notNull(),
+  anonymous: boolean("anonymous").notNull().default(false),
+  user_id: uuid("user_id").references(() => profilesTable.id),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// ── WhatsApp templates table ───────────────────────────────────────────────────
+// Reusable message templates for WhatsApp automations (e.g. follow-ups keyed to a
+// number of weeks since a stage, or event-creation announcements). `color_hex` is
+// used to colour-code templates in the leader UI.
+export const whatsappTemplatesTable = pgTable("whatsapp_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  template_type: text("template_type").notNull(),
+  stage_weeks: integer("stage_weeks"),
+  message_text: text("message_text").notNull(),
+  color_hex: text("color_hex").notNull().default("#2A9D8F"),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const insertFeedbackSchema = createInsertSchema(feedbacksTable).omit({
+  id: true,
+  created_at: true,
+});
+export const insertWhatsappTemplateSchema = createInsertSchema(
+  whatsappTemplatesTable,
+).omit({ id: true, created_at: true });
+
+export type Feedback = typeof feedbacksTable.$inferSelect;
+export type InsertFeedback = z.infer<typeof insertFeedbackSchema>;
+export type WhatsappTemplate = typeof whatsappTemplatesTable.$inferSelect;
+export type InsertWhatsappTemplate = z.infer<
+  typeof insertWhatsappTemplateSchema
+>;
+
+// ── Feedback settings ──────────────────────────────────────────────────────────
+// Single-row config for the recurring member feedback prompt. Lets leaders edit
+// the prompt copy + cadence from the backend without a frontend redeploy.
+export const feedbackSettingsTable = pgTable("feedback_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  enabled: boolean("enabled").notNull().default(true),
+  interval_days: integer("interval_days").notNull().default(14),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  examples: jsonb("examples").$type<string[]>(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  updated_by: uuid("updated_by"),
+});
+
+export const insertFeedbackSettingsSchema = createInsertSchema(
+  feedbackSettingsTable,
+).omit({ id: true, updated_at: true });
+
+export type FeedbackSettings = typeof feedbackSettingsTable.$inferSelect;
+export type InsertFeedbackSettings = z.infer<
+  typeof insertFeedbackSettingsSchema
+>;
+
