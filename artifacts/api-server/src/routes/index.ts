@@ -14,7 +14,6 @@ import pinAccountsRouter from "./pinAccounts";
 import adminRouter from "./admin";
 import feedbacksRouter from "./feedbacks";
 import whatsappTemplatesRouter from "./whatsappTemplates";
-import whatsappRouter from "./whatsapp";
 
 const router: IRouter = Router();
 
@@ -35,6 +34,5 @@ router.use(dashboardRouter);
 router.use(adminRouter);
 router.use(feedbacksRouter);
 router.use(whatsappTemplatesRouter);
-router.use(whatsappRouter);
 
 export default router;

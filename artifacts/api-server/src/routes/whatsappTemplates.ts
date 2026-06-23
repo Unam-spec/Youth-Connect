@@ -42,8 +42,6 @@ router.post("/whatsapp-templates", requireLeaderSession("leader"), async (req: R
         template_type: parsed.data.template_type,
         stage_weeks: parsed.data.stage_weeks ?? null,
         message_text: parsed.data.message_text,
-        content_sid: parsed.data.content_sid ?? null,
-        content_var_map: parsed.data.content_var_map ?? null,
         ...(parsed.data.color_hex ? { color_hex: parsed.data.color_hex } : {}),
       })
       .returning();
