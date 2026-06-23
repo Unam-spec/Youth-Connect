@@ -336,6 +336,12 @@ export const whatsappTemplatesTable = pgTable("whatsapp_templates", {
   stage_weeks: integer("stage_weeks"),
   message_text: text("message_text").notNull(),
   color_hex: text("color_hex").notNull().default("#2A9D8F"),
+  // Production WhatsApp sends: when `content_sid` (a Twilio approved Content
+  // template, HX…) is set, messages go out via the Content API instead of
+  // free-form text. `content_var_map` maps the template's positional variables
+  // ({{1}}, {{2}}…) to our semantic keys, e.g. {"1":"User","2":"Event"}.
+  content_sid: text("content_sid"),
+  content_var_map: jsonb("content_var_map").$type<Record<string, string>>(),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -122,6 +122,24 @@ CREATE TABLE IF NOT EXISTS "whatsapp_templates" (
   "created_at" timestamp with time zone NOT NULL DEFAULT now()
 );
 
+-- Twilio Content API columns (set per-template once approved templates exist;
+-- NULL → free-form send, used for the sandbox / within the 24h session window).
+ALTER TABLE "whatsapp_templates" ADD COLUMN IF NOT EXISTS "content_sid" text;
+ALTER TABLE "whatsapp_templates" ADD COLUMN IF NOT EXISTS "content_var_map" jsonb;
+
+-- Seed default WhatsApp templates only when the table is empty (leaders can edit
+-- them afterward). follow_up stages key off weeks-absent; event_creation is the
+-- new-event announcement. Placeholders: [User] [Leader] [Event] [Date] [Time] [Location].
+INSERT INTO "whatsapp_templates" ("template_type", "stage_weeks", "message_text", "color_hex")
+  SELECT * FROM (VALUES
+    ('follow_up', 2, 'Hi [User]! 👋 We''ve missed you at JG Youth these past couple of weeks. Hope you''re doing okay — would love to see you again this Friday! — [Leader]', '#FACC15'),
+    ('follow_up', 4, 'Hey [User], it''s been about a month since we last saw you at JG Youth. You matter to us and we''d love to have you back! Anything we can do to help? — [Leader]', '#FB923C'),
+    ('follow_up', 6, 'Hi [User], we really miss having you at JG Youth — it''s been a while. Is everything alright? We''d love to check in and see you again soon. — [Leader]', '#F87171'),
+    ('follow_up', 8, 'Hi [User], it''s been quite some time since we''ve seen you at JG Youth. You''re always welcome here, and we''d love to reconnect whenever you''re ready. — [Leader]', '#EF4444'),
+    ('event_creation', NULL::integer, 'Hi [User]! 🎉 New at JG Youth: [Event] on [Date] at [Time], [Location]. Hope to see you there!', '#2A9D8F')
+  ) AS seed(template_type, stage_weeks, message_text, color_hex)
+  WHERE NOT EXISTS (SELECT 1 FROM "whatsapp_templates");
+
 -- Feedback prompt settings (2026-06): single-row, editable copy + cadence for the
 -- recurring member feedback prompt. Seeded with defaults only when empty.
 CREATE TABLE IF NOT EXISTS "feedback_settings" (
