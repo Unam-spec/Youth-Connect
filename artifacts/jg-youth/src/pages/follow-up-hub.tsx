@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Redirect } from "wouter";
 import {
   useQuery,
@@ -5,33 +6,62 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { UserMinus, Send, Check, Loader2, Phone, CalendarOff } from "lucide-react";
+import {
+  UserMinus,
+  Send,
+  Check,
+  Loader2,
+  Phone,
+  CalendarOff,
+  X,
+  RefreshCw,
+  Settings2,
+  Zap,
+  Clock,
+  ToggleLeft,
+  ToggleRight,
+  MessageSquare,
+  AlertTriangle,
+  CheckCircle,
+} from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { getLeaderSession } from "@/lib/auth";
 import { useApiFetch } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
-interface FollowUpUser {
+// ── Types ──────────────────────────────────────────────────────────────────────
+interface QueueEntry {
   id: string;
-  full_name: string;
+  profile_id: string;
+  full_name: string | null;
   phone: string | null;
-  whatsapp_opt_in: boolean;
-  last_checkin: string | null;
-  weeks_absent: number;
   stage_weeks: number;
-  sent?: boolean; // optimistic UI flag
+  weeks_absent: number;
+  message_preview: string;
+  status: "pending" | "approved" | "rejected" | "sent" | "failed";
+  created_at: string;
+  sent_at: string | null;
+  error_message: string | null;
 }
 
-interface FollowUpResponse {
-  total: number;
-  groups: Record<string, Omit<FollowUpUser, "sent">[]>;
+interface AutomationSettings {
+  id?: string;
+  enabled: boolean;
+  day_of_week: number;
+  time: string;
+  include_never_attended: boolean;
 }
 
-const FOLLOWUPS_KEY = ["follow-ups"];
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const QUEUE_KEY = ["follow-up-queue"];
+const SETTINGS_KEY = ["automation-settings"];
 
-// Fallback stage colours (overridden by each follow_up template's color_hex).
-const FALLBACK_STAGE_COLOR: Record<number, string> = {
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+const STAGE_COLORS: Record<number, string> = {
   2: "#FACC15",
   4: "#FB923C",
   6: "#F87171",
@@ -51,217 +81,510 @@ function formatDate(d: string | null): string {
   }
 }
 
+// ── Main Component ─────────────────────────────────────────────────────────────
 export default function FollowUpHub() {
   const session = getLeaderSession();
   const apiFetch = useApiFetch();
   const queryClient = useQueryClient();
   const leaderId = session?.profile_id;
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Flatten the grouped response into one most-overdue-first list.
-  const { data: users, isLoading } = useQuery<FollowUpUser[]>({
-    queryKey: FOLLOWUPS_KEY,
+  // ── Queue data ─────────────────────────────────────────────────────────────
+  const { data: queueEntries, isLoading: queueLoading } = useQuery<QueueEntry[]>({
+    queryKey: QUEUE_KEY,
     queryFn: async () => {
-      const res = await apiFetch("/api/whatsapp/follow-ups");
-      if (!res.ok) throw new Error("Failed to load follow-ups");
-      const json: FollowUpResponse = await res.json();
-      return Object.values(json.groups)
-        .flat()
-        .sort((a, b) => b.weeks_absent - a.weeks_absent);
+      const res = await apiFetch("/api/whatsapp/queue?status=pending,sent,failed");
+      if (!res.ok) throw new Error("Failed to load queue");
+      return res.json();
     },
     enabled: !!session,
   });
 
-  // Stage → colour map from the follow_up templates.
-  const { data: stageColors } = useQuery<Record<number, string>>({
-    queryKey: ["whatsapp-templates", "stage-colors"],
+  // ── Automation settings ────────────────────────────────────────────────────
+  const { data: settings, isLoading: settingsLoading } = useQuery<AutomationSettings>({
+    queryKey: SETTINGS_KEY,
     queryFn: async () => {
-      const res = await apiFetch("/api/whatsapp-templates?template_type=follow_up");
-      if (!res.ok) return FALLBACK_STAGE_COLOR;
-      const rows: { stage_weeks: number | null; color_hex: string }[] = await res.json();
-      const map: Record<number, string> = { ...FALLBACK_STAGE_COLOR };
-      for (const r of rows) if (r.stage_weeks != null) map[r.stage_weeks] = r.color_hex;
-      return map;
+      const res = await apiFetch("/api/whatsapp/automation-settings");
+      if (!res.ok) throw new Error("Failed to load settings");
+      return res.json();
     },
     enabled: !!session,
   });
 
-  // ── Send WhatsApp (optimistic: flag the card as sent) ──────────────────────
-  const sendWhatsApp = useMutation({
-    mutationFn: async (user: FollowUpUser) => {
-      const res = await apiFetch("/api/whatsapp/send", {
-        method: "POST",
-        body: JSON.stringify({ user_id: user.id, leader_id: leaderId }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to send WhatsApp");
-      }
+  // ── Generate queue (manual trigger) ────────────────────────────────────────
+  const generateQueue = useMutation({
+    mutationFn: async () => {
+      const res = await apiFetch("/api/whatsapp/queue/generate", { method: "POST" });
+      if (!res.ok) throw new Error("Failed to generate queue");
       return res.json();
     },
-    onMutate: async (user) => {
-      await queryClient.cancelQueries({ queryKey: FOLLOWUPS_KEY });
-      const prev = queryClient.getQueryData<FollowUpUser[]>(FOLLOWUPS_KEY);
-      queryClient.setQueryData<FollowUpUser[]>(FOLLOWUPS_KEY, (old) =>
-        (old ?? []).map((u) => (u.id === user.id ? { ...u, sent: true } : u)),
-      );
-      return { prev };
+    onSuccess: (data) => {
+      toast.success(`${data.generated} follow-up(s) queued for review`);
+      queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
     },
-    onError: (err, _user, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(FOLLOWUPS_KEY, ctx.prev);
-      toast.error(err instanceof Error ? err.message : "Failed to send WhatsApp");
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Failed to generate queue");
     },
-    onSuccess: (_data, user) => {
-      toast.success(`WhatsApp sent to ${user.full_name.split(" ")[0]}`);
-    },
-    // No invalidate — keep the optimistic "Sent" state for this session.
   });
 
-  // ── Mark checked in (optimistic: remove the card) ──────────────────────────
-  const markCheckedIn = useMutation({
-    mutationFn: async (user: FollowUpUser) => {
-      const res = await apiFetch("/api/attendance", {
+  // ── Approve & Send ─────────────────────────────────────────────────────────
+  const approveAndSend = useMutation({
+    mutationFn: async (ids?: string[]) => {
+      const res = await apiFetch("/api/whatsapp/queue/approve", {
         method: "POST",
-        body: JSON.stringify({ profile_id: user.id, check_in_method: "manual" }),
+        body: JSON.stringify({
+          ids: ids && ids.length > 0 ? ids : undefined,
+          leader_id: leaderId,
+        }),
       });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to mark check-in");
-      }
+      if (!res.ok) throw new Error("Failed to approve");
       return res.json();
     },
-    onMutate: async (user) => {
-      await queryClient.cancelQueries({ queryKey: FOLLOWUPS_KEY });
-      const prev = queryClient.getQueryData<FollowUpUser[]>(FOLLOWUPS_KEY);
-      queryClient.setQueryData<FollowUpUser[]>(FOLLOWUPS_KEY, (old) =>
-        (old ?? []).filter((u) => u.id !== user.id),
+    onSuccess: (data) => {
+      const msg = data.failed > 0
+        ? `${data.sent} sent, ${data.failed} failed`
+        : `${data.sent} message(s) sent successfully`;
+      toast.success(msg);
+      setSelectedIds(new Set());
+      queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Approval failed");
+    },
+  });
+
+  // ── Reject ─────────────────────────────────────────────────────────────────
+  const rejectEntries = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiFetch("/api/whatsapp/queue/reject", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error("Failed to reject");
+      return res.json();
+    },
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: QUEUE_KEY });
+      const prev = queryClient.getQueryData<QueueEntry[]>(QUEUE_KEY);
+      queryClient.setQueryData<QueueEntry[]>(QUEUE_KEY, (old) =>
+        (old ?? []).filter((e) => !ids.includes(e.id)),
       );
       return { prev };
     },
-    onError: (err, _user, ctx) => {
-      if (ctx?.prev) queryClient.setQueryData(FOLLOWUPS_KEY, ctx.prev);
-      toast.error(err instanceof Error ? err.message : "Failed to mark check-in");
-    },
-    onSuccess: (_data, user) => {
-      toast.success(`${user.full_name.split(" ")[0]} marked checked in`);
+    onError: (err, _ids, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(QUEUE_KEY, ctx.prev);
+      toast.error(err instanceof Error ? err.message : "Reject failed");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: FOLLOWUPS_KEY });
+      queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
+    },
+  });
+
+  // ── Update settings ────────────────────────────────────────────────────────
+  const updateSettings = useMutation({
+    mutationFn: async (patch: Partial<AutomationSettings>) => {
+      const res = await apiFetch("/api/whatsapp/automation-settings", {
+        method: "PATCH",
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error("Failed to update settings");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast.success("Automation settings updated");
+      queryClient.invalidateQueries({ queryKey: SETTINGS_KEY });
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Settings update failed");
     },
   });
 
   if (!session) return <Redirect to="/leader-login" />;
 
-  const colorFor = (stage: number) =>
-    stageColors?.[stage] ?? FALLBACK_STAGE_COLOR[stage] ?? "#EF4444";
+  const pendingEntries = (queueEntries ?? []).filter((e) => e.status === "pending");
+  const sentEntries = (queueEntries ?? []).filter((e) => e.status === "sent");
+  const failedEntries = (queueEntries ?? []).filter((e) => e.status === "failed");
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === pendingEntries.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingEntries.map((e) => e.id)));
+    }
+  };
 
   return (
     <DashboardLayout active="follow-ups">
       <div className="space-y-6 pb-12">
         {/* Header */}
         <div className="rounded-2xl border border-border bg-card p-6">
-          <div className="mb-2 flex items-center gap-2">
-            <UserMinus className="h-4 w-4 text-primary" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-primary">
-              Re-engagement
-            </span>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-2">
+                <UserMinus className="h-4 w-4 text-primary" />
+                <span className="text-xs font-semibold uppercase tracking-widest text-primary">
+                  Re-engagement
+                </span>
+              </div>
+              <h1 className="font-[family-name:var(--app-font-heading)] text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                Follow-up Hub
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Review queued follow-up messages before they're sent. Approve, reject, or generate new ones.
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowSettings(!showSettings)}
+                className="gap-1.5"
+              >
+                <Settings2 className="h-4 w-4" />
+                Schedule
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => generateQueue.mutate()}
+                disabled={generateQueue.isPending}
+                className="gap-1.5"
+              >
+                {generateQueue.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4" />
+                )}
+                Generate Now
+              </Button>
+            </div>
           </div>
-          <h1 className="font-[family-name:var(--app-font-heading)] text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-            Follow-up Hub
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Members overdue for a check-in, grouped by how long they've been away.
-            Send a WhatsApp nudge or mark them in.
-          </p>
         </div>
 
-        {isLoading ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-40 w-full rounded-2xl" />
-            ))}
-          </div>
-        ) : !users || users.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
-              <Check className="h-6 w-6 text-emerald-600" />
+        {/* ── Automation Settings Panel ───────────────────────────────────────── */}
+        {showSettings && (
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock className="h-4 w-4 text-primary" />
+                <h2 className="font-semibold text-sm text-foreground">Automation Schedule</h2>
+              </div>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            <h2 className="text-lg font-semibold text-foreground">All caught up! 🎉</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              No members are overdue for a check-in right now.
+
+            {settingsLoading ? (
+              <Skeleton className="h-24 w-full rounded-xl" />
+            ) : settings ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {/* Enabled toggle */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Automation</p>
+                  <button
+                    onClick={() => updateSettings.mutate({ enabled: !settings.enabled })}
+                    className="flex items-center gap-2 text-sm font-medium"
+                    disabled={updateSettings.isPending}
+                  >
+                    {settings.enabled ? (
+                      <>
+                        <ToggleRight className="h-5 w-5 text-emerald-500" />
+                        <span className="text-emerald-500">Enabled</span>
+                      </>
+                    ) : (
+                      <>
+                        <ToggleLeft className="h-5 w-5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Disabled</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Day picker */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Day</p>
+                  <select
+                    value={settings.day_of_week}
+                    onChange={(e) =>
+                      updateSettings.mutate({ day_of_week: parseInt(e.target.value) })
+                    }
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  >
+                    {DAY_NAMES.map((name, i) => (
+                      <option key={i} value={i}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Time picker */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Time (SAST)</p>
+                  <input
+                    type="time"
+                    value={settings.time}
+                    onChange={(e) => updateSettings.mutate({ time: e.target.value })}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground"
+                  />
+                </div>
+
+                {/* Include never attended */}
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">Never Attended</p>
+                  <button
+                    onClick={() =>
+                      updateSettings.mutate({
+                        include_never_attended: !settings.include_never_attended,
+                      })
+                    }
+                    className="flex items-center gap-2 text-sm font-medium"
+                    disabled={updateSettings.isPending}
+                  >
+                    {settings.include_never_attended ? (
+                      <>
+                        <ToggleRight className="h-5 w-5 text-emerald-500" />
+                        <span className="text-emerald-500">Included</span>
+                      </>
+                    ) : (
+                      <>
+                        <ToggleLeft className="h-5 w-5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Excluded</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <p className="text-xs text-muted-foreground">
+              The automation will generate pending messages at the set time. You'll still need to
+              review and approve them from this page before they're sent.
             </p>
           </div>
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {users.map((user) => {
-              const color = colorFor(user.stage_weeks);
-              const sending = sendWhatsApp.isPending && sendWhatsApp.variables?.id === user.id;
-              const marking = markCheckedIn.isPending && markCheckedIn.variables?.id === user.id;
-              return (
-                <div
-                  key={user.id}
-                  className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4"
+        )}
+
+        {/* ── Pending Queue ──────────────────────────────────────────────────── */}
+        <div className="space-y-3">
+          {pendingEntries.length > 0 && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4 text-primary" />
+                <h2 className="font-semibold text-sm">
+                  Pending Review ({pendingEntries.length})
+                </h2>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={toggleAll}
+                  className="text-xs h-7"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full ring-2 ring-background"
-                        style={{ backgroundColor: color }}
-                        aria-hidden
+                  {selectedIds.size === pendingEntries.length ? "Deselect All" : "Select All"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    approveAndSend.mutate(
+                      selectedIds.size > 0 ? Array.from(selectedIds) : undefined,
+                    )
+                  }
+                  disabled={approveAndSend.isPending}
+                  className="text-xs h-7 gap-1.5"
+                >
+                  {approveAndSend.isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
+                  {selectedIds.size > 0
+                    ? `Approve & Send (${selectedIds.size})`
+                    : "Approve & Send All"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {queueLoading ? (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-44 w-full rounded-2xl" />
+              ))}
+            </div>
+          ) : pendingEntries.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
+                <Check className="h-6 w-6 text-emerald-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-foreground">All caught up! 🎉</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                No pending follow-ups in the queue. Use "Generate Now" to check for overdue members.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {pendingEntries.map((entry) => {
+                const color = STAGE_COLORS[entry.stage_weeks] ?? "#EF4444";
+                const isSelected = selectedIds.has(entry.id);
+                return (
+                  <div
+                    key={entry.id}
+                    className={cn(
+                      "flex flex-col gap-3 rounded-2xl border p-4 transition-all cursor-pointer",
+                      isSelected
+                        ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                        : "border-border bg-card hover:border-border/80",
+                    )}
+                    onClick={() => toggleSelect(entry.id)}
+                  >
+                    {/* Stage badge + absence */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full ring-2 ring-background"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                          style={{ backgroundColor: `${color}22`, color }}
+                        >
+                          {entry.weeks_absent}w absent
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(entry.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
                       />
-                      <span
-                        className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
-                        style={{ backgroundColor: `${color}22`, color }}
+                    </div>
+
+                    {/* Person info */}
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-foreground">
+                        {entry.full_name ?? "Unknown"}
+                      </p>
+                      <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Phone className="h-3 w-3" />
+                        {entry.phone || "no phone"}
+                      </p>
+                    </div>
+
+                    {/* Message preview */}
+                    <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
+                      <p className="text-xs text-muted-foreground line-clamp-3">
+                        {entry.message_preview}
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-auto flex gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        className="flex-1 rounded-xl text-xs h-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          approveAndSend.mutate([entry.id]);
+                        }}
+                        disabled={approveAndSend.isPending}
                       >
-                        {user.weeks_absent}w absent
-                      </span>
+                        <Send className="mr-1 h-3 w-3" />
+                        Send
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 rounded-xl text-xs h-7"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          rejectEntries.mutate([entry.id]);
+                        }}
+                        disabled={rejectEntries.isPending}
+                      >
+                        <X className="mr-1 h-3 w-3" />
+                        Reject
+                      </Button>
                     </div>
                   </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
-                  <div className="min-w-0">
-                    <p className="truncate font-semibold text-foreground">{user.full_name}</p>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Phone className="h-3 w-3" />
-                      {user.phone || "no phone"}
-                    </p>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <CalendarOff className="h-3 w-3" />
-                      Last in: {formatDate(user.last_checkin)}
-                    </p>
+        {/* ── Recently Sent ──────────────────────────────────────────────────── */}
+        {sentEntries.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-4 w-4 text-emerald-500" />
+              <h2 className="font-semibold text-sm">
+                Recently Sent ({sentEntries.length})
+              </h2>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {sentEntries.slice(0, 6).map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3"
+                >
+                  <div className="h-8 w-8 rounded-full bg-emerald-500/15 flex items-center justify-center shrink-0">
+                    <Check className="h-4 w-4 text-emerald-600" />
                   </div>
-
-                  <div className="mt-auto flex gap-2 pt-1">
-                    <Button
-                      size="sm"
-                      className="flex-1 rounded-xl"
-                      disabled={!user.phone || user.sent || sending}
-                      onClick={() => sendWhatsApp.mutate(user)}
-                      title={!user.phone ? "No phone number on file" : undefined}
-                    >
-                      {sending ? (
-                        <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />Sending…</>
-                      ) : user.sent ? (
-                        <><Check className="mr-1.5 h-3.5 w-3.5" />Sent</>
-                      ) : (
-                        <><Send className="mr-1.5 h-3.5 w-3.5" />WhatsApp</>
-                      )}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1 rounded-xl"
-                      disabled={marking}
-                      onClick={() => markCheckedIn.mutate(user)}
-                    >
-                      {marking ? (
-                        <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />…</>
-                      ) : (
-                        <><Check className="mr-1.5 h-3.5 w-3.5" />Mark in</>
-                      )}
-                    </Button>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {entry.full_name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Sent • {entry.stage_weeks}w stage
+                    </p>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Failed ─────────────────────────────────────────────────────────── */}
+        {failedEntries.length > 0 && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+              <h2 className="font-semibold text-sm">
+                Failed ({failedEntries.length})
+              </h2>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {failedEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-3"
+                >
+                  <div className="h-8 w-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {entry.full_name}
+                    </p>
+                    <p className="text-xs text-red-400 truncate">
+                      {entry.error_message ?? "Send failed"}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
