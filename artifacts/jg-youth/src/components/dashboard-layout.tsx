@@ -6,6 +6,8 @@ import {
   Calendar,
   Settings,
   BarChart3,
+  MessageSquare,
+  UserMinus,
   type LucideIcon,
 } from "lucide-react";
 import { Layout } from "@/components/layout";
@@ -17,7 +19,11 @@ import { cn } from "@/lib/utils";
 // `/dashboard?section=<key>` so the sidebar and command palette can deep-link
 // into them.
 export type DashboardSectionKey = "session" | "members" | "events" | "manage";
-export type DashboardNavKey = DashboardSectionKey | "analytics";
+export type DashboardNavKey =
+  | DashboardSectionKey
+  | "analytics"
+  | "follow-ups"
+  | "templates";
 
 const SECTION_KEYS: DashboardSectionKey[] = [
   "session",
@@ -75,6 +81,20 @@ function useNavItems(): NavItem[] {
       label: "Events",
       icon: Calendar,
       href: "/dashboard?section=events",
+      visible: true,
+    },
+    {
+      key: "follow-ups",
+      label: "Follow-ups",
+      icon: UserMinus,
+      href: "/dashboard/follow-ups",
+      visible: true,
+    },
+    {
+      key: "templates",
+      label: "Templates",
+      icon: MessageSquare,
+      href: "/dashboard/templates",
       visible: true,
     },
     {

@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-query";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
@@ -26,6 +27,8 @@ import PinLogin from "@/pages/pin-login";
 import AccountHome from "@/pages/account";
 import Dashboard from "@/pages/dashboard";
 import Analytics from "@/pages/analytics";
+import FollowUpHub from "@/pages/follow-up-hub";
+import Templates from "@/pages/templates";
 import LeaderQr from "@/pages/leader-qr";
 import SessionQr from "@/pages/session-qr";
 import QrResolver from "@/pages/qr-resolver";
@@ -234,6 +237,8 @@ function ClerkProviderWithRoutes() {
           <Route path="/my" component={MyDashboard} />
           <Route path="/become-member" component={BecomeMember} />
           <Route path="/dashboard/analytics" component={Analytics} />
+          <Route path="/dashboard/follow-ups" component={FollowUpHub} />
+          <Route path="/dashboard/templates" component={Templates} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/leader-qr" component={LeaderQr} />
           <Route path="/session-qr" component={SessionQr} />
@@ -255,6 +260,7 @@ function App() {
       <TooltipProvider>
         <ClerkProviderWithRoutes />
         <Toaster />
+        <SonnerToaster />
       </TooltipProvider>
     </WouterRouter>
   );

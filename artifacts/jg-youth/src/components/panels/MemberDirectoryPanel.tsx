@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useState, useRef, useEffect } from "react";
+import { useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { Users, Star, MapPin, User, Search, RefreshCw, AlertCircle, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useListProfiles, getListProfilesQueryKey, useMergeProfiles } from "@workspace/api-client-react";
+import { getListProfilesQueryKey, useMergeProfiles } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
+import { useApiFetch } from "@/lib/api";
 import { useDebouncedValue } from "@/lib/useDebounce";
 import { DashCard, SectionTitle, SkeletonRows, RoleBadge, EmptyState } from "./shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -42,18 +43,54 @@ export function MemberDirectoryPanel({
   // Debounce so each keystroke doesn't fire a profiles request (300ms idle).
   const debouncedSearch = useDebouncedValue(search, 300);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const apiFetch = useApiFetch();
+  const PAGE_SIZE = 50;
+
+  // Cursor-free infinite scroll over the paginated /profiles endpoint. The query
+  // key reuses the generated prefix so existing dashboard invalidations (edits,
+  // deletes, role changes) still refetch this list.
   const {
-    data: profiles,
+    data,
     isLoading: isProfilesLoading,
     isError: isProfilesError,
     refetch: refetchProfiles,
-  } = useListProfiles(debouncedSearch ? { search: debouncedSearch } : undefined, {
-    query: {
-      queryKey: getListProfilesQueryKey(
-        debouncedSearch ? { search: debouncedSearch } : undefined,
-      ),
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: [...getListProfilesQueryKey(), "infinite", debouncedSearch],
+    initialPageParam: 1,
+    queryFn: async ({ pageParam }) => {
+      const qs = new URLSearchParams({
+        page: String(pageParam),
+        pageSize: String(PAGE_SIZE),
+      });
+      if (debouncedSearch) qs.set("search", debouncedSearch);
+      const res = await apiFetch(`/api/profiles?${qs.toString()}`);
+      if (!res.ok) throw new Error("Failed to load members");
+      return (await res.json()) as any[];
     },
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === PAGE_SIZE ? allPages.length + 1 : undefined,
   });
+  const profiles = data?.pages.flat() ?? [];
+
+  // Load the next page when a sentinel at the bottom scrolls into view.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "200px" },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, profiles.length]);
 
   const [demoteAlert, setDemoteAlert] = useState<{ isOpen: boolean; profile: any | null }>({ isOpen: false, profile: null });
 
@@ -106,6 +143,7 @@ export function MemberDirectoryPanel({
           <p className="text-sm text-destructive font-medium">Could not load members — tap to retry</p>
         </div>
       ) : profiles && profiles.length > 0 ? (
+        <>
         <div className="space-y-2.5">
           {profiles.map((profile: any) => {
             const isSelf = profile.id === sessionProfileId || profile.clerk_id === sessionProfileId;
@@ -250,6 +288,18 @@ export function MemberDirectoryPanel({
             );
           })}
         </div>
+        <div ref={sentinelRef} className="h-1" />
+        {isFetchingNextPage && (
+          <div className="flex justify-center py-4">
+            <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {!hasNextPage && profiles.length > PAGE_SIZE && (
+          <p className="py-3 text-center text-xs text-muted-foreground">
+            End of list · {profiles.length} members
+          </p>
+        )}
+        </>
       ) : (
         <EmptyState text="No members found matching your search." />
       )}
