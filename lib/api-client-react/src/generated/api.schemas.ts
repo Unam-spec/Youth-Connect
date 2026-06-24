@@ -319,6 +319,7 @@ export interface PinVerificationResult {
   success: boolean;
   role: PinVerificationResultRole;
   profile_id?: string;
+  full_name: string;
   can_create_events?: boolean;
   can_view_kpis?: boolean;
   can_view_members?: boolean;

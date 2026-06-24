@@ -186,6 +186,7 @@ export default function Dashboard() {
               setLeaderSession({
                 role: profile.role,
                 profile_id: profile.id,
+                full_name: profile.full_name,
                 can_create_events: profile.role === "super_admin" ? true : profile.can_create_events,
                 can_view_kpis: profile.role === "super_admin" ? true : profile.can_view_kpis,
                 can_view_members: profile.role === "super_admin" ? true : profile.can_view_members,

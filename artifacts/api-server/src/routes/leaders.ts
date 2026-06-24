@@ -210,6 +210,8 @@ router.post("/leaders/verify-pin", async (req, res) => {
     return res.json({
       success: true,
       profile_id: profile.id,
+      full_name: profile.full_name,
+      role: profile.role,
       session_token: sessionToken,
       expires_at: expiresAt,
       can_create_events: profile.role === "super_admin" ? true : profile.can_create_events,
@@ -327,6 +329,7 @@ router.post("/leaders/session", requireLeaderSession("leader"), async (req, res)
     const isSuperAdmin = profile.role === "super_admin";
     return res.json({
       profile_id: profile.id,
+      full_name: profile.full_name,
       session_token: sessionToken,
       expires_at: Date.now() + 8 * 60 * 60 * 1000, // 8 hours
       role: profile.role,

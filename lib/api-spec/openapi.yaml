@@ -1204,7 +1204,7 @@ components:
 
     PinVerificationResult:
       type: object
-      required: [success, role]
+      required: [success, role, full_name]
       properties:
         success:
           type: boolean
@@ -1212,6 +1212,8 @@ components:
           type: string
           enum: [super_admin, leader]
         profile_id:
+          type: string
+        full_name:
           type: string
         can_create_events:
           type: boolean

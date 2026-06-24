@@ -110,6 +110,7 @@ export default function LeaderLogin() {
           setLeaderSession({
             role: profile.role,
             profile_id: profile.id, // fix: was profile.profile_id, correct field is id
+            full_name: profile.full_name,
             session_token,
             can_create_events: true,
             can_view_kpis: true,
@@ -177,6 +178,7 @@ export default function LeaderLogin() {
               setLeaderSession({
                 role: result.role,
                 profile_id: result.profile_id,
+                full_name: result.full_name,
                 session_token: result.session_token,
                 can_create_events: result.can_create_events ?? false,
                 can_view_kpis: result.can_view_kpis ?? false,
@@ -220,6 +222,7 @@ export default function LeaderLogin() {
             setLeaderSession({
               role: result.role,
               profile_id: result.profile_id,
+              full_name: result.full_name,
               session_token: result.session_token,
               can_create_events: result.can_create_events ?? false,
               can_view_kpis: result.can_view_kpis ?? false,

@@ -24,7 +24,7 @@ export function LeaderOnboarding() {
             title: "Welcome to the Leader Dashboard! 👋",
             description:
               "We've added some powerful new features to help you manage JG Youth. Let's take a quick 3-step tour.",
-            side: "center",
+            side: "bottom",
           },
         },
         {

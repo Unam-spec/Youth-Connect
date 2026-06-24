@@ -815,6 +815,7 @@ export const VerifyLeaderPinResponse = zod.object({
   "success": zod.boolean(),
   "role": zod.enum(['super_admin', 'leader']),
   "profile_id": zod.string().optional(),
+  "full_name": zod.string(),
   "can_create_events": zod.boolean().optional(),
   "can_view_kpis": zod.boolean().optional(),
   "can_view_members": zod.boolean().optional(),

@@ -1,6 +1,7 @@
 export interface LeaderSession {
   role: "super_admin" | "leader";
   profile_id?: string;
+  full_name?: string;
   // Required by the backend's strict PIN-session validation (matched against
   // profiles.session_token). Absent for Clerk-authenticated sessions, which
   // authorize via the Bearer token instead.
