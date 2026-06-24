@@ -13,6 +13,7 @@ import {
 import { Layout } from "@/components/layout";
 import { getLeaderSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
+import { LeaderOnboarding } from "@/components/leader-onboarding";
 
 // The four in-page dashboard sections (rendered as Tabs content on /dashboard)
 // plus the standalone Analytics route. Sections are URL-addressable via
@@ -134,6 +135,7 @@ export function DashboardLayout({
       <div className="flex flex-col gap-5 md:flex-row md:gap-6">
         <aside className="md:w-56 md:shrink-0">
           <nav
+            id="tour-nav-sidebar"
             aria-label="Dashboard sections"
             className="flex gap-2 overflow-x-auto pb-1 md:sticky md:top-20 md:flex-col md:overflow-visible md:pb-0"
           >
@@ -158,8 +160,11 @@ export function DashboardLayout({
             })}
           </nav>
         </aside>
-        <div className="min-w-0 flex-1">{children}</div>
+        <div id="tour-main-content" className="min-w-0 flex-1">
+          {children}
+        </div>
       </div>
+      <LeaderOnboarding />
     </Layout>
   );
 }

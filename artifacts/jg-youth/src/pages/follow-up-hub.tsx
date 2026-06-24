@@ -23,6 +23,7 @@ import {
   MessageSquare,
   AlertTriangle,
   CheckCircle,
+  RotateCcw,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { getLeaderSession } from "@/lib/auth";
@@ -200,7 +201,33 @@ export default function FollowUpHub() {
     },
   });
 
+  // ── Retry ──────────────────────────────────────────────────────────────────
+  const retryEntries = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const res = await apiFetch("/api/whatsapp/queue/retry", {
+        method: "POST",
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error("Failed to retry");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast.success(`${data.retried} entry(s) moved back to pending queue`);
+      queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Retry failed");
+    },
+  });
+
   if (!session) return <Redirect to="/leader-login" />;
+
+  const leaderName = session.full_name || "JG Youth Team";
+
+  // Replaces the placeholder in the preview with the actual logged-in leader name
+  const formatPreview = (preview: string) => {
+    return preview.replace("JG Youth Team", leaderName);
+  };
 
   const pendingEntries = (queueEntries ?? []).filter((e) => e.status === "pending");
   const sentEntries = (queueEntries ?? []).filter((e) => e.status === "sent");
@@ -485,7 +512,7 @@ export default function FollowUpHub() {
                     {/* Message preview */}
                     <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
                       <p className="text-xs text-muted-foreground line-clamp-3">
-                        {entry.message_preview}
+                        {formatPreview(entry.message_preview)}
                       </p>
                     </div>
 
@@ -569,16 +596,28 @@ export default function FollowUpHub() {
               {failedEntries.map((entry) => (
                 <div
                   key={entry.id}
-                  className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-3"
+                  className="flex gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-3 items-start"
                 >
-                  <div className="h-8 w-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+                  <div className="h-8 w-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0 mt-0.5">
                     <AlertTriangle className="h-4 w-4 text-red-500" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground truncate">
-                      {entry.full_name}
-                    </p>
-                    <p className="text-xs text-red-400 truncate">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {entry.full_name}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[10px] uppercase tracking-wider text-red-500 hover:text-red-600 hover:bg-red-500/10 shrink-0"
+                        onClick={() => retryEntries.mutate([entry.id])}
+                        disabled={retryEntries.isPending}
+                      >
+                        <RotateCcw className="mr-1 h-3 w-3" />
+                        Retry
+                      </Button>
+                    </div>
+                    <p className="text-xs text-red-400 mt-1">
                       {entry.error_message ?? "Send failed"}
                     </p>
                   </div>

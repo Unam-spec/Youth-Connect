@@ -443,6 +443,46 @@ router.post(
   },
 );
 
+// ── POST /whatsapp/queue/retry ──────────────────────────────────────────────────
+const RetryBody = z.object({
+  ids: z.array(z.string().uuid()),
+});
+
+router.post(
+  "/whatsapp/queue/retry",
+  requireLeaderSession("leader"),
+  async (req: Request, res: Response) => {
+    try {
+      const parsed = RetryBody.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.flatten() });
+      }
+      const { ids } = parsed.data;
+
+      // Only allow retrying "failed" or "rejected" entries
+      await db
+        .update(followUpQueueTable)
+        .set({
+          status: "pending",
+          error_message: null,
+          reviewed_by: null,
+          reviewed_at: null,
+        })
+        .where(
+          and(
+            inArray(followUpQueueTable.id, ids),
+            inArray(followUpQueueTable.status, ["failed", "rejected"]),
+          ),
+        );
+
+      return res.json({ retried: ids.length });
+    } catch (err) {
+      req.log.error(err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  Automation SETTINGS routes
 // ═══════════════════════════════════════════════════════════════════════════════

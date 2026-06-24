@@ -18,6 +18,7 @@
     "@fontsource/sora": "^5.2.8",
     "@sentry/react": "^8.0.0",
     "@workspace/api-client-react": "workspace:*",
+    "driver.js": "^1.4.0",
     "html5-qrcode": "^2.3.8",
     "posthog-js": "^1.391.2",
     "qrcode": "^1.5.4",
