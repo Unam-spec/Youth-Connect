@@ -38,6 +38,76 @@ export function LeaderOnboarding() {
           },
         },
         {
+          element: "#tour-nav-session",
+          popover: {
+            title: "Live Session",
+            description:
+              "The default view. See today's live check-ins and approve pending first-timers.",
+            side: "right",
+            align: "start",
+          },
+        },
+        {
+          element: "#tour-nav-members",
+          popover: {
+            title: "Manage Members",
+            description:
+              "View the full directory, edit member details, and manage PIN accounts.",
+            side: "right",
+            align: "start",
+          },
+        },
+        {
+          element: "#tour-nav-events",
+          popover: {
+            title: "Events",
+            description:
+              "Create and manage upcoming youth events and view RSVPs.",
+            side: "right",
+            align: "start",
+          },
+        },
+        {
+          element: "#tour-nav-follow-ups",
+          popover: {
+            title: "Follow-ups",
+            description:
+              "Send automated WhatsApp messages to members who haven't attended in a while.",
+            side: "right",
+            align: "start",
+          },
+        },
+        {
+          element: "#tour-nav-templates",
+          popover: {
+            title: "Message Templates",
+            description:
+              "Customize the text of your automated WhatsApp follow-up messages.",
+            side: "right",
+            align: "start",
+          },
+        },
+        {
+          element: "#tour-nav-manage",
+          popover: {
+            title: "Settings / Manage",
+            description:
+              "Super Admins can manage leader permissions and system settings here.",
+            side: "right",
+            align: "start",
+          },
+        },
+        {
+          element: "#tour-nav-analytics",
+          popover: {
+            title: "Analytics",
+            description:
+              "View attendance charts and member statistics over time.",
+            side: "right",
+            align: "start",
+          },
+        },
+        {
           element: "#tour-main-content",
           popover: {
             title: "Your Workspace",

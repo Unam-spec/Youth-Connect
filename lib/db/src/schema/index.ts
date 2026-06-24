@@ -26,6 +26,7 @@ export const membershipStatusEnum = pgEnum("membership_status", [
   "pending",
   "approved",
   "rejected",
+  "invited",
 ]);
 
 export const checkInMethodEnum = pgEnum("check_in_method", [

@@ -4,6 +4,7 @@ import { getLeaderSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -29,7 +30,7 @@ import {
 import { isPostServiceWindow, serviceBannerKey } from "@/lib/serviceBanner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload, Check, BookOpen } from "lucide-react";
+import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload, Check, BookOpen, Star } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -59,6 +60,38 @@ export default function MyDashboard() {
     body: string;
     examples?: string[];
   } | null>(null);
+
+  // Invitations state
+  const [invitations, setInvitations] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (isSignedIn) {
+      fetch("/api/membership-requests/my-invitations")
+        .then(r => r.ok ? r.json() : [])
+        .then(data => setInvitations(data))
+        .catch(() => {});
+    }
+  }, [isSignedIn]);
+
+  const handleRespondToInvitation = async (id: string, action: "accept" | "decline") => {
+    try {
+      const res = await fetch(`/api/membership-requests/invitations/${id}/${action}`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        setInvitations(prev => prev.filter(inv => inv.id !== id));
+        if (action === "accept") {
+          toast({ title: "Welcome!", description: "You are now a full member of JG Youth." });
+          // Force a refetch of the profile to update the role
+          window.location.reload();
+        } else {
+          toast({ title: "Invitation declined" });
+        }
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "Could not respond to invitation.", variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
@@ -403,6 +436,33 @@ export default function MyDashboard() {
 
   return (
     <Layout>
+      {/* Member Invitation Modal */}
+      <Dialog open={invitations.length > 0} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md rounded-2xl" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          {invitations.length > 0 && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                  <Star className="w-5 h-5 text-amber-500 fill-amber-500" /> You're Invited!
+                </DialogTitle>
+                <DialogDescription className="text-base text-foreground mt-3">
+                  <span className="font-semibold">{invitations[0].leader_name}</span> has invited you to become a full member of Jeremiah Generation Youth.
+                  As a member, you'll be able to RSVP to events and track your check-ins!
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter className="flex-col sm:flex-row gap-2 mt-6">
+                <Button variant="outline" className="w-full sm:w-1/2 rounded-xl" onClick={() => handleRespondToInvitation(invitations[0].id, "decline")}>
+                  Decline
+                </Button>
+                <Button className="w-full sm:w-1/2 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => handleRespondToInvitation(invitations[0].id, "accept")}>
+                  Accept Invitation
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+      
       <div className="max-w-4xl mx-auto space-y-10 py-6 px-4">
 
         {showServiceBanner && (
@@ -734,12 +794,9 @@ export default function MyDashboard() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="prompt-phone">Phone Number <span className="text-destructive">*</span></Label>
-              <Input
-                id="prompt-phone"
-                type="tel"
-                placeholder="082 123 4567"
+              <PhoneInput
                 value={promptPhone}
-                onChange={(e) => setPromptPhone(e.target.value)}
+                onChange={setPromptPhone}
               />
             </div>
             {/* Gender Field (Male / Female Only) */}
@@ -901,12 +958,9 @@ export default function MyDashboard() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="prompt-parent-phone" className="text-xs text-muted-foreground">Parent/Guardian Phone <span className="text-destructive">*</span></Label>
-                  <Input
-                    id="prompt-parent-phone"
-                    type="tel"
-                    placeholder="e.g. 081 123 4567"
+                  <PhoneInput
                     value={promptParentPhone}
-                    onChange={(e) => setPromptParentPhone(e.target.value)}
+                    onChange={setPromptParentPhone}
                     className="h-9 text-sm"
                   />
                 </div>

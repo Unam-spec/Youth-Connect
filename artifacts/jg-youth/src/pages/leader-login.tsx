@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import {
   Form,
   FormControl,
@@ -345,10 +346,7 @@ export default function LeaderLogin() {
                       <FormItem>
                         <FormLabel>Phone Number</FormLabel>
                         <FormControl>
-                          <Input
-                            type="tel"
-                            placeholder="082 123 4567"
-                            className="h-12"
+                          <PhoneInput
                             {...field}
                           />
                         </FormControl>

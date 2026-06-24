@@ -20,9 +20,11 @@
     "@workspace/api-client-react": "workspace:*",
     "driver.js": "^1.4.0",
     "html5-qrcode": "^2.3.8",
+    "libphonenumber-js": "^1.13.7",
     "posthog-js": "^1.391.2",
     "qrcode": "^1.5.4",
-    "qrcode.react": "^4.2.0"
+    "qrcode.react": "^4.2.0",
+    "react-international-phone": "^4.8.0"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -4,7 +4,10 @@ import {
   db,
   whatsappTemplatesTable,
   insertWhatsappTemplateSchema,
+  followUpQueueTable,
+  profilesTable,
 } from "@workspace/db";
+import { and } from "drizzle-orm";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 
 const router = Router();
@@ -85,6 +88,39 @@ router.patch("/whatsapp-templates/:id", requireLeaderSession("leader"), async (r
     if (!updated) {
       return res.status(404).json({ error: "Template not found" });
     }
+
+    // Sync updated template to pending follow-ups using it
+    if (updated.message_text) {
+      const pendingQueue = await db
+        .select({
+          id: followUpQueueTable.id,
+          profile_id: followUpQueueTable.profile_id,
+          full_name: profilesTable.full_name,
+        })
+        .from(followUpQueueTable)
+        .innerJoin(profilesTable, eq(followUpQueueTable.profile_id, profilesTable.id))
+        .where(
+          and(
+            eq(followUpQueueTable.template_id, updated.id),
+            eq(followUpQueueTable.status, "pending")
+          )
+        );
+
+      if (pendingQueue.length > 0) {
+        for (const item of pendingQueue) {
+          const firstName = item.full_name?.split(" ")[0] || "there";
+          const newPreview = updated.message_text
+            .split("[User]").join(firstName)
+            .split("[Leader]").join("JG Youth Team");
+
+          await db
+            .update(followUpQueueTable)
+            .set({ message_preview: newPreview })
+            .where(eq(followUpQueueTable.id, item.id));
+        }
+      }
+    }
+
     return res.json(updated);
   } catch (err) {
     req.log.error(err);

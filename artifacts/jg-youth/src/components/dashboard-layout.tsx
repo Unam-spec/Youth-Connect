@@ -144,6 +144,7 @@ export function DashboardLayout({
               return (
                 <Link
                   key={key}
+                  id={`tour-nav-${key}`}
                   href={href}
                   className={cn(
                     "flex shrink-0 items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-sm font-medium transition-colors md:shrink",

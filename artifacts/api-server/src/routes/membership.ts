@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db, membershipRequestsTable, profilesTable, pendingEmailsTable } from "@workspace/db";
 import { CreateMembershipRequestBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
@@ -165,6 +165,178 @@ router.post("/membership-requests/:id/reject", requireLeaderSession("leader"), a
     }
 
     return res.json({ ...updated, profile: member ?? null });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /membership-requests/invite - Leader invites a visitor to become a member (protected: leader)
+router.post("/membership-requests/invite", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    const { profile_id } = req.body;
+    if (!profile_id) {
+      return res.status(400).json({ error: "profile_id is required" });
+    }
+
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, profile_id),
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    if (profile.role !== "visitor") {
+      return res.status(400).json({ error: "Profile is already a member or higher" });
+    }
+
+    const [request] = await db
+      .insert(membershipRequestsTable)
+      .values({
+        profile_id: profile.id,
+        reason: "Invited by leader",
+        status: "invited",
+        reviewed_by: req.leaderId!,
+      })
+      .returning();
+
+    if (profile.email) {
+      const signUpUrl = `${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/sign-up`;
+      const emailBody = `
+        <div style="font-family: 'Inter', sans-serif; background-color: #0B0F14; color: #E6E8EB; padding: 24px; border-radius: 8px;">
+          <h2 style="color: #2A9D8F; font-family: 'Sora', sans-serif;">You're Invited!</h2>
+          <p>Hi <strong>${profile.full_name}</strong>,</p>
+          <p>You have been invited by a leader to become a full member of Jeremiah Generation Youth!</p>
+          <p>As a member, you'll be able to see upcoming events, RSVP, and check in on Fridays.</p>
+          <p><a href="${signUpUrl}" style="background:#2A9D8F;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;margin-top:8px">Create Your Login to Accept</a></p>
+          <p style="font-size:12px;color:#888;margin-top:4px">Or copy this link: ${signUpUrl}</p>
+          <p style="margin-top: 24px; font-weight: bold;">Jeremiah Generation Youth Team</p>
+        </div>
+      `;
+
+      await db.insert(pendingEmailsTable).values({
+        to_address: profile.email,
+        subject: "You've been invited to join Jeremiah Generation Youth!",
+        body_html: emailBody,
+      });
+    }
+
+    return res.status(201).json({ ...request, profile });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /membership-requests/invitations/:id/accept - Accept an invitation (Clerk-auth member)
+router.post("/membership-requests/invitations/:id/accept", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const request = await db.query.membershipRequestsTable.findFirst({
+      where: eq(membershipRequestsTable.id, req.params.id as string),
+    });
+    
+    if (!request || request.profile_id !== profile.id || request.status !== "invited") {
+      return res.status(404).json({ error: "Valid invitation not found" });
+    }
+
+    const [updated] = await db
+      .update(membershipRequestsTable)
+      .set({ status: "approved" })
+      .where(eq(membershipRequestsTable.id, request.id))
+      .returning();
+
+    await db
+      .update(profilesTable)
+      .set({ role: "member" })
+      .where(eq(profilesTable.id, profile.id));
+
+    return res.json({ ...updated, profile: { ...profile, role: "member" } });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /membership-requests/invitations/:id/decline - Decline an invitation (Clerk-auth member)
+router.post("/membership-requests/invitations/:id/decline", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const request = await db.query.membershipRequestsTable.findFirst({
+      where: eq(membershipRequestsTable.id, req.params.id as string),
+    });
+    
+    if (!request || request.profile_id !== profile.id || request.status !== "invited") {
+      return res.status(404).json({ error: "Valid invitation not found" });
+    }
+
+    const [updated] = await db
+      .update(membershipRequestsTable)
+      .set({ status: "rejected" })
+      .where(eq(membershipRequestsTable.id, request.id))
+      .returning();
+
+    return res.json({ ...updated, profile });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET /membership-requests/my-invitations - Get pending invitations for the logged-in user
+router.get("/membership-requests/my-invitations", async (req, res) => {
+  try {
+    const auth = getAuth(req);
+    if (!auth?.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.clerk_id, auth.userId),
+    });
+    if (!profile) {
+      return res.status(404).json({ error: "Profile not found" });
+    }
+
+    const invitations = await db
+      .select({
+        id: membershipRequestsTable.id,
+        reason: membershipRequestsTable.reason,
+        created_at: membershipRequestsTable.created_at,
+        leader_name: profilesTable.full_name,
+      })
+      .from(membershipRequestsTable)
+      .leftJoin(profilesTable, eq(membershipRequestsTable.reviewed_by, profilesTable.id))
+      .where(
+        and(
+          eq(membershipRequestsTable.profile_id, profile.id),
+          eq(membershipRequestsTable.status, "invited")
+        )
+      );
+
+    return res.json(invitations);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });

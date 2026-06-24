@@ -202,6 +202,9 @@ importers:
       html5-qrcode:
         specifier: ^2.3.8
         version: 2.3.8
+      libphonenumber-js:
+        specifier: ^1.13.7
+        version: 1.13.7
       posthog-js:
         specifier: ^1.391.2
         version: 1.391.2
@@ -211,6 +214,9 @@ importers:
       qrcode.react:
         specifier: ^4.2.0
         version: 4.2.0(react@19.1.0)
+      react-international-phone:
+        specifier: ^4.8.0
+        version: 4.8.0(react@19.1.0)
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
@@ -3615,6 +3621,9 @@ packages:
     resolution: {integrity: sha512-KZ9W9nWDT7rF7Dazg8xyLHGLrmpgq2nVNFUckhqdW3szVP6YhCpp/RAnpmVExA9JvrMynjwSLVrEj3AepHR6ew==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
+  libphonenumber-js@1.13.7:
+    resolution: {integrity: sha512-rvr3HIMdOgzhz1RFGjftji+wjoAFlzhqCNqJOU/MKTZQ8d9NZxAR/tI+0weDicyoucqVR0U1GCniqHJ0f8aM2A==}
+
   lightningcss-android-arm64@1.32.0:
     resolution: {integrity: sha512-YK7/ClTt4kAK0vo6w3X+Pnm0D2cf2vPHbhOXdoNti1Ga0al1P4TBZhwjATvjNwLEBCnKvjJc2jQgHXH0NEwlAg==}
     engines: {node: '>= 12.0.0'}
@@ -4109,6 +4118,11 @@ packages:
     resolution: {integrity: sha512-RH93p5ki6LfOiIt0UtDyNg/cee+HLVR6cHHtW3wALfo+eOHTp8RnU2kRkI6E+H19zMIs03DyxUG/GfZMOGvmiA==}
     peerDependencies:
       react: '*'
+
+  react-international-phone@4.8.0:
+    resolution: {integrity: sha512-PoyXx8t0OZNZXLupZN5UtmLb8nO6PQ6f6jQvYCAtg7VzxonuBcDs/4YA4+flqZZj5QOVqN4DLY1p39mEtJAwzw==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   react-is@16.13.1:
     resolution: {integrity: sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ==}
@@ -7784,6 +7798,8 @@ snapshots:
 
   leven@4.1.0: {}
 
+  libphonenumber-js@1.13.7: {}
+
   lightningcss-android-arm64@1.32.0:
     optional: true
 
@@ -8250,6 +8266,10 @@ snapshots:
       react: 19.1.0
 
   react-icons@5.6.0(react@19.1.0):
+    dependencies:
+      react: 19.1.0
+
+  react-international-phone@4.8.0(react@19.1.0):
     dependencies:
       react: 19.1.0
 

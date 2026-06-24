@@ -153,7 +153,9 @@ export function MemberDirectoryPanel({
             if (!isSelf) {
               if (sessionRole === 'super_admin') {
                 showMenu = true;
-              } else if (sessionRole === 'leader' && canManageMembers && targetRole === 'member') {
+              } else if (sessionRole === 'leader' && targetRole === 'member') {
+                showMenu = true;
+              } else if (targetRole === 'visitor') {
                 showMenu = true;
               }
             }
@@ -267,6 +269,34 @@ export function MemberDirectoryPanel({
                       {sessionRole === 'leader' && targetRole === 'member' && (
                         <DropdownMenuItem onClick={() => setRoleConfirm({ profile, targetRole: "leader" })}>
                           Promote to Leader
+                        </DropdownMenuItem>
+                      )}
+
+                      {targetRole === 'visitor' && (
+                        <DropdownMenuItem onClick={async () => {
+                          const sessionStr = localStorage.getItem("jg_leader_session") ?? "";
+                          try {
+                            const res = await fetch('/api/membership-requests/invite', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json', "x-leader-session": sessionStr },
+                              body: JSON.stringify({ profile_id: profile.id })
+                            });
+                            if (!res.ok) {
+                              const err = await res.json();
+                              throw new Error(err.error || "Failed to invite");
+                            }
+                            toast({ title: "Invitation sent", description: "The visitor will receive an email." });
+                            
+                            if (profile.phone) {
+                              const phoneNum = profile.phone.replace(/[^0-9]/g, "");
+                              const message = encodeURIComponent(`Hi ${profile.full_name?.split(" ")[0] || "there"},\n\nYou have been invited to become a full member of Jeremiah Generation Youth!\n\nPlease log in to accept the invitation and see upcoming events: ${window.location.origin}/sign-up\n\n- JG Youth Team`);
+                              window.open(`https://wa.me/${phoneNum}?text=${message}`, "_blank");
+                            }
+                          } catch (err: any) {
+                            toast({ title: "Error", description: err.message || "Failed to send invitation.", variant: "destructive" });
+                          }
+                        }}>
+                          Invite to Member
                         </DropdownMenuItem>
                       )}
 

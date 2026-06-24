@@ -205,6 +205,13 @@ CREATE TABLE IF NOT EXISTS "follow_up_queue" (
 
 CREATE INDEX IF NOT EXISTS idx_follow_up_queue_status ON "follow_up_queue" ("status");
 CREATE INDEX IF NOT EXISTS idx_follow_up_queue_profile ON "follow_up_queue" ("profile_id");
+
+-- Add 'invited' to membership_status if it doesn't exist
+DO $$ BEGIN
+  ALTER TYPE "membership_status" ADD VALUE IF NOT EXISTS 'invited';
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 `;
 
 export async function runMigrations() {

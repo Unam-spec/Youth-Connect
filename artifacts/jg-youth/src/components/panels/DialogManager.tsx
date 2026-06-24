@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { QRCodeSVG } from "qrcode.react";
 import { User, GraduationCap, BookOpen, Check } from "lucide-react";
@@ -109,12 +110,9 @@ export function DialogManager(props: DialogManagerProps) {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="edit-phone" className="text-foreground">Phone Number</Label>
-                <Input
-                  id="edit-phone"
+                <PhoneInput
                   value={props.editPhone}
-                  onChange={(e) => props.setEditPhone(e.target.value)}
-                  placeholder="082 123 4567"
-                  className="bg-card border-border rounded-xl"
+                  onChange={props.setEditPhone}
                 />
               </div>
               <div className="space-y-1.5">
@@ -237,12 +235,10 @@ export function DialogManager(props: DialogManagerProps) {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="edit-parent-phone" className="text-xs text-muted-foreground">Parent/Guardian Phone</Label>
-                  <Input
-                    id="edit-parent-phone"
+                  <PhoneInput
                     value={props.editParentPhone}
-                    onChange={(e) => props.setEditParentPhone(e.target.value)}
-                    placeholder="081 123 4567"
-                    className="bg-card border-border rounded-xl h-9 text-sm"
+                    onChange={props.setEditParentPhone}
+                    className="h-9 text-sm"
                   />
                 </div>
               </div>

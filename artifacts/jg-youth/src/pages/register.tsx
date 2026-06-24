@@ -19,6 +19,7 @@ import {
   SelectValue,
   SelectTrigger,
 } from "@/components/ui/select";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Link } from "wouter";
 import {
   Card,
@@ -35,8 +36,8 @@ const registerSchema = z.object({
   full_name: z.string().min(2, "Full name must be at least 2 characters"),
   phone_number: z
     .string()
-    .min(10, "Valid phone number is required")
-    .max(15, "Phone number is too long"),
+    .min(8, "Valid phone number is required")
+    .max(20, "Phone number is too long"),
   email: z.string().email("Invalid email address").min(1, "Email is required"),
   gender: z.enum(["male", "female"], {
     required_error: "Please select a gender",
@@ -49,7 +50,7 @@ const registerSchema = z.object({
   how_did_you_hear: z.string().min(2, "Please tell us how you heard about us"),
   school: z.string().min(2, "School/University is required"),
   parent_name: z.string().min(2, "Parent/Guardian name is required"),
-  parent_phone: z.string().min(10, "Parent/Guardian phone is required").max(15),
+  parent_phone: z.string().min(8, "Parent/Guardian phone is required").max(20),
   whatsapp_opt_in: z.boolean().default(false),
 });
 
@@ -290,10 +291,7 @@ export default function Register() {
                         <FormItem>
                           <FormLabel className="text-foreground">Phone Number *</FormLabel>
                           <FormControl>
-                            <Input
-                              type="tel"
-                              placeholder="082 123 4567"
-                              className="bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
+                            <PhoneInput
                               {...field}
                             />
                           </FormControl>
@@ -523,10 +521,7 @@ export default function Register() {
                           <FormItem>
                             <FormLabel className="text-foreground">Phone *</FormLabel>
                             <FormControl>
-                              <Input
-                                type="tel"
-                                placeholder="e.g. 081 123 4567"
-                                className="bg-card border-border text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
+                              <PhoneInput
                                 {...field}
                               />
                             </FormControl>
