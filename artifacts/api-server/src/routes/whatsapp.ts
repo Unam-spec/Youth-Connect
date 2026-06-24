@@ -256,148 +256,43 @@ router.post(
   },
 );
 
-// ── POST /whatsapp/queue/approve ────────────────────────────────────────────────
-// Approve & send selected queue entries (or all pending if ids=[] / omitted).
-const ApproveBody = z.object({
-  ids: z.array(z.string().uuid()).optional(), // empty/omitted = approve all
-  leader_id: z.string().uuid(),
+// ── POST /whatsapp/queue/mark-sent ───────────────────────────────────────────
+// Mark selected queue entries as sent (after the leader sends them via wa.me).
+const MarkSentBody = z.object({
+  ids: z.array(z.string().uuid()),
 });
 
 router.post(
-  "/whatsapp/queue/approve",
+  "/whatsapp/queue/mark-sent",
   requireLeaderSession("leader"),
   async (req: Request, res: Response) => {
     try {
-      const parsed = ApproveBody.safeParse(req.body);
+      const parsed = MarkSentBody.safeParse(req.body);
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.flatten() });
       }
-      const { ids, leader_id } = parsed.data;
+      const { ids } = parsed.data;
 
-      // Fetch queue entries to approve
-      let entries;
-      if (ids && ids.length > 0) {
-        entries = await db
-          .select()
-          .from(followUpQueueTable)
-          .where(
-            and(
-              inArray(followUpQueueTable.id, ids),
-              eq(followUpQueueTable.status, "pending"),
-            ),
-          );
-      } else {
-        entries = await db
-          .select()
-          .from(followUpQueueTable)
-          .where(eq(followUpQueueTable.status, "pending"));
+      if (ids.length === 0) {
+        return res.json({ updated: 0 });
       }
 
-      if (entries.length === 0) {
-        return res.json({ sent: 0, failed: 0, results: [] });
-      }
+      await db
+        .update(followUpQueueTable)
+        .set({
+          status: "sent",
+          sent_at: new Date(),
+          reviewed_by: req.leaderId ?? null,
+          reviewed_at: new Date(),
+        })
+        .where(
+          and(
+            inArray(followUpQueueTable.id, ids),
+            eq(followUpQueueTable.status, "pending"),
+          ),
+        );
 
-      // Load leader name for template vars
-      const leader = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.id, leader_id),
-      });
-      const leaderName = leader?.full_name ?? "JG Youth Team";
-
-      // Process each entry
-      const results: { id: string; status: string; error?: string }[] = [];
-      let sentCount = 0;
-      let failedCount = 0;
-
-      for (const entry of entries) {
-        // Get profile
-        const profile = await db.query.profilesTable.findFirst({
-          where: eq(profilesTable.id, entry.profile_id),
-        });
-        if (!profile?.phone) {
-          await db
-            .update(followUpQueueTable)
-            .set({
-              status: "failed",
-              error_message: "No phone number on file",
-              reviewed_by: leader_id,
-              reviewed_at: new Date(),
-            })
-            .where(eq(followUpQueueTable.id, entry.id));
-          results.push({ id: entry.id, status: "failed", error: "No phone" });
-          failedCount++;
-          continue;
-        }
-
-        // Get template
-        let template = null;
-        if (entry.template_id) {
-          template = await db.query.whatsappTemplatesTable.findFirst({
-            where: eq(whatsappTemplatesTable.id, entry.template_id),
-          });
-        }
-        if (!template) {
-          template = await db.query.whatsappTemplatesTable.findFirst({
-            where: and(
-              eq(whatsappTemplatesTable.template_type, "follow_up"),
-              eq(whatsappTemplatesTable.stage_weeks, entry.stage_weeks),
-            ),
-          });
-        }
-
-        try {
-          const vars = {
-            User: firstName(profile.full_name),
-            Leader: leaderName,
-          };
-
-          let sid: string;
-          if (template) {
-            sid = await sendWhatsAppFromTemplate({
-              to: profile.phone,
-              template,
-              vars,
-            });
-          } else {
-            // Fallback: import sendWhatsApp directly
-            const { sendWhatsApp } = await import("../lib/twilio");
-            sid = await sendWhatsApp({
-              to: profile.phone,
-              body: entry.message_preview,
-            });
-          }
-
-          await db
-            .update(followUpQueueTable)
-            .set({
-              status: "sent",
-              twilio_sid: sid,
-              sent_at: new Date(),
-              reviewed_by: leader_id,
-              reviewed_at: new Date(),
-            })
-            .where(eq(followUpQueueTable.id, entry.id));
-
-          results.push({ id: entry.id, status: "sent" });
-          sentCount++;
-        } catch (sendErr) {
-          const errMsg =
-            sendErr instanceof Error ? sendErr.message : "Send failed";
-          await db
-            .update(followUpQueueTable)
-            .set({
-              status: "failed",
-              error_message: errMsg,
-              reviewed_by: leader_id,
-              reviewed_at: new Date(),
-            })
-            .where(eq(followUpQueueTable.id, entry.id));
-
-          results.push({ id: entry.id, status: "failed", error: errMsg });
-          failedCount++;
-        }
-      }
-
-      return res.json({ sent: sentCount, failed: failedCount, results });
+      return res.json({ updated: ids.length });
     } catch (err) {
       req.log.error(err);
       return res.status(500).json({ error: "Internal server error" });
@@ -436,46 +331,6 @@ router.post(
         );
 
       return res.json({ rejected: ids.length });
-    } catch (err) {
-      req.log.error(err);
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  },
-);
-
-// ── POST /whatsapp/queue/retry ──────────────────────────────────────────────────
-const RetryBody = z.object({
-  ids: z.array(z.string().uuid()),
-});
-
-router.post(
-  "/whatsapp/queue/retry",
-  requireLeaderSession("leader"),
-  async (req: Request, res: Response) => {
-    try {
-      const parsed = RetryBody.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.flatten() });
-      }
-      const { ids } = parsed.data;
-
-      // Only allow retrying "failed" or "rejected" entries
-      await db
-        .update(followUpQueueTable)
-        .set({
-          status: "pending",
-          error_message: null,
-          reviewed_by: null,
-          reviewed_at: null,
-        })
-        .where(
-          and(
-            inArray(followUpQueueTable.id, ids),
-            inArray(followUpQueueTable.status, ["failed", "rejected"]),
-          ),
-        );
-
-      return res.json({ retried: ids.length });
     } catch (err) {
       req.log.error(err);
       return res.status(500).json({ error: "Internal server error" });

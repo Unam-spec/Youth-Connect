@@ -89,7 +89,6 @@ export default function FollowUpHub() {
   const queryClient = useQueryClient();
   const leaderId = session?.profile_id;
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // ── Queue data ─────────────────────────────────────────────────────────────
   const { data: queueEntries, isLoading: queueLoading } = useQuery<QueueEntry[]>({
@@ -129,29 +128,30 @@ export default function FollowUpHub() {
     },
   });
 
-  // ── Approve & Send ─────────────────────────────────────────────────────────
-  const approveAndSend = useMutation({
-    mutationFn: async (ids?: string[]) => {
-      const res = await apiFetch("/api/whatsapp/queue/approve", {
+  // ── Mark as Sent (after wa.me redirect) ────────────────────────────────────
+  const markAsSent = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiFetch("/api/whatsapp/queue/mark-sent", {
         method: "POST",
-        body: JSON.stringify({
-          ids: ids && ids.length > 0 ? ids : undefined,
-          leader_id: leaderId,
-        }),
+        body: JSON.stringify({ ids: [id] }),
       });
-      if (!res.ok) throw new Error("Failed to approve");
+      if (!res.ok) throw new Error("Failed to mark sent");
       return res.json();
     },
-    onSuccess: (data) => {
-      const msg = data.failed > 0
-        ? `${data.sent} sent, ${data.failed} failed`
-        : `${data.sent} message(s) sent successfully`;
-      toast.success(msg);
-      setSelectedIds(new Set());
-      queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: QUEUE_KEY });
+      const prev = queryClient.getQueryData<QueueEntry[]>(QUEUE_KEY);
+      queryClient.setQueryData<QueueEntry[]>(QUEUE_KEY, (old) =>
+        (old ?? []).map((e) => (e.id === id ? { ...e, status: "sent" } : e)),
+      );
+      return { prev };
     },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Approval failed");
+    onError: (err, _id, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(QUEUE_KEY, ctx.prev);
+      toast.error(err instanceof Error ? err.message : "Failed to update status");
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: QUEUE_KEY });
     },
   });
 
@@ -224,29 +224,18 @@ export default function FollowUpHub() {
 
   const leaderName = session.full_name || "JG Youth Team";
 
-  // Replaces the placeholder in the preview with the actual logged-in leader name
-  const formatPreview = (preview: string) => {
-    return preview.replace("JG Youth Team", leaderName);
-  };
-
   const pendingEntries = (queueEntries ?? []).filter((e) => e.status === "pending");
   const sentEntries = (queueEntries ?? []).filter((e) => e.status === "sent");
-  const failedEntries = (queueEntries ?? []).filter((e) => e.status === "failed");
 
-  const toggleSelect = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
-  const toggleAll = () => {
-    if (selectedIds.size === pendingEntries.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(pendingEntries.map((e) => e.id)));
+  // Format phone number for wa.me link
+  const getWaMeLink = (phone: string, text: string) => {
+    let cleanPhone = phone.replace(/[^0-9+]/g, "");
+    if (cleanPhone.startsWith("0")) {
+      cleanPhone = "27" + cleanPhone.slice(1);
+    } else if (cleanPhone.startsWith("+")) {
+      cleanPhone = cleanPhone.slice(1);
     }
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
   };
 
   return (
@@ -404,42 +393,11 @@ export default function FollowUpHub() {
         {/* ── Pending Queue ──────────────────────────────────────────────────── */}
         <div className="space-y-3">
           {pendingEntries.length > 0 && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-primary" />
-                <h2 className="font-semibold text-sm">
-                  Pending Review ({pendingEntries.length})
-                </h2>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={toggleAll}
-                  className="text-xs h-7"
-                >
-                  {selectedIds.size === pendingEntries.length ? "Deselect All" : "Select All"}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    approveAndSend.mutate(
-                      selectedIds.size > 0 ? Array.from(selectedIds) : undefined,
-                    )
-                  }
-                  disabled={approveAndSend.isPending}
-                  className="text-xs h-7 gap-1.5"
-                >
-                  {approveAndSend.isPending ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Send className="h-3.5 w-3.5" />
-                  )}
-                  {selectedIds.size > 0
-                    ? `Approve & Send (${selectedIds.size})`
-                    : "Approve & Send All"}
-                </Button>
-              </div>
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-primary" />
+              <h2 className="font-semibold text-sm">
+                Pending Action ({pendingEntries.length})
+              </h2>
             </div>
           )}
 
@@ -463,20 +421,12 @@ export default function FollowUpHub() {
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {pendingEntries.map((entry) => {
                 const color = STAGE_COLORS[entry.stage_weeks] ?? "#EF4444";
-                const isSelected = selectedIds.has(entry.id);
                 return (
                   <div
                     key={entry.id}
-                    className={cn(
-                      "flex flex-col gap-3 rounded-2xl border p-4 transition-all cursor-pointer",
-                      isSelected
-                        ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
-                        : "border-border bg-card hover:border-border/80",
-                    )}
-                    onClick={() => toggleSelect(entry.id)}
+                    className="flex flex-col gap-3 rounded-2xl border p-4 transition-all border-border bg-card"
                   >
                     {/* Stage badge + absence */}
-                    <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <span
                           className="h-3 w-3 shrink-0 rounded-full ring-2 ring-background"
@@ -489,14 +439,6 @@ export default function FollowUpHub() {
                           {entry.weeks_absent}w absent
                         </span>
                       </div>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(entry.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-                      />
-                    </div>
 
                     {/* Person info */}
                     <div className="min-w-0">
@@ -512,7 +454,7 @@ export default function FollowUpHub() {
                     {/* Message preview */}
                     <div className="rounded-lg border border-border/50 bg-muted/30 px-3 py-2">
                       <p className="text-xs text-muted-foreground line-clamp-3">
-                        {formatPreview(entry.message_preview)}
+                        {entry.message_preview.replace(" — JG Youth Team", "")}
                       </p>
                     </div>
 
@@ -523,12 +465,18 @@ export default function FollowUpHub() {
                         className="flex-1 rounded-xl text-xs h-7"
                         onClick={(e) => {
                           e.stopPropagation();
-                          approveAndSend.mutate([entry.id]);
+                          if (!entry.phone) {
+                            toast.error("No phone number for this member");
+                            return;
+                          }
+                          const cleanMsg = entry.message_preview.replace(" — JG Youth Team", "");
+                          window.open(getWaMeLink(entry.phone, cleanMsg), "_blank");
+                          markAsSent.mutate(entry.id);
                         }}
-                        disabled={approveAndSend.isPending}
+                        disabled={markAsSent.isPending}
                       >
                         <Send className="mr-1 h-3 w-3" />
-                        Send
+                        Send via WhatsApp
                       </Button>
                       <Button
                         size="sm"
@@ -583,49 +531,6 @@ export default function FollowUpHub() {
           </div>
         )}
 
-        {/* ── Failed ─────────────────────────────────────────────────────────── */}
-        {failedEntries.length > 0 && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-              <h2 className="font-semibold text-sm">
-                Failed ({failedEntries.length})
-              </h2>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {failedEntries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex gap-3 rounded-xl border border-red-500/20 bg-red-500/5 p-3 items-start"
-                >
-                  <div className="h-8 w-8 rounded-full bg-red-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {entry.full_name}
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 px-2 text-[10px] uppercase tracking-wider text-red-500 hover:text-red-600 hover:bg-red-500/10 shrink-0"
-                        onClick={() => retryEntries.mutate([entry.id])}
-                        disabled={retryEntries.isPending}
-                      >
-                        <RotateCcw className="mr-1 h-3 w-3" />
-                        Retry
-                      </Button>
-                    </div>
-                    <p className="text-xs text-red-400 mt-1">
-                      {entry.error_message ?? "Send failed"}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </DashboardLayout>
   );
