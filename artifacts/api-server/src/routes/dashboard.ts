@@ -293,7 +293,7 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
         phone: profilesTable.phone,
         last_checkin: sql<string>`max(${attendanceTable.session_date})`,
         weeks_absent: sql<number>`
-          GREATEST(1, EXTRACT(WEEK FROM age(current_date, max(${attendanceTable.session_date}::date)))::int)
+          GREATEST(1, (current_date - max(${attendanceTable.session_date}::date)) / 7)
         `,
       })
       .from(profilesTable)
