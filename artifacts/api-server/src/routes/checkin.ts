@@ -14,6 +14,7 @@ import {
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { getSchedule, isCheckinOpenNow, type CheckinWindow } from "../lib/checkinSchedule";
 import { resolveAccount } from "../lib/resolveAccount";
+import { publishActivity } from "../lib/activityStream";
 
 const router = Router();
 
@@ -207,6 +208,13 @@ router.post("/checkin/requests", async (req, res) => {
         })
         .returning();
 
+      publishActivity({
+        type: "check_in",
+        profile_id: profile.id,
+        profile_name: profile.full_name,
+        metadata: { method: "self", role: profile.role },
+      });
+
       return res.status(200).json({
         status: "approved",
         message: "Checked in successfully.",
@@ -337,6 +345,20 @@ router.patch("/checkin/requests/:id/approve", requireLeaderSession("leader"), as
     await db
       .delete(checkInRequestsTable)
       .where(eq(checkInRequestsTable.id, req.params.id as string));
+
+    if (request.profile_id) {
+      const checkedInProfile = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, request.profile_id),
+      });
+      if (checkedInProfile) {
+        publishActivity({
+          type: "check_in",
+          profile_id: checkedInProfile.id,
+          profile_name: checkedInProfile.full_name,
+          metadata: { method: "qr", role: checkedInProfile.role },
+        });
+      }
+    }
 
     // Send check-in confirmation email via database pending_emails queue
     if (request.profile_id) {

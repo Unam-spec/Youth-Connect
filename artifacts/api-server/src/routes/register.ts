@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { db, visitorsTable, checkInRequestsTable } from "@workspace/db";
 import { isCheckinOpenNow } from "../lib/checkinSchedule";
+import { publishActivity } from "../lib/activityStream";
 
 const router = Router();
 
@@ -103,6 +104,13 @@ router.post("/register", async (req, res) => {
       type: "visitor",
       session_date: today,
       status: "pending",
+    });
+
+    publishActivity({
+      type: "registration",
+      profile_id: visitor.id,
+      profile_name: visitor.full_name,
+      metadata: { source: "visitor_registration" },
     });
 
     return res.status(201).json({ success: true, visitor });

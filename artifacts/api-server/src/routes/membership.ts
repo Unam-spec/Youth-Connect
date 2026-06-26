@@ -5,6 +5,7 @@ import { db, membershipRequestsTable, profilesTable, pendingEmailsTable } from "
 import { CreateMembershipRequestBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembershipRequest";
+import { publishActivity } from "../lib/activityStream";
 
 const router = Router();
 
@@ -70,6 +71,12 @@ router.post("/membership-requests", async (req, res) => {
       .returning();
 
     await notifyLeadersOfMembershipRequest(profile.full_name, parsed.data.reason);
+
+    publishActivity({
+      type: "membership_request",
+      profile_id: profile.id,
+      profile_name: profile.full_name,
+    });
 
     return res.status(201).json({ ...request, profile });
   } catch (err) {

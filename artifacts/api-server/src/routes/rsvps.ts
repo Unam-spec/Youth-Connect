@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { db, rsvpsTable, eventsTable, profilesTable, pendingEmailsTable } from "@workspace/db";
 import { UpsertRsvpBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { publishActivity } from "../lib/activityStream";
 
 const router = Router();
 
@@ -152,6 +153,15 @@ router.post("/rsvps/:eventId", async (req, res) => {
         })
         .returning();
       rsvp = inserted;
+    }
+
+    if (event) {
+      publishActivity({
+        type: "rsvp",
+        profile_id: profile.id,
+        profile_name: profile.full_name,
+        metadata: { event_title: event.title, status: parsed.data.status },
+      });
     }
 
     if (parsed.data.status === "going" && profile.email && event) {

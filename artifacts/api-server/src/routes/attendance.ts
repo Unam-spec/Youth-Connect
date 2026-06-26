@@ -6,6 +6,7 @@ import {
   CheckInBody,
   CheckInByNameBody,
 } from "@workspace/api-zod";
+import { publishActivity } from "../lib/activityStream";
 
 const router = Router();
 
@@ -77,6 +78,16 @@ router.post("/attendance", async (req, res) => {
     const profile = await db.query.profilesTable.findFirst({
       where: eq(profilesTable.id, parsed.data.profile_id),
     });
+
+    if (profile) {
+      publishActivity({
+        type: "check_in",
+        profile_id: profile.id,
+        profile_name: profile.full_name,
+        metadata: { method: parsed.data.check_in_method },
+      });
+    }
+
     return res.status(201).json({ ...record, profile });
   } catch (err) {
     req.log.error(err);
@@ -178,6 +189,13 @@ router.post("/attendance/checkin-by-name", async (req, res) => {
         check_in_method: "self",
       })
       .returning();
+    publishActivity({
+      type: "check_in",
+      profile_id: profile.id,
+      profile_name: profile.full_name,
+      metadata: { method: "self", source: "checkin_by_name" },
+    });
+
     return res.status(201).json({ ...record, profile });
   } catch (err) {
     req.log.error(err);
