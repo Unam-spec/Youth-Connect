@@ -17,7 +17,7 @@ import {
 
 export const roleEnum = pgEnum("role", ["super_admin", "leader", "member", "visitor"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
-export const membershipStatusEnum = pgEnum("membership_status", ["pending", "approved", "rejected"]);
+export const membershipStatusEnum = pgEnum("membership_status", ["pending", "approved", "rejected", "invited"]);
 export const checkInMethodEnum = pgEnum("check_in_method", ["manual", "self", "qr"]);
 export const qrCodeTypeEnum = pgEnum("qr_code_type", ["public", "leader", "session"]);
 export const rsvpStatusEnum = pgEnum("rsvp", ["going", "not_going", "maybe"]);
