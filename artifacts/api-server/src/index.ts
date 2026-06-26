@@ -4,10 +4,17 @@ import { logger } from "./lib/logger";
 import { runMigrations } from "./db";
 import { startEmailProcessor, stopEmailProcessor } from "./jobs/emailProcessor";
 import { startFollowUpGenerator, stopFollowUpGenerator } from "./jobs/followUpGenerator";
+import { startEmailWorker, stopQueue } from "./lib/queue";
 
-process.on("SIGTERM", () => {
+let usingBullMQ = false;
+
+process.on("SIGTERM", async () => {
   logger.info("Received SIGTERM, shutting down gracefully");
-  stopEmailProcessor();
+  if (usingBullMQ) {
+    await stopQueue();
+  } else {
+    stopEmailProcessor();
+  }
   stopFollowUpGenerator();
 });
 
@@ -27,7 +34,12 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function startServer() {
   await runMigrations();
-  startEmailProcessor();
+
+  usingBullMQ = startEmailWorker();
+  if (!usingBullMQ) {
+    startEmailProcessor();
+  }
+
   startFollowUpGenerator();
 
   app.listen(port, (err) => {
@@ -44,4 +56,3 @@ startServer().catch((err) => {
   logger.error({ err }, "Failed to start server");
   process.exit(1);
 });
-

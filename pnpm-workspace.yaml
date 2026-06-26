@@ -8,3 +8,4 @@ allowBuilds:
   bcrypt: true
   core-js: set this to true or false
   esbuild: true
+  msgpackr-extract: true

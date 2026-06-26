@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { eq, count, sql, desc, gte, inArray, and, lte } from "drizzle-orm";
+import ExcelJS from "exceljs";
 import {
   db,
   profilesTable,
@@ -12,8 +13,12 @@ import {
   whatsappTemplatesTable,
 } from "@workspace/db";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { getCache, setCache } from "../lib/redis";
 
 const router = Router();
+
+const CACHE_TTL_KPIS = 300; // 5 min
+const CACHE_TTL_ANALYTICS = 600; // 10 min
 
 function getSastParts(): {
   dayOfWeek: number;
@@ -68,12 +73,16 @@ function isInsideFridayWindow(): boolean {
   return totalMinutes >= start && totalMinutes < end;
 }
 
+// ── KPIs (cached) ─────────────────────────────────────────────────────────────
 router.get("/dashboard/kpis", async (req, res) => {
   try {
     const { dateString: today } = getSastParts();
     const inWindow = isInsideFridayWindow();
 
-    // Count ALL roles — members + leaders + super_admins
+    const cacheKey = `dashboard:kpis:${today}:${inWindow}`;
+    const cached = await getCache<Record<string, number>>(cacheKey);
+    if (cached) return res.json(cached);
+
     const [totalMembersRow] = await db
       .select({ count: count() })
       .from(profilesTable)
@@ -102,12 +111,16 @@ router.get("/dashboard/kpis", async (req, res) => {
       todayNewVisitorsCount = Number(todayNewVisitors?.count ?? 0);
     }
 
-    return res.json({
+    const result = {
       total_members: Number(totalMembersRow?.count ?? 0),
       today_attendance: todayAttendanceCount,
       today_new_visitors: todayNewVisitorsCount,
       upcoming_events_count: Number(upcomingEvents?.count ?? 0),
-    });
+    };
+
+    await setCache(cacheKey, result, inWindow ? 60 : CACHE_TTL_KPIS);
+
+    return res.json(result);
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -223,12 +236,15 @@ router.get("/dashboard/attendance-history", async (req, res) => {
   }
 });
 
-// ── Analytics Data Endpoint ────────────────────────────────────────────────────
-// Returns all metrics for the custom Recharts analytics dashboard.
+// ── Analytics Data Endpoint (cached) ──────────────────────────────────────────
 router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (req, res) => {
   try {
     const { dateString: today } = getSastParts();
     const now = new Date();
+
+    const cacheKey = `dashboard:analytics:${today}`;
+    const cached = await getCache<Record<string, unknown>>(cacheKey);
+    if (cached) return res.json(cached);
 
     // ── 1. Check-in trends (last 12 weeks, grouped by week) ──────────────
     const checkinTrends = await db
@@ -264,7 +280,6 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
       .orderBy(sql`date_trunc('week', ${profilesTable.created_at})`);
 
     // ── 4. Active vs dormant members ─────────────────────────────────────
-    // Active = checked in within 2 weeks; dormant = not checked in within 2 weeks
     const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split("T")[0];
@@ -321,7 +336,6 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
       .orderBy(desc(eventsTable.date))
       .limit(10);
 
-    // Calculate attendance rate per event (attendance / total members)
     const eventAttendanceWithRate = eventAttendance.map((e) => ({
       event_id: e.event_id,
       title: e.title,
@@ -351,7 +365,6 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
       .where(sql`${feedbacksTable.created_at} >= (current_date - interval '7 days')`);
 
     // ── 9. Streak leaderboard (top 5) ────────────────────────────────────
-    // Calculate streaks: consecutive session_dates per profile
     const streakLeaders = await db
       .select({
         profile_id: attendanceTable.profile_id,
@@ -377,8 +390,7 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
       .from(attendanceTable)
       .where(sql`${attendanceTable.session_date}::date >= date_trunc('month', current_date)`);
 
-    return res.json({
-      // Summary cards
+    const result = {
       summary: {
         total_members: totalMembers,
         active_members: activeMembers,
@@ -390,7 +402,6 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
         feedback_total: Number(feedbackTotal?.count ?? 0),
         feedback_this_week: Number(feedbackThisWeek?.count ?? 0),
       },
-      // Chart data
       checkin_trends_weekly: checkinTrends.map((r) => ({
         week: r.week,
         checkins: Number(r.total),
@@ -417,7 +428,225 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
         total_checkins: Number(s.total_checkins),
         last_checkin: s.last_checkin,
       })),
-    });
+    };
+
+    await setCache(cacheKey, result, CACHE_TTL_ANALYTICS);
+
+    return res.json(result);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// ── Data Export (multi-sheet Excel) ───────────────────────────────────────────
+router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    const { dateString: today } = getSastParts();
+
+    // ── 1. Full Attendance ──────────────────────────────────────────────
+    const fullAttendance = await db
+      .select({
+        full_name: profilesTable.full_name,
+        phone: profilesTable.phone,
+        role: profilesTable.role,
+        session_date: attendanceTable.session_date,
+        checked_in_at: attendanceTable.checked_in_at,
+        check_in_method: attendanceTable.check_in_method,
+      })
+      .from(attendanceTable)
+      .leftJoin(profilesTable, eq(attendanceTable.profile_id, profilesTable.id))
+      .orderBy(desc(attendanceTable.session_date));
+
+    // ── 2. At-Risk / Absentees ──────────────────────────────────────────
+    const absentees = await db
+      .select({
+        full_name: profilesTable.full_name,
+        phone: profilesTable.phone,
+        email: profilesTable.email,
+        role: profilesTable.role,
+        last_checkin: sql<string>`max(${attendanceTable.session_date})`,
+        weeks_absent: sql<number>`
+          GREATEST(1, (current_date - max(${attendanceTable.session_date}::date)) / 7)
+        `,
+        total_checkins: sql<number>`count(${attendanceTable.id})`,
+      })
+      .from(profilesTable)
+      .leftJoin(attendanceTable, eq(profilesTable.id, attendanceTable.profile_id))
+      .where(inArray(profilesTable.role, ["member", "leader", "super_admin"]))
+      .groupBy(
+        profilesTable.id,
+        profilesTable.full_name,
+        profilesTable.phone,
+        profilesTable.email,
+        profilesTable.role,
+      )
+      .having(
+        sql`max(${attendanceTable.session_date}) IS NULL
+            OR max(${attendanceTable.session_date}::date) < (current_date - interval '2 weeks')`,
+      )
+      .orderBy(sql`max(${attendanceTable.session_date}) ASC NULLS FIRST`);
+
+    // ── 3. Visitor Tracking ─────────────────────────────────────────────
+    const visitors = await db
+      .select({
+        full_name: profilesTable.full_name,
+        phone: profilesTable.phone,
+        email: profilesTable.email,
+        age: profilesTable.age,
+        school: profilesTable.school,
+        heard_from: profilesTable.heard_from,
+        created_at: profilesTable.created_at,
+        checkin_count: sql<number>`(
+          SELECT count(*) FROM attendance WHERE attendance.profile_id = ${profilesTable.id}
+        )`,
+      })
+      .from(profilesTable)
+      .where(eq(profilesTable.role, "visitor"))
+      .orderBy(desc(profilesTable.created_at));
+
+    // ── 4. Weekly Trends ────────────────────────────────────────────────
+    const weeklyTrends = await db
+      .select({
+        week: sql<string>`to_char(date_trunc('week', ${attendanceTable.session_date}::date), 'YYYY-MM-DD')`,
+        total: count(),
+        members: sql<number>`count(*) filter (where ${profilesTable.role} IN ('member', 'leader', 'super_admin'))`,
+        visitors: sql<number>`count(*) filter (where ${profilesTable.role} = 'visitor')`,
+      })
+      .from(attendanceTable)
+      .leftJoin(profilesTable, eq(attendanceTable.profile_id, profilesTable.id))
+      .groupBy(sql`date_trunc('week', ${attendanceTable.session_date}::date)`)
+      .orderBy(sql`date_trunc('week', ${attendanceTable.session_date}::date) DESC`);
+
+    // ── 5. Feedback ─────────────────────────────────────────────────────
+    const feedback = await db
+      .select({
+        content: feedbacksTable.content,
+        anonymous: feedbacksTable.anonymous,
+        submitted_by: profilesTable.full_name,
+        created_at: feedbacksTable.created_at,
+      })
+      .from(feedbacksTable)
+      .leftJoin(profilesTable, eq(feedbacksTable.user_id, profilesTable.id))
+      .orderBy(desc(feedbacksTable.created_at));
+
+    // ── Build Excel workbook ────────────────────────────────────────────
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "JG Youth Connect";
+    workbook.created = new Date();
+
+    const headerStyle: Partial<ExcelJS.Style> = {
+      font: { bold: true, color: { argb: "FFFFFFFF" } },
+      fill: { type: "pattern", pattern: "solid", fgColor: { argb: "FF2A9D8F" } },
+      alignment: { horizontal: "center" },
+    };
+
+    // Sheet 1: Full Attendance
+    const attendSheet = workbook.addWorksheet("Full Attendance");
+    attendSheet.columns = [
+      { header: "Name", key: "full_name", width: 25 },
+      { header: "Phone", key: "phone", width: 18 },
+      { header: "Role", key: "role", width: 14 },
+      { header: "Session Date", key: "session_date", width: 14 },
+      { header: "Checked In At", key: "checked_in_at", width: 22 },
+      { header: "Method", key: "check_in_method", width: 12 },
+    ];
+    attendSheet.getRow(1).eachCell((cell) => { cell.style = headerStyle; });
+    for (const row of fullAttendance) {
+      attendSheet.addRow({
+        ...row,
+        checked_in_at: row.checked_in_at.toISOString(),
+      });
+    }
+
+    // Sheet 2: At-Risk / Absentees
+    const absentSheet = workbook.addWorksheet("Absentees");
+    absentSheet.columns = [
+      { header: "Name", key: "full_name", width: 25 },
+      { header: "Phone", key: "phone", width: 18 },
+      { header: "Email", key: "email", width: 25 },
+      { header: "Role", key: "role", width: 14 },
+      { header: "Last Check-in", key: "last_checkin", width: 14 },
+      { header: "Weeks Absent", key: "weeks_absent", width: 14 },
+      { header: "Total Check-ins", key: "total_checkins", width: 16 },
+    ];
+    absentSheet.getRow(1).eachCell((cell) => { cell.style = headerStyle; });
+    for (const row of absentees) {
+      absentSheet.addRow({
+        ...row,
+        last_checkin: row.last_checkin ?? "Never",
+        weeks_absent: Number(row.weeks_absent),
+        total_checkins: Number(row.total_checkins),
+      });
+    }
+
+    // Sheet 3: Visitor Tracking
+    const visitorSheet = workbook.addWorksheet("Visitor Tracking");
+    visitorSheet.columns = [
+      { header: "Name", key: "full_name", width: 25 },
+      { header: "Phone", key: "phone", width: 18 },
+      { header: "Email", key: "email", width: 25 },
+      { header: "Age", key: "age", width: 8 },
+      { header: "School", key: "school", width: 20 },
+      { header: "How Did You Hear?", key: "heard_from", width: 20 },
+      { header: "Registered", key: "created_at", width: 22 },
+      { header: "Check-ins", key: "checkin_count", width: 12 },
+    ];
+    visitorSheet.getRow(1).eachCell((cell) => { cell.style = headerStyle; });
+    for (const row of visitors) {
+      visitorSheet.addRow({
+        ...row,
+        created_at: row.created_at.toISOString().split("T")[0],
+        checkin_count: Number(row.checkin_count),
+      });
+    }
+
+    // Sheet 4: Weekly Trends
+    const trendsSheet = workbook.addWorksheet("Weekly Trends");
+    trendsSheet.columns = [
+      { header: "Week Starting", key: "week", width: 14 },
+      { header: "Total", key: "total", width: 10 },
+      { header: "Members", key: "members", width: 10 },
+      { header: "Visitors", key: "visitors", width: 10 },
+    ];
+    trendsSheet.getRow(1).eachCell((cell) => { cell.style = headerStyle; });
+    for (const row of weeklyTrends) {
+      trendsSheet.addRow({
+        week: row.week,
+        total: Number(row.total),
+        members: Number(row.members),
+        visitors: Number(row.visitors),
+      });
+    }
+
+    // Sheet 5: Feedback
+    const feedbackSheet = workbook.addWorksheet("Feedback");
+    feedbackSheet.columns = [
+      { header: "Feedback", key: "content", width: 50 },
+      { header: "Anonymous", key: "anonymous", width: 12 },
+      { header: "Submitted By", key: "submitted_by", width: 25 },
+      { header: "Date", key: "created_at", width: 22 },
+    ];
+    feedbackSheet.getRow(1).eachCell((cell) => { cell.style = headerStyle; });
+    for (const row of feedback) {
+      feedbackSheet.addRow({
+        content: row.content,
+        anonymous: row.anonymous ? "Yes" : "No",
+        submitted_by: row.anonymous ? "Anonymous" : (row.submitted_by ?? "Unknown"),
+        created_at: row.created_at.toISOString().split("T")[0],
+      });
+    }
+
+    // Stream response
+    const filename = `JG-Youth-Report-${today}.xlsx`;
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+
+    await workbook.xlsx.write(res);
+    return res.end();
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });

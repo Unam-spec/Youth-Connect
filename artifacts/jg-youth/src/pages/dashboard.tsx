@@ -100,7 +100,7 @@ import { CheckInSchedulePanel } from "@/components/panels/CheckInSchedulePanel";
 import { DeleteConfirmPanel } from "@/components/panels/DeleteConfirmPanel";
 import { DialogManager } from "@/components/panels/DialogManager";
 import { KpiCard } from "@/components/panels/shared";
-import { Activity, Settings } from "lucide-react";
+import { Activity, Download, Settings } from "lucide-react";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -328,6 +328,7 @@ export default function Dashboard() {
     null,
   );
   const [kpisUpdatedAt, setKpisUpdatedAt] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -579,6 +580,36 @@ export default function Dashboard() {
       });
     } finally {
       setIsGeneratingQr(false);
+    }
+  };
+
+  const handleExportReport = async () => {
+    setIsExporting(true);
+    toast({ title: "Generating report…" });
+    try {
+      const res = await apiFetch("/api/dashboard/export");
+      if (!res.ok) {
+        throw new Error("Export failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const today = new Date().toISOString().split("T")[0];
+      a.download = `JG-Youth-Report-${today}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast({ title: "Report downloaded" });
+    } catch {
+      toast({
+        title: "Export failed",
+        description: "Could not generate the report. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -1011,16 +1042,27 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 flex-wrap">
               {(session.role === "leader" ||
                 session.role === "super_admin") && (
-                <Button
-                  id="btn-generate-qr"
-                  onClick={handleGenerateSessionQrCode}
-                  disabled={isGeneratingQr}
-                  size="sm"
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
-                >
-                  <QrCode className="h-4 w-4 mr-2" />
-                  {isGeneratingQr ? "Generating…" : "Session QR"}
-                </Button>
+                <>
+                  <Button
+                    onClick={handleExportReport}
+                    disabled={isExporting}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Download className={`h-4 w-4 mr-2${isExporting ? " animate-bounce" : ""}`} />
+                    {isExporting ? "Exporting…" : "Export Report"}
+                  </Button>
+                  <Button
+                    id="btn-generate-qr"
+                    onClick={handleGenerateSessionQrCode}
+                    disabled={isGeneratingQr}
+                    size="sm"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
+                  >
+                    <QrCode className="h-4 w-4 mr-2" />
+                    {isGeneratingQr ? "Generating…" : "Session QR"}
+                  </Button>
+                </>
               )}
               <Badge
                 className={

@@ -78,6 +78,8 @@ async function buildAll() {
       "ffi-napi",
       "grpc",
       "hiredis",
+      "ioredis",
+      "bullmq",
       "kerberos",
       "leveldown",
       "miniflare",
