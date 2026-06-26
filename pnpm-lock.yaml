@@ -72,6 +72,9 @@ importers:
       '@types/bcrypt':
         specifier: ^6.0.0
         version: 6.0.0
+      '@upstash/kafka':
+        specifier: ^1.3.5
+        version: 1.3.5
       '@upstash/redis':
         specifier: ^1.34.3
         version: 1.38.0
@@ -2723,6 +2726,11 @@ packages:
 
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
+
+  '@upstash/kafka@1.3.5':
+    resolution: {integrity: sha512-BQYwjE2gD0tbSLo7aBXLaQn+yNObHVTr9igGG4WsFM/rlFLHsHTWvuu9tkEqSdSmjicvJZg5Hf9hMzXblYUZxA==}
+    engines: {node: '>=18'}
+    deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
 
   '@upstash/redis@1.38.0':
     resolution: {integrity: sha512-wu+dZBptlLy0+MCUEoHmzrY/TnmgDey3+c7EbIGwrLqAvkP8yi5MWZHYGIFtAygmL4Bkz2TdFu+eU0vFPncIcg==}
@@ -7261,6 +7269,8 @@ snapshots:
     optional: true
 
   '@types/unist@3.0.3': {}
+
+  '@upstash/kafka@1.3.5': {}
 
   '@upstash/redis@1.38.0':
     dependencies:
