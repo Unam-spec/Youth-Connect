@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
+import { WATERBERG_SCHOOLS, SA_UNIVERSITIES, NONE_SCHOOL } from "@/lib/schools";
 import {
   Dialog,
   DialogContent,
@@ -833,16 +834,9 @@ export default function MyDashboard() {
               </div>
               {showSchoolDropdown && (() => {
                 const query = promptSchool.toLowerCase();
-                const filteredWaterberg = [
-                  "Paresis Secondary",
-                  "Otjiwarongo Secondary",
-                  "Waterberg High",
-                  "Edugate Academy"
-                ].filter(s => s.toLowerCase().includes(query));
-                const filteredUni = [
-                  "UP", "UCT", "Wits", "Stellenbosch", "UJ", "UNISA", "DUT", "UKZN", "NWU", "UFS", "WSU", "MUT", "CUT", "UFH", "UWC", "RU", "SMU", "VUT", "TUT", "CPUT", "NMU"
-                ].filter(s => s.toLowerCase().includes(query));
-                const showNone = "None / Completed Schooling".toLowerCase().includes(query);
+                const filteredWaterberg = WATERBERG_SCHOOLS.filter(s => s.toLowerCase().includes(query));
+                const filteredUni = SA_UNIVERSITIES.filter(s => s.toLowerCase().includes(query));
+                const showNone = NONE_SCHOOL.toLowerCase().includes(query);
 
                 return (
                   <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-xl max-h-40 overflow-y-auto">
@@ -918,14 +912,7 @@ export default function MyDashboard() {
                       </div>
                     )}
 
-                    {promptSchool && ![
-                      "Paresis Secondary",
-                      "Otjiwarongo Secondary",
-                      "Waterberg High",
-                      "Edugate Academy",
-                      "UP", "UCT", "Wits", "Stellenbosch", "UJ", "UNISA", "DUT", "UKZN", "NWU", "UFS", "WSU", "MUT", "CUT", "UFH", "UWC", "RU", "SMU", "VUT", "TUT", "CPUT", "NMU",
-                      "None / Completed Schooling"
-                    ].includes(promptSchool) && (
+                    {promptSchool && ![...WATERBERG_SCHOOLS, ...SA_UNIVERSITIES, NONE_SCHOOL].includes(promptSchool) && (
                       <div
                         onClick={() => setShowSchoolDropdown(false)}
                         className="px-4 py-2 text-sm text-primary hover:bg-primary/10 cursor-pointer italic flex items-center gap-2"

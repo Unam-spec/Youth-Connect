@@ -14,6 +14,7 @@ import {
   CheckCircle,
   RefreshCw,
   Flame,
+  KeyRound,
 } from "lucide-react";
 import {
   BarChart,
@@ -50,6 +51,9 @@ interface AnalyticsData {
     at_risk_count: number;
     feedback_total: number;
     feedback_this_week: number;
+    no_email_accounts: number;
+    no_email_visitors: number;
+    no_email_members: number;
   };
   checkin_trends_weekly: { week: string; checkins: number }[];
   checkin_trends_monthly: { month: string; checkins: number }[];
@@ -379,6 +383,59 @@ export default function Analytics() {
             loading={loading}
           />
         </div>
+
+        {/* ── No-Email (PIN) Accounts ── */}
+        <Card className="border border-primary/20 bg-primary/5">
+          <CardContent className="p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-11 w-11 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                  <KeyRound className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">
+                    No-Email (PIN) Accounts
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Username + PIN sign-ups — no email needed
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-6 sm:gap-8 pl-14 sm:pl-0">
+                <div>
+                  {loading ? (
+                    <Skeleton className="h-8 w-12" />
+                  ) : (
+                    <div className="text-3xl font-bold tabular-nums text-foreground">
+                      {s?.no_email_accounts ?? 0}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">Total</p>
+                </div>
+                <div>
+                  {loading ? (
+                    <Skeleton className="h-7 w-10" />
+                  ) : (
+                    <div className="text-2xl font-semibold tabular-nums text-amber-500">
+                      {s?.no_email_visitors ?? 0}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">Awaiting promotion</p>
+                </div>
+                <div>
+                  {loading ? (
+                    <Skeleton className="h-7 w-10" />
+                  ) : (
+                    <div className="text-2xl font-semibold tabular-nums text-emerald-500">
+                      {s?.no_email_members ?? 0}
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-0.5">Promoted to member</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* ── Charts Row 1: Check-in Trends + Active vs Dormant ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

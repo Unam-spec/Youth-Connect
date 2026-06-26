@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
-import { eq, count, sql, desc, gte, inArray, and, lte } from "drizzle-orm";
+import { eq, count, sql, desc, gte, inArray, and, lte, isNotNull } from "drizzle-orm";
 import ExcelJS from "exceljs";
 import {
   db,
@@ -300,6 +300,22 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
     const activeMembers = Number(activeMembersRow?.count ?? 0);
     const dormantMembers = Math.max(0, totalMembers - activeMembers);
 
+    // ── 4b. No-email (PIN) accounts ──────────────────────────────────────
+    // PIN accounts are the username+PIN signups (no email); identified by a
+    // non-null username — the only flow that sets one. They start as visitors
+    // and a leader can promote them to member.
+    const [pinAccountsRow] = await db
+      .select({
+        total: count(),
+        visitors: sql<number>`count(*) filter (where ${profilesTable.role} = 'visitor')`,
+      })
+      .from(profilesTable)
+      .where(isNotNull(profilesTable.username));
+
+    const pinAccountsTotal = Number(pinAccountsRow?.total ?? 0);
+    const pinAccountsVisitors = Number(pinAccountsRow?.visitors ?? 0);
+    const pinAccountsMembers = Math.max(0, pinAccountsTotal - pinAccountsVisitors);
+
     // ── 5. At-risk members (haven't checked in for 2+ weeks) ─────────────
     const atRiskMembers = await db
       .select({
@@ -401,6 +417,9 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
         at_risk_count: atRiskMembers.length,
         feedback_total: Number(feedbackTotal?.count ?? 0),
         feedback_this_week: Number(feedbackThisWeek?.count ?? 0),
+        no_email_accounts: pinAccountsTotal,
+        no_email_visitors: pinAccountsVisitors,
+        no_email_members: pinAccountsMembers,
       },
       checkin_trends_weekly: checkinTrends.map((r) => ({
         week: r.week,

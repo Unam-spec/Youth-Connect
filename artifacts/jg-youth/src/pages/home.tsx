@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, KeyRound } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
 
@@ -52,20 +52,21 @@ function PublicHome() {
               </Button>
               <Button
                 size="lg"
+                variant="secondary"
+                className="w-full h-12 px-8 text-base font-semibold"
+                onClick={() => setLocation("/pin-signup")}
+              >
+                <KeyRound className="mr-2 h-5 w-5" />
+                No email? Register with a username
+              </Button>
+              <Button
+                size="lg"
                 variant="outline"
                 className="w-full h-12 px-8 text-base"
                 onClick={() => setLocation("/sign-in")}
               >
                 <LogIn className="mr-2 h-5 w-5" />
                 Login
-              </Button>
-              <Button
-                size="lg"
-                variant="ghost"
-                className="w-full h-12 px-8 text-base"
-                onClick={() => setLocation("/pin-signup")}
-              >
-                No email? Use a username
               </Button>
             </div>
           </div>

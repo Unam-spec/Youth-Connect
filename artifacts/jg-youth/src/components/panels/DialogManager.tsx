@@ -12,6 +12,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { QRCodeSVG } from "qrcode.react";
 import { User, GraduationCap, BookOpen, Check } from "lucide-react";
+import { SCHOOL_OPTIONS } from "@/lib/schools";
 
 export interface DialogManagerProps {
   showSessionQrCodeDialog: boolean;
@@ -174,14 +175,7 @@ export function DialogManager(props: DialogManagerProps) {
               </div>
               {props.editShowSchoolDropdown && (
                 <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-xl shadow-xl max-h-40 overflow-y-auto">
-                  {[
-                    "University of Namibia (UNAM)",
-                    "Namibia University of Science and Technology (NUST)",
-                    "International University of Management (IUM)",
-                    "Waterberg High School",
-                    "Windhoek High School",
-                    "None / Finished Schooling"
-                  ].filter(s => s.toLowerCase().includes(props.editSchool.toLowerCase())).map((schoolName) => (
+                  {SCHOOL_OPTIONS.filter(s => s.toLowerCase().includes(props.editSchool.toLowerCase())).map((schoolName) => (
                     <div
                       key={schoolName}
                       onClick={() => {
@@ -197,14 +191,7 @@ export function DialogManager(props: DialogManagerProps) {
                       {props.editSchool === schoolName && <Check className="w-3.5 h-3.5 text-primary" />}
                     </div>
                   ))}
-                  {props.editSchool && ![
-                    "University of Namibia (UNAM)",
-                    "Namibia University of Science and Technology (NUST)",
-                    "International University of Management (IUM)",
-                    "Waterberg High School",
-                    "Windhoek High School",
-                    "None / Finished Schooling"
-                  ].includes(props.editSchool) && (
+                  {props.editSchool && !SCHOOL_OPTIONS.includes(props.editSchool) && (
                     <div
                       onClick={() => props.setEditShowSchoolDropdown(false)}
                       className="px-4 py-2 text-sm text-primary hover:bg-primary/10 cursor-pointer italic flex items-center gap-2"

@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/card";
 import { AlertCircle, CheckCircle2, ChevronLeft, GraduationCap, Check, BookOpen, User, XCircle, ArrowRight } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
+import { WATERBERG_SCHOOLS, SA_UNIVERSITIES, NONE_SCHOOL } from "@/lib/schools";
 
 // ─── Client-side validation schema ────────────────────────────────────────────
 const registerSchema = z.object({
@@ -55,20 +56,6 @@ const registerSchema = z.object({
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
-
-const WATERBERG_SCHOOLS = [
-  "Paresis Secondary",
-  "Otjiwarongo Secondary",
-  "Waterberg High",
-  "Edugate Academy"
-];
-
-const SA_UNIVERSITIES = [
-  "UP", "UCT", "Wits", "Stellenbosch", "UJ", "UNISA", "DUT", "UKZN", "NWU", 
-  "UFS", "WSU", "MUT", "CUT", "UFH", "UWC", "RU", "SMU", "VUT", "TUT", "CPUT", "NMU"
-];
-
-const NONE_SCHOOL = "None / Completed Schooling";
 
 export default function Register() {
   const [isSuccess, setIsSuccess] = useState(false);
