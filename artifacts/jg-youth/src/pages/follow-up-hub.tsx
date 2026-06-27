@@ -268,8 +268,8 @@ export default function FollowUpHub() {
           <TabsContent value="re-engagement" className="space-y-6 outline-none">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Absence Follow-ups</h2>
-                <p className="text-sm text-muted-foreground">Generated queue of members who have been absent for 2+ weeks.</p>
+                <h2 className="text-lg font-semibold">Follow-ups & Reminders</h2>
+                <p className="text-sm text-muted-foreground">Generated queue of members absent for 2+ weeks, plus check-in reminders.</p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <Button

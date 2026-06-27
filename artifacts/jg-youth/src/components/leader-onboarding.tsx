@@ -72,7 +72,7 @@ export function LeaderOnboarding() {
           popover: {
             title: "Follow-ups",
             description:
-              "Send automated WhatsApp messages to members who haven't attended in a while.",
+              "Send automated check-in reminders and WhatsApp follow-up messages to members.",
             side: "right",
             align: "start",
           },
