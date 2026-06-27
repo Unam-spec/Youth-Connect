@@ -187,9 +187,22 @@ export default function MyDashboard() {
     }
   }, [profile, feedbackSettings, myAttendance]);
 
-  // First-time onboarding tour: starts once the feedback modal isn't in the way.
+  // First-time onboarding tour: deferred until (a) the feedback modal isn't in the
+  // way and (b) the member has actually submitted their core profile info to the
+  // DB. New accounts land here with a half-filled profile and get the
+  // profile-completion prompt first; firing the tour over that prompt is the
+  // "onboarding gets in the way of registration" bug. We gate on the persisted
+  // profile (phone + real name) rather than the prompt's local state so the tour
+  // starts on the next render after the save round-trips and `profile` refreshes.
   useEffect(() => {
     if (!profile || feedbackOpen) return;
+    const profileIncomplete =
+      !profile.phone ||
+      !profile.full_name ||
+      profile.full_name === "New Member" ||
+      !profile.avatar_url ||
+      profile.avatar_url.startsWith("gradient:");
+    if (profileIncomplete) return;
     if (localStorage.getItem("jg_tour_completed")) return;
     const t = setTimeout(() => setTourOpen(true), 600);
     return () => clearTimeout(t);
@@ -280,9 +293,11 @@ export default function MyDashboard() {
   const needsPhone = profileLoaded && !profile!.phone;
   const needsName = profileLoaded && (!profile!.full_name || profile!.full_name === "New Member");
   const needsSchoolOrParent = profileLoaded && (!profile!.school || !profile!.parent_phone || !(profile as any).parent_name);
+  // Profile picture is compulsory — gradient-only backgrounds don't count as a real photo.
+  const needsAvatar = profileLoaded && (!profile!.avatar_url || profile!.avatar_url.startsWith("gradient:"));
   
   // Prompt existing members if missing school/parent_phone, unless they dismissed it in this session
-  const shouldPrompt = needsPhone || needsName || (needsSchoolOrParent && !localStorage.getItem("dismissed_school_prompt"));
+  const shouldPrompt = needsPhone || needsName || needsAvatar || (needsSchoolOrParent && !localStorage.getItem("dismissed_school_prompt"));
 
   // Open prompt once when profile loads and is incomplete
   if (profileLoaded && shouldPrompt && !showProfilePrompt && promptPhone === "" && promptName === "") {
@@ -972,6 +987,26 @@ export default function MyDashboard() {
                 </p>
               </div>
             </div>
+
+            {/* Profile picture required notice */}
+            {needsAvatar && (
+              <div className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 shadow-xs">
+                <span className="text-2xl">📸</span>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-amber-400">Profile picture required</p>
+                  <p className="text-[10px] text-amber-400/70 mt-0.5">Please upload a clear photo of your face so we can recognise you.</p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl text-xs border-amber-500/30 hover:bg-amber-500/10"
+                  onClick={() => setShowAvatarDialog(true)}
+                >
+                  Upload
+                </Button>
+              </div>
+            )}
           </div>
           <DialogFooter className="flex gap-2">
             {needsSchoolOrParent && !needsPhone && !needsName && (
@@ -1003,8 +1038,12 @@ export default function MyDashboard() {
           <DialogHeader>
             <DialogTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Update Profile Picture</DialogTitle>
             <DialogDescription>
-              Choose a stunning custom background gradient preset, upload your own photo, or take a live picture.
+              Upload a clear picture of your face so leaders and members can recognise you. Take a selfie or upload a photo — it must be you!
             </DialogDescription>
+            <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+              <span className="text-amber-500 text-sm">📸</span>
+              <p className="text-xs text-amber-400 font-medium">A profile picture is required. Please use a photo that is recognisable as you.</p>
+            </div>
           </DialogHeader>
 
           <div className="space-y-6 py-4">

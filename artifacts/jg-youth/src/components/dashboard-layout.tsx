@@ -86,8 +86,8 @@ function useNavItems(): NavItem[] {
     },
     {
       key: "follow-ups",
-      label: "Follow-ups",
-      icon: UserMinus,
+      label: "Messaging",
+      icon: MessageSquare,
       href: "/dashboard/follow-ups",
       visible: true,
     },

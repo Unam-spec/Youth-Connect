@@ -781,12 +781,20 @@ export default function Dashboard() {
 
   async function handleSetLeaderPin() {
     if (!settingPinFor || leaderPinInput.length !== 4) return;
+
+    // Pre-open the window before the async fetch to bypass popup blockers
+    let waWindow: Window | null = null;
+    if (settingPinFor.phone) {
+      waWindow = window.open("", "_blank");
+    }
+
     try {
       const res = await apiFetch(`/api/leaders/${settingPinFor.id}/set-pin`, {
         method: "POST",
         body: JSON.stringify({ pin: leaderPinInput }),
       });
       if (!res.ok) {
+        if (waWindow) waWindow.close();
         const err = await res.json();
         toast({
           title: "Failed to set PIN",
@@ -796,10 +804,18 @@ export default function Dashboard() {
         return;
       }
       toast({ title: `PIN set for ${settingPinFor.full_name}` });
+      
+      if (waWindow && settingPinFor.phone) {
+        const message = `Hi ${settingPinFor.full_name.split(" ")[0]}, your leader PIN for JG Youth Connect has been set to: ${leaderPinInput}. Please use this PIN to log in to the Leader Dashboard.`;
+        const phone = settingPinFor.phone.replace(/\D/g, "");
+        waWindow.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+      }
+
       setSettingPinFor(null);
       setLeaderPinInput("");
       fetchLeaderPins();
     } catch {
+      if (waWindow) waWindow.close();
       toast({ title: "Failed to set PIN", variant: "destructive" });
     }
   }

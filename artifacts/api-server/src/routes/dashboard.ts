@@ -135,40 +135,48 @@ router.get("/dashboard/recent-activity", async (req, res) => {
     }
     const limit = parseInt(String(req.query.limit ?? "20"));
 
-    const checkIns = await db
-      .select({
-        id: attendanceTable.id,
-        name: profilesTable.full_name,
-        timestamp: attendanceTable.checked_in_at,
-        method: attendanceTable.check_in_method,
-      })
-      .from(attendanceTable)
-      .leftJoin(profilesTable, eq(attendanceTable.profile_id, profilesTable.id))
-      .orderBy(desc(attendanceTable.checked_in_at))
-      .limit(Math.ceil(limit / 3));
+    // Check Redis cache first (30s TTL — activity doesn't need to be real-time)
+    const cacheKey = `dashboard:recent-activity:${limit}`;
+    const cached = await getCache<unknown[]>(cacheKey);
+    if (cached) return res.json(cached);
 
-    const registrations = await db
-      .select({
-        id: profilesTable.id,
-        name: profilesTable.full_name,
-        timestamp: profilesTable.created_at,
-        role: profilesTable.role,
-      })
-      .from(profilesTable)
-      .orderBy(desc(profilesTable.created_at))
-      .limit(Math.ceil(limit / 3));
+    // Run all 3 queries in parallel instead of sequentially (~3x faster)
+    const [checkIns, registrations, memberRequests] = await Promise.all([
+      db
+        .select({
+          id: attendanceTable.id,
+          name: profilesTable.full_name,
+          timestamp: attendanceTable.checked_in_at,
+          method: attendanceTable.check_in_method,
+        })
+        .from(attendanceTable)
+        .leftJoin(profilesTable, eq(attendanceTable.profile_id, profilesTable.id))
+        .orderBy(desc(attendanceTable.checked_in_at))
+        .limit(Math.ceil(limit / 3)),
 
-    const memberRequests = await db
-      .select({
-        id: membershipRequestsTable.id,
-        name: profilesTable.full_name,
-        timestamp: membershipRequestsTable.created_at,
-        status: membershipRequestsTable.status,
-      })
-      .from(membershipRequestsTable)
-      .leftJoin(profilesTable, eq(membershipRequestsTable.profile_id, profilesTable.id))
-      .orderBy(desc(membershipRequestsTable.created_at))
-      .limit(Math.ceil(limit / 3));
+      db
+        .select({
+          id: profilesTable.id,
+          name: profilesTable.full_name,
+          timestamp: profilesTable.created_at,
+          role: profilesTable.role,
+        })
+        .from(profilesTable)
+        .orderBy(desc(profilesTable.created_at))
+        .limit(Math.ceil(limit / 3)),
+
+      db
+        .select({
+          id: membershipRequestsTable.id,
+          name: profilesTable.full_name,
+          timestamp: membershipRequestsTable.created_at,
+          status: membershipRequestsTable.status,
+        })
+        .from(membershipRequestsTable)
+        .leftJoin(profilesTable, eq(membershipRequestsTable.profile_id, profilesTable.id))
+        .orderBy(desc(membershipRequestsTable.created_at))
+        .limit(Math.ceil(limit / 3)),
+    ]);
 
     const activity = [
       ...checkIns.map((r) => ({
@@ -192,6 +200,8 @@ router.get("/dashboard/recent-activity", async (req, res) => {
     ]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, limit);
+
+    await setCache(cacheKey, activity, 30); // 30s TTL
 
     return res.json(activity);
   } catch (err) {

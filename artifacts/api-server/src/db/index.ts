@@ -56,6 +56,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS "profiles_username_unique"
 -- enum the ORM schema declares).
 ALTER TABLE "attendance" ADD COLUMN IF NOT EXISTS "type" text NOT NULL DEFAULT 'member';
 
+-- Ensure check_in_requests.check_in_method exists (2026-06). Without it the member's
+-- method (qr vs self) is lost before a leader approves, so every approved attendance
+-- was hardcoded 'qr'. Stored as text (matching the enum-as-text convention prod uses
+-- for check_in_requests.type) so the leader-approval path can carry the real method.
+ALTER TABLE "check_in_requests" ADD COLUMN IF NOT EXISTS "check_in_method" text NOT NULL DEFAULT 'self';
+
 -- Ensure pending_emails table exists
 CREATE TABLE IF NOT EXISTS "pending_emails" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -77,6 +83,16 @@ DROP INDEX IF EXISTS idx_super_admin_limit;
 CREATE INDEX IF NOT EXISTS idx_profiles_clerk_id ON profiles (clerk_id);
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON profiles (email);
 CREATE INDEX IF NOT EXISTS idx_profiles_phone ON profiles (phone);
+
+-- Performance indexes (2026-06): speed up the most common manage-side queries.
+-- profiles.role: every leader list, member directory, and KPI count query filters by role.
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles (role);
+-- attendance.session_date: every check-in, dashboard KPI, and attendance history query.
+CREATE INDEX IF NOT EXISTS idx_attendance_session_date ON attendance (session_date);
+-- attendance.profile_id: follow-up queue, per-member attendance lookups.
+CREATE INDEX IF NOT EXISTS idx_attendance_profile_id ON attendance (profile_id);
+-- membership_requests.status: pending requests list on the manage dashboard.
+CREATE INDEX IF NOT EXISTS idx_membership_requests_status ON membership_requests (status);
 
 -- Configurable check-in schedule (added 2026-06): single-row settings + per-weekday windows.
 CREATE TABLE IF NOT EXISTS "checkin_settings" (

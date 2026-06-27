@@ -10,7 +10,6 @@ import {
   followUpQueueTable,
 } from "@workspace/db";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
-import { applyTemplateVars, sendWhatsAppFromTemplate } from "../lib/twilio";
 import { generateFollowUpQueue } from "../jobs/followUpGenerator";
 
 const router = Router();
@@ -110,83 +109,74 @@ router.get(
   },
 );
 
-// ── POST /whatsapp/send ─────────────────────────────────────────────────────────
-const SendBody = z.object({
-  user_id: z.string().uuid(),
-  leader_id: z.string().uuid(),
-  weeks_absent: z.number().int().nonnegative().optional(),
-});
-
-router.post(
-  "/whatsapp/send",
+// ── GET /whatsapp/pending-checkins ────────────────────────────────────────────
+// Returns members who haven't checked in yet today
+router.get(
+  "/whatsapp/pending-checkins",
   requireLeaderSession("leader"),
   async (req: Request, res: Response) => {
     try {
-      const parsed = SendBody.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ error: parsed.error.flatten() });
-      }
-      const { user_id, leader_id } = parsed.data;
+      const today = new Date().toISOString().split("T")[0];
 
-      const [user, leader] = await Promise.all([
-        db.query.profilesTable.findFirst({ where: eq(profilesTable.id, user_id) }),
-        db.query.profilesTable.findFirst({ where: eq(profilesTable.id, leader_id) }),
-      ]);
-      if (!user) return res.status(404).json({ error: "User not found" });
-      if (!leader) return res.status(404).json({ error: "Leader not found" });
-      if (!user.phone) {
-        return res.status(400).json({ error: "User has no phone number on file" });
-      }
+      // Members who have opted into WhatsApp and have a phone number,
+      // but do NOT have an attendance record for today.
+      const rows = await db
+        .select({
+          id: profilesTable.id,
+          full_name: profilesTable.full_name,
+          phone: profilesTable.phone,
+        })
+        .from(profilesTable)
+        .leftJoin(
+          attendanceTable,
+          and(
+            eq(profilesTable.id, attendanceTable.profile_id),
+            eq(attendanceTable.session_date, today),
+          ),
+        )
+        .where(
+          and(
+            inArray(profilesTable.role, ["member", "visitor"]),
+            eq(profilesTable.whatsapp_opt_in, true),
+            sql`btrim(${profilesTable.phone}) <> ''`,
+            sql`${attendanceTable.id} IS NULL`, // No check-in today
+          ),
+        );
 
-      let weeks = parsed.data.weeks_absent ?? null;
-      if (weeks == null) {
-        const [att] = await db
-          .select({
-            weeks: sql<number | null>`floor((current_date - max(${attendanceTable.session_date}::date)) / 7)::int`,
-          })
-          .from(attendanceTable)
-          .where(eq(attendanceTable.profile_id, user_id));
-        weeks = att?.weeks == null ? null : Number(att.weeks);
-      }
-
-      const stage = stageFor(weeks);
-      if (!stage) {
-        return res.status(400).json({
-          error:
-            "Could not determine a follow-up stage (user is not 2+ weeks absent, or has no check-in history). Pass weeks_absent to override.",
-        });
-      }
-
-      const template = await db.query.whatsappTemplatesTable.findFirst({
-        where: and(
-          eq(whatsappTemplatesTable.template_type, "follow_up"),
-          eq(whatsappTemplatesTable.stage_weeks, stage),
-        ),
-      });
-      if (!template) {
-        return res.status(404).json({
-          error: `No 'follow_up' template configured for ${stage} weeks absent`,
-        });
-      }
-
-      const vars = {
-        User: firstName(user.full_name),
-        Leader: leader.full_name,
-      };
-      const sid = await sendWhatsAppFromTemplate({ to: user.phone, template, vars });
-
-      return res.json({
-        sent: true,
-        sid,
-        to: user.phone,
-        stage_weeks: stage,
-        weeks_absent: weeks,
-        message: applyTemplateVars(template.message_text, vars),
-      });
+      return res.json(rows);
     } catch (err) {
       req.log.error(err);
-      const msg = err instanceof Error ? err.message : "Failed to send WhatsApp message";
-      return res.status(502).json({ error: msg });
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// ── GET /whatsapp/event-recipients ────────────────────────────────────────────
+// Returns opted-in members to broadcast an event to.
+router.get(
+  "/whatsapp/event-recipients",
+  requireLeaderSession("leader"),
+  async (req: Request, res: Response) => {
+    try {
+      const rows = await db
+        .select({
+          id: profilesTable.id,
+          full_name: profilesTable.full_name,
+          phone: profilesTable.phone,
+        })
+        .from(profilesTable)
+        .where(
+          and(
+            eq(profilesTable.whatsapp_opt_in, true),
+            sql`btrim(${profilesTable.phone}) <> ''`,
+            inArray(profilesTable.role, ["member", "visitor"]),
+          ),
+        );
+
+      return res.json(rows);
+    } catch (err) {
+      req.log.error(err);
+      return res.status(500).json({ error: "Internal server error" });
     }
   },
 );

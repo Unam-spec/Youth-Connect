@@ -218,6 +218,7 @@ export const checkInRequestsTable = pgTable("check_in_requests", {
   type: checkInRequestTypeEnum("type").notNull().default("member"),
   session_date: date("session_date").notNull(),
   status: checkInRequestStatusEnum("status").notNull().default("pending"),
+  check_in_method: checkInMethodEnum("check_in_method").notNull().default("self"),
   requested_at: timestamp("requested_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

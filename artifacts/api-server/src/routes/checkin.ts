@@ -222,6 +222,10 @@ router.post("/checkin/requests", async (req, res) => {
       });
     }
 
+    // Determine method: if a sessionSlug (QR code) was scanned → "qr",
+    // otherwise the member found themselves via search → "self".
+    const method = sessionSlug ? "qr" : "self";
+
     const [request] = await db
       .insert(checkInRequestsTable)
       .values({
@@ -229,6 +233,7 @@ router.post("/checkin/requests", async (req, res) => {
         session_date: today,
         status: "pending",
         type: "member",
+        check_in_method: method,
       })
       .returning();
 
@@ -335,10 +340,13 @@ router.patch("/checkin/requests/:id/approve", requireLeaderSession("leader"), as
         .json({ error: "Request has already been processed." });
     }
 
+    // Carry over the real method the member used when they created the request
+    // instead of hardcoding 'qr' for every approval.
+    const method = (request as any).check_in_method ?? "self";
     await db.insert(attendanceTable).values({
       profile_id: request.profile_id ?? undefined,
       session_date: request.session_date,
-      check_in_method: "qr",
+      check_in_method: method,
       type: request.type,
     });
 
@@ -355,7 +363,7 @@ router.patch("/checkin/requests/:id/approve", requireLeaderSession("leader"), as
           type: "check_in",
           profile_id: checkedInProfile.id,
           profile_name: checkedInProfile.full_name,
-          metadata: { method: "qr", role: checkedInProfile.role },
+          metadata: { method, role: checkedInProfile.role },
         });
       }
     }

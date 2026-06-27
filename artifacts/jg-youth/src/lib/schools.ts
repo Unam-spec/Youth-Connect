@@ -8,14 +8,24 @@
 // The forms always allow a free-typed custom school, so this list only needs to
 // cover the common cases, not every school in the district.
 
+// High schools in / around the Waterberg District (Limpopo). These are the
+// primary suggestions — most of our youth attend one of these. Forms still allow
+// a free-typed custom school, so this only needs to cover the common cases.
 export const WATERBERG_SCHOOLS = [
+  "MSTS",
+  "Waterberg Academy",
   "Hoërskool Ellisras",
   "Hoërskool Frikkie Meyer",
+  "Hoërskool Nylstroom",
+  "Hoërskool Bela-Bela",
+  "Hoërskool Piet Potgieter",
 ];
 
+// Kept short and locally relevant — the audience is mostly high-schoolers, so we
+// only surface the tertiary institutions our older youth actually attend rather
+// than the full national list. Custom entries remain possible.
 export const SA_UNIVERSITIES = [
-  "UP", "UCT", "Wits", "Stellenbosch", "UJ", "UNISA", "DUT", "UKZN", "NWU",
-  "UFS", "WSU", "MUT", "CUT", "UFH", "UWC", "RU", "SMU", "VUT", "TUT", "CPUT", "NMU",
+  "University of Limpopo", "TUT", "UNISA", "UP",
 ];
 
 export const NONE_SCHOOL = "None / Completed Schooling";

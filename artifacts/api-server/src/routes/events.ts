@@ -10,7 +10,6 @@ import {
 } from "@workspace/db";
 import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
-import { sendEventCreationBroadcast } from "../lib/eventWhatsappBroadcast";
 
 const router = Router();
 
@@ -89,18 +88,7 @@ router.post("/events", requireLeaderSession("leader"), async (req: Request, res:
       })
       .returning();
 
-    // Fire-and-forget WhatsApp broadcast to opted-in members. Deliberately not
-    // awaited — a messaging hiccup must never block or fail event creation; the
-    // helper logs its own success/failure summary.
-    if (event.is_public) {
-      void sendEventCreationBroadcast({
-        id: event.id,
-        title: event.title,
-        date: event.date,
-        time: event.time,
-        location: event.location,
-      });
-    }
+    // (WhatsApp broadcast removed: now handled manually via the frontend Messaging Hub)
 
     // Queue email notifications for new public events
     if (event.is_public) {

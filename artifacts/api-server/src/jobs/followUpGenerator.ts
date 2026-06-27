@@ -17,7 +17,13 @@ import {
   whatsappAutomationSettingsTable,
   followUpQueueTable,
 } from "@workspace/db";
-import { applyTemplateVars } from "../lib/twilio";
+function applyTemplateVars(text: string, vars: Record<string, string>): string {
+  let result = text;
+  for (const [k, v] of Object.entries(vars)) {
+    result = result.replace(new RegExp(`{{${k}}}`, "g"), v);
+  }
+  return result;
+}
 import { logger } from "../lib/logger";
 
 const STAGES = [2, 4, 6, 8] as const;

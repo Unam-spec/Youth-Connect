@@ -10,7 +10,6 @@ import {
 } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { deleteProfileCascade } from "../lib/deleteProfileCascade";
-import { sendWhatsApp, isTwilioConfigured } from "../lib/twilio";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -73,17 +72,6 @@ router.post("/leaders", requireLeaderSession("super_admin"), async (req, res) =>
       .returning();
       
     const profile = await db.query.profilesTable.findFirst({ where: eq(profilesTable.id, profile_id) });
-
-    if (profile?.phone && isTwilioConfigured) {
-      try {
-        await sendWhatsApp({
-          to: profile.phone,
-          body: `🎉 Congratulations ${profile.full_name}!\n\nYou've been promoted to *Leader* at JG Youth Connect.\n\nYour dashboard PIN is: *${pin}*\n\nUse this PIN to log in at the Leader Dashboard. Please keep it safe and change it once you're logged in.\n\n— Jeremiah Generation Youth Team`,
-        });
-      } catch (waErr) {
-        logger.warn({ err: waErr, profileId: profile_id }, "Failed to send leader promotion WhatsApp");
-      }
-    }
 
     return res.status(201).json({ ...permissions, profile });
   } catch (err) {
@@ -277,17 +265,6 @@ router.post("/leaders/:id/set-pin", requireLeaderSession("super_admin"), async (
       .set({ pin_hash: pinHash })
       .where(eq(profilesTable.id, profile.id));
 
-    if (profile.phone && isTwilioConfigured) {
-      try {
-        await sendWhatsApp({
-          to: profile.phone,
-          body: `Hi ${profile.full_name},\n\nYour JG Youth Connect leader PIN has been updated.\n\nYour new PIN is: *${pin}*\n\nIf you did not request this change, please contact a super administrator immediately.\n\n— Jeremiah Generation Youth Team`,
-        });
-      } catch (waErr) {
-        logger.warn({ err: waErr, profileId: profile.id }, "Failed to send set-pin WhatsApp");
-      }
-    }
-
     return res.json({ success: true });
   } catch (err) {
     req.log.error(err);
@@ -330,17 +307,6 @@ router.post("/leaders/:id/reset-pin", requireLeaderSession("super_admin"), async
         subject: "Youth Connect — Secure PIN Reset",
         body_html: emailBody,
       });
-    }
-
-    if (profile.phone && isTwilioConfigured) {
-      try {
-        await sendWhatsApp({
-          to: profile.phone,
-          body: `Hi ${profile.full_name},\n\nA super administrator has reset your JG Youth Connect leader PIN.\n\nYour temporary PIN is: *${rawPin}*\n\nPlease log in and change it immediately.\n\n— Jeremiah Generation Youth Team`,
-        });
-      } catch (waErr) {
-        logger.warn({ err: waErr, profileId: profile.id }, "Failed to send reset-pin WhatsApp");
-      }
     }
 
     return res.json({ success: true });
