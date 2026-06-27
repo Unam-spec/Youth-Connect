@@ -109,48 +109,6 @@ router.get(
   },
 );
 
-// ── GET /whatsapp/pending-checkins ────────────────────────────────────────────
-// Returns members who haven't checked in yet today
-router.get(
-  "/whatsapp/pending-checkins",
-  requireLeaderSession("leader"),
-  async (req: Request, res: Response) => {
-    try {
-      const today = new Date().toISOString().split("T")[0];
-
-      // Members who have opted into WhatsApp and have a phone number,
-      // but do NOT have an attendance record for today.
-      const rows = await db
-        .select({
-          id: profilesTable.id,
-          full_name: profilesTable.full_name,
-          phone: profilesTable.phone,
-        })
-        .from(profilesTable)
-        .leftJoin(
-          attendanceTable,
-          and(
-            eq(profilesTable.id, attendanceTable.profile_id),
-            eq(attendanceTable.session_date, today),
-          ),
-        )
-        .where(
-          and(
-            inArray(profilesTable.role, ["member", "visitor"]),
-            eq(profilesTable.whatsapp_opt_in, true),
-            sql`btrim(${profilesTable.phone}) <> ''`,
-            sql`${attendanceTable.id} IS NULL`, // No check-in today
-          ),
-        );
-
-      return res.json(rows);
-    } catch (err) {
-      req.log.error(err);
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  },
-);
-
 // ── GET /whatsapp/event-recipients ────────────────────────────────────────────
 // Returns opted-in members to broadcast an event to.
 router.get(

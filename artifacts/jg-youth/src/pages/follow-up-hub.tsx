@@ -65,7 +65,6 @@ interface EventSummary {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const QUEUE_KEY = ["follow-up-queue"];
 const SETTINGS_KEY = ["automation-settings"];
-const PENDING_CHECKINS_KEY = ["pending-checkins"];
 const EVENT_RECIPIENTS_KEY = ["event-recipients"];
 const UPCOMING_EVENTS_KEY = ["upcoming-events"];
 
@@ -112,16 +111,6 @@ export default function FollowUpHub() {
     queryFn: async () => {
       const res = await apiFetch("/api/whatsapp/automation-settings");
       if (!res.ok) throw new Error("Failed to load settings");
-      return res.json();
-    },
-    enabled: !!session,
-  });
-
-  const { data: pendingCheckins, isLoading: pendingCheckinsLoading } = useQuery<ProfileSummary[]>({
-    queryKey: PENDING_CHECKINS_KEY,
-    queryFn: async () => {
-      const res = await apiFetch("/api/whatsapp/pending-checkins");
-      if (!res.ok) throw new Error("Failed to load pending checkins");
       return res.json();
     },
     enabled: !!session,
@@ -264,14 +253,10 @@ export default function FollowUpHub() {
         </div>
 
         <Tabs defaultValue="re-engagement" className="w-full">
-          <TabsList className="mb-6 grid w-full grid-cols-3 rounded-xl bg-muted/50 p-1">
+          <TabsList className="mb-6 grid w-full grid-cols-2 rounded-xl bg-muted/50 p-1">
             <TabsTrigger value="re-engagement" className="rounded-lg">
               <UserMinus className="mr-2 h-4 w-4" />
-              Re-engagement
-            </TabsTrigger>
-            <TabsTrigger value="checkins" className="rounded-lg">
-              <BellRing className="mr-2 h-4 w-4" />
-              Check-in Reminders
+              Re-engagement & Check-ins
             </TabsTrigger>
             <TabsTrigger value="events" className="rounded-lg">
               <CalendarDays className="mr-2 h-4 w-4" />
@@ -446,7 +431,10 @@ export default function FollowUpHub() {
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {pendingEntries.map((entry) => {
-                    const color = STAGE_COLORS[entry.stage_weeks] ?? "#EF4444";
+                    const isCheckinReminder = entry.stage_weeks === 0;
+                    const color = isCheckinReminder ? "#3B82F6" : (STAGE_COLORS[entry.stage_weeks] ?? "#EF4444");
+                    const badgeText = isCheckinReminder ? "Check-in Reminder" : `${entry.weeks_absent}w absent`;
+
                     return (
                       <div
                         key={entry.id}
@@ -462,7 +450,7 @@ export default function FollowUpHub() {
                             className="rounded-full px-2 py-0.5 text-[11px] font-semibold"
                             style={{ backgroundColor: `${color}22`, color }}
                           >
-                            {entry.weeks_absent}w absent
+                            {badgeText}
                           </span>
                         </div>
 
@@ -548,75 +536,12 @@ export default function FollowUpHub() {
                           {entry.full_name}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {entry.stage_weeks}w stage
+                          {entry.stage_weeks === 0 ? "Check-in Reminder" : `${entry.stage_weeks}w stage`}
                         </p>
                       </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* ── Tab 2: Check-in Reminders ────────────────────────────────────── */}
-          <TabsContent value="checkins" className="space-y-6 outline-none">
-            <div>
-              <h2 className="text-lg font-semibold">Today's Check-in Reminders</h2>
-              <p className="text-sm text-muted-foreground">Members who have opted in but haven't checked in today yet.</p>
-            </div>
-
-            {pendingCheckinsLoading ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <Skeleton key={i} className="h-28 w-full rounded-2xl" />
-                ))}
-              </div>
-            ) : pendingCheckins && pendingCheckins.length > 0 ? (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {pendingCheckins.map((member) => (
-                  <div
-                    key={member.id}
-                    className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-foreground">
-                        {member.full_name}
-                      </p>
-                      <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Phone className="h-3 w-3" />
-                        {member.phone || "no phone"}
-                      </p>
-                    </div>
-
-                    <div className="mt-auto pt-2">
-                      <Button
-                        size="sm"
-                        className="w-full rounded-xl text-xs"
-                        onClick={() => {
-                          if (!member.phone) {
-                            toast.error("No phone number for this member");
-                            return;
-                          }
-                          const msg = `Hi ${member.full_name.split(" ")[0]}, we noticed you haven't checked in yet for today's session. Please let us know if you'll be joining us! — JG Youth Team`;
-                          window.open(getWaMeLink(member.phone, msg), "_blank");
-                        }}
-                      >
-                        <Send className="mr-2 h-3 w-3" />
-                        Send Reminder
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center">
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10">
-                  <Check className="h-6 w-6 text-emerald-600" />
-                </div>
-                <h2 className="text-lg font-semibold text-foreground">All checked in!</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Every opted-in member has checked in today.
-                </p>
               </div>
             )}
           </TabsContent>

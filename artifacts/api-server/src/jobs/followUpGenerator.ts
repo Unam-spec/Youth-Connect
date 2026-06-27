@@ -16,6 +16,7 @@ import {
   whatsappTemplatesTable,
   whatsappAutomationSettingsTable,
   followUpQueueTable,
+  checkinWindowsTable,
 } from "@workspace/db";
 function applyTemplateVars(text: string, vars: Record<string, string>): string {
   let result = text;
@@ -66,6 +67,84 @@ function getSastNow(): { dayOfWeek: number; hhmm: string } {
 
 /** Has the cron already fired in the current window? Prevents duplicates. */
 let lastFiredDate: string | null = null;
+let lastCheckinFiredDate: string | null = null;
+
+export async function generateCheckinReminders(): Promise<number> {
+  const today = new Date().toISOString().split("T")[0];
+
+  // Members who have opted into WhatsApp and have a phone number,
+  // but do NOT have an attendance record for today.
+  const overdueMembers = await db
+    .select({
+      id: profilesTable.id,
+      full_name: profilesTable.full_name,
+      phone: profilesTable.phone,
+    })
+    .from(profilesTable)
+    .leftJoin(
+      attendanceTable,
+      and(
+        eq(profilesTable.id, attendanceTable.profile_id),
+        eq(attendanceTable.session_date, today),
+      ),
+    )
+    .where(
+      and(
+        inArray(profilesTable.role, ["member", "visitor"]),
+        eq(profilesTable.whatsapp_opt_in, true),
+        sql`btrim(${profilesTable.phone}) <> ''`,
+        sql`${attendanceTable.id} IS NULL`, // No check-in today
+      ),
+    );
+
+  if (overdueMembers.length === 0) return 0;
+
+  // Check which profiles already have a check-in reminder (stage_weeks: 0) generated today
+  const existingPending = await db
+    .select({ profile_id: followUpQueueTable.profile_id })
+    .from(followUpQueueTable)
+    .where(
+      and(
+        eq(followUpQueueTable.stage_weeks, 0),
+        sql`${followUpQueueTable.created_at}::date = current_date`,
+      ),
+    );
+  
+  const existingSet = new Set(existingPending.map((e) => e.profile_id));
+
+  const inserts: {
+    profile_id: string;
+    stage_weeks: number;
+    weeks_absent: number;
+    message_preview: string;
+    template_id: string | null;
+    status: "pending";
+  }[] = [];
+
+  for (const row of overdueMembers) {
+    if (existingSet.has(row.id)) continue;
+    
+    inserts.push({
+      profile_id: row.id,
+      stage_weeks: 0,
+      weeks_absent: 0,
+      message_preview: `Hi ${firstName(row.full_name)}, don't forget to check in for JG Youth tonight!`,
+      template_id: null,
+      status: "pending",
+    });
+  }
+
+  if (inserts.length === 0) return 0;
+
+  await db.insert(followUpQueueTable).values(inserts);
+
+  logger.info(
+    { count: inserts.length },
+    "[followUpGenerator] Queued check-in reminders for leader review",
+  );
+
+  return inserts.length;
+}
 
 export async function generateFollowUpQueue(): Promise<number> {
   // 1. Read automation settings
@@ -203,31 +282,55 @@ let intervalId: NodeJS.Timeout | null = null;
 /** Called every 60s. Checks if we're inside the configured automation window. */
 async function tick() {
   try {
+    const { dayOfWeek, hhmm } = getSastNow();
+    const today = new Date().toISOString().split("T")[0];
+    const [nowH, nowM] = hhmm.split(":").map(Number);
+    const nowTotal = nowH * 60 + nowM;
+
+    // --- 1. Weekly Follow-Ups (2/4/6/8 weeks) ---
     const [settings] = await db
       .select()
       .from(whatsappAutomationSettingsTable)
       .limit(1);
-    if (!settings || !settings.enabled) return;
+      
+    if (settings && settings.enabled && settings.day_of_week === dayOfWeek) {
+      const [configH, configM] = settings.time.split(":").map(Number);
+      const configTotal = configH * 60 + configM;
+      
+      if (Math.abs(nowTotal - configTotal) <= 2 && lastFiredDate !== today) {
+        lastFiredDate = today;
+        logger.info("[followUpGenerator] Follow-up automation window hit — generating queue…");
+        const count = await generateFollowUpQueue();
+        logger.info({ count }, "[followUpGenerator] Follow-up queue generation complete");
+      }
+    }
 
-    const { dayOfWeek, hhmm } = getSastNow();
-    const today = new Date().toISOString().split("T")[0];
+    // --- 2. Check-in Reminders (1 hour before window closes) ---
+    const activeWindow = await db
+      .select()
+      .from(checkinWindowsTable)
+      .where(and(
+        eq(checkinWindowsTable.day_of_week, dayOfWeek),
+        eq(checkinWindowsTable.enabled, true)
+      ))
+      .limit(1);
+      
+    if (activeWindow.length > 0) {
+      const windowEnd = activeWindow[0].end_time;
+      const [endH, endM] = windowEnd.split(":").map(Number);
+      const endTotal = endH * 60 + endM;
+      
+      // Target time is exactly 1 hour (60 minutes) before the end time
+      const targetTotal = endTotal - 60;
+      
+      if (Math.abs(nowTotal - targetTotal) <= 2 && lastCheckinFiredDate !== today) {
+        lastCheckinFiredDate = today;
+        logger.info("[followUpGenerator] Check-in reminder window hit (-1h) — generating queue…");
+        const count = await generateCheckinReminders();
+        logger.info({ count }, "[followUpGenerator] Check-in reminders generation complete");
+      }
+    }
 
-    // Only fire if day matches and we're within ±2 min of the configured time
-    if (dayOfWeek !== settings.day_of_week) return;
-
-    const [configH, configM] = settings.time.split(":").map(Number);
-    const [nowH, nowM] = hhmm.split(":").map(Number);
-    const configTotal = configH * 60 + configM;
-    const nowTotal = nowH * 60 + nowM;
-    if (Math.abs(nowTotal - configTotal) > 2) return;
-
-    // Prevent duplicate fires on the same day
-    if (lastFiredDate === today) return;
-    lastFiredDate = today;
-
-    logger.info("[followUpGenerator] Automation window hit — generating queue…");
-    const count = await generateFollowUpQueue();
-    logger.info({ count }, "[followUpGenerator] Queue generation complete");
   } catch (err) {
     logger.error({ err }, "[followUpGenerator] Tick error");
   }

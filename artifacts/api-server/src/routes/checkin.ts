@@ -203,7 +203,6 @@ router.post("/checkin/requests", async (req, res) => {
         .values({
           profile_id: profile.id,
           session_date: today,
-          check_in_method: "self",
           type: "member",
         })
         .returning();
@@ -233,7 +232,6 @@ router.post("/checkin/requests", async (req, res) => {
         session_date: today,
         status: "pending",
         type: "member",
-        check_in_method: method,
       })
       .returning();
 

@@ -174,7 +174,6 @@ export default function CheckIn() {
   const [isScanning, setIsScanning] = useState(false);
   const [scannerError, setScannerError] = useState<string>("");
   const qrReaderRef = useRef<Html5Qrcode | null>(null);
-  const [showMemberDialog, setShowMemberDialog] = useState(false);
   const [scannedData, setScannedData] = useState<string>("");
   const [sessionSlug, setSessionSlug] = useState<string | null>(null);
 
@@ -185,13 +184,13 @@ export default function CheckIn() {
         const sessionId = url.searchParams.get("session_id");
         if (sessionId) {
           setSessionSlug(sessionId);
+          handleMemberCheckIn(sessionId);
         } else {
           toast({
             title: "Invalid QR Code",
             description: "The scanned QR code does not contain a valid session ID.",
             variant: "destructive",
           });
-          setShowMemberDialog(false);
         }
       } catch (error) {
         toast({
@@ -199,7 +198,6 @@ export default function CheckIn() {
           description: "The scanned QR code is not a valid URL.",
           variant: "destructive",
         });
-        setShowMemberDialog(false);
       }
     }
   }, [scannedData, toast]);
@@ -313,7 +311,6 @@ export default function CheckIn() {
           html5QrCode.stop().then(() => {
             setIsScanning(false);
             setScannedData(decodedText);
-            setShowMemberDialog(true);
           });
         },
         () => {},
@@ -345,17 +342,17 @@ export default function CheckIn() {
 
   // ── Check-in Functions ───────────────────────────────────────────────────────
 
-  async function handleMemberCheckIn() {
+  async function handleMemberCheckIn(slug?: string) {
     if (!isSignedIn) {
       setErrorMessage("Please sign in to check in");
       return;
     }
-    if (!sessionSlug) {
+    const targetSlug = typeof slug === 'string' ? slug : sessionSlug;
+    if (!targetSlug) {
       setErrorMessage("No session QR code scanned.");
       setCheckInStatus("error");
       return;
     }
-    setShowMemberDialog(false);
     setCheckInStatus("loading");
     setErrorMessage("");
     try {
@@ -366,7 +363,7 @@ export default function CheckIn() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ sessionSlug }),
+        body: JSON.stringify({ sessionSlug: targetSlug }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -383,11 +380,6 @@ export default function CheckIn() {
       setErrorMessage("Network error. Please try again.");
       toast({ title: "Check-in failed", description: "Network error. Please try again.", variant: "destructive" });
     }
-  }
-
-  function handleFirstTimer() {
-    setShowMemberDialog(false);
-    window.location.href = `/register?session_id=${sessionSlug}`;
   }
 
   // ── Search Functions ─────────────────────────────────────────────────────────
@@ -752,7 +744,7 @@ export default function CheckIn() {
                   <p className="text-xs text-muted-foreground text-center mb-3">Or check in directly with your account</p>
                   <Button
                     className="w-full h-12 rounded-xl text-sm font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
-                    onClick={handleMemberCheckIn}
+                    onClick={() => handleMemberCheckIn()}
                     disabled={checkInStatus === "loading"}
                   >
                     {checkInStatus === "loading" ? (
@@ -774,39 +766,6 @@ export default function CheckIn() {
           </div>
         )}
       </div>
-
-      {/* Member vs First Timer Dialog */}
-      <Dialog open={showMemberDialog} onOpenChange={setShowMemberDialog}>
-        <DialogContent className="rounded-2xl max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Welcome!</DialogTitle>
-            <DialogDescription>
-              Are you a returning member or is this your first time here?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-3 pt-2">
-            <Button
-              onClick={handleMemberCheckIn}
-              disabled={checkInStatus === "loading"}
-              className="w-full h-12 rounded-xl bg-primary text-primary-foreground hover:bg-primary/90"
-            >
-              {checkInStatus === "loading" ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Users className="w-4 h-4 mr-2" />
-              )}
-              I'm a Member
-            </Button>
-            <Button
-              variant="outline"
-              onClick={handleFirstTimer}
-              className="w-full h-12 rounded-xl"
-            >
-              First Time Here
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* QR Generator Dialog */}
       <Dialog open={showQRGenerator} onOpenChange={setShowQRGenerator}>
