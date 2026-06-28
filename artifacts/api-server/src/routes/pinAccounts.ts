@@ -8,6 +8,7 @@ import { validatePin } from "../lib/pin";
 import { resolveAccount } from "../lib/resolveAccount";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { canGrantMembership, CONSENT_AGE } from "../lib/membershipConsent";
+import { computeAge } from "../lib/age";
 
 const router = Router();
 
@@ -154,10 +155,13 @@ router.post(
           ? body.parent_phone.trim()
           : target.parent_phone;
 
+      // Live age from date_of_birth (falls back to the stored age) drives the
+      // under-13 consent decision.
+      const effectiveAge = computeAge(target.date_of_birth) ?? target.age;
       const gate = canGrantMembership(
         {
           role: target.role,
-          age: target.age,
+          age: effectiveAge,
           parent_phone: parentPhone,
           parent_name: parentName,
         },
@@ -168,7 +172,7 @@ router.post(
       // For 13+ no consent is required, so the audit columns are explicitly
       // nulled. Safe: the gate above only lets visitors through, so this never
       // clears an existing member's recorded consent.
-      const needsConsent = target.age === null || target.age < CONSENT_AGE;
+      const needsConsent = effectiveAge === null || effectiveAge < CONSENT_AGE;
       const [updated] = await db
         .update(profilesTable)
         .set({
