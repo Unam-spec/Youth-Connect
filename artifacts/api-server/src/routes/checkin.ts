@@ -277,6 +277,8 @@ router.get("/checkin/requests", requireLeaderSession("leader"), async (req, res)
         visitor_school: visitorsTable.school,
         visitor_parent_phone: visitorsTable.parent_phone,
         visitor_how_did_you_hear: visitorsTable.how_did_you_hear,
+        visitor_avatar: visitorsTable.avatar_url,
+        visitor_wants_membership: visitorsTable.wants_membership,
       })
       .from(checkInRequestsTable)
       .leftJoin(
@@ -312,6 +314,10 @@ router.get("/checkin/requests", requireLeaderSession("leader"), async (req, res)
       school: row.type === "visitor" ? (row.visitor_school ?? null) : null,
       parent_phone: row.type === "visitor" ? (row.visitor_parent_phone ?? null) : null,
       how_did_you_hear: row.type === "visitor" ? (row.visitor_how_did_you_hear ?? null) : null,
+      avatar_url: row.type === "visitor" ? (row.visitor_avatar ?? null) : null,
+      // Only first-timers carry a membership intent; members are always "true"
+      // here so they stay in the member check-in queue alongside opt-in visitors.
+      wants_membership: row.type === "visitor" ? !!row.visitor_wants_membership : true,
     }));
 
     return res.json(requests);

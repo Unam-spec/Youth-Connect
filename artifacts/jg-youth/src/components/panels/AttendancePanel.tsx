@@ -33,8 +33,9 @@ export function AttendancePanel({
     query: { queryKey: getGetTodayAttendanceQueryKey() },
   });
 
+  // Members plus first-timers who opted in to membership at registration.
   const pendingMemberCheckIns = useMemo(
-    () => pendingCheckIns.filter((r) => r.type === "member"),
+    () => pendingCheckIns.filter((r) => r.type === "member" || r.wants_membership),
     [pendingCheckIns]
   );
 
@@ -85,8 +86,8 @@ export function AttendancePanel({
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mb-4">
-          Only shows existing members who scanned the QR and requested
-          check-in. Auto-refreshes every 30s.
+          Members who requested check-in, plus first-timers who chose to become a
+          member at registration. Auto-refreshes every 30s.
         </p>
         {isPendingLoading && pendingMemberCheckIns.length === 0 ? (
           <SkeletonRows />

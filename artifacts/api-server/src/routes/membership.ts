@@ -6,6 +6,7 @@ import { CreateMembershipRequestBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembershipRequest";
 import { publishActivity } from "../lib/activityStream";
+import { resolveAccount } from "../lib/resolveAccount";
 
 const router = Router();
 
@@ -44,22 +45,18 @@ router.get("/membership-requests", requireLeaderSession("leader"), async (req, r
   }
 });
 
-// POST /membership-requests - Create a new membership request (Clerk-auth member)
+// POST /membership-requests - Create a new membership request.
+// Accepts EITHER a Clerk login or a no-email PIN session so PIN accounts can
+// request membership without being forced through a Clerk email sign-up.
 router.post("/membership-requests", async (req, res) => {
   try {
-    const auth = getAuth(req);
-    if (!auth?.userId) {
+    const profile = await resolveAccount(req);
+    if (!profile) {
       return res.status(401).json({ error: "Unauthorized" });
     }
     const parsed = CreateMembershipRequestBody.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten() });
-    }
-    const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
-    if (!profile) {
-      return res.status(404).json({ error: "Profile not found" });
     }
     const [request] = await db
       .insert(membershipRequestsTable)

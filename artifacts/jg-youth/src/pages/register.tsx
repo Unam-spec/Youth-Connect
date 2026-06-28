@@ -28,7 +28,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { AlertCircle, CheckCircle2, ChevronLeft, GraduationCap, Check, BookOpen, User, XCircle, ArrowRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { AlertCircle, CheckCircle2, ChevronLeft, GraduationCap, Check, BookOpen, User, XCircle, ArrowRight, Camera, Loader2, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { WATERBERG_SCHOOLS, SA_UNIVERSITIES, NONE_SCHOOL } from "@/lib/schools";
 
@@ -53,6 +60,7 @@ const registerSchema = z.object({
   parent_name: z.string().min(2, "Parent/Guardian name is required"),
   parent_phone: z.string().min(8, "Parent/Guardian phone is required").max(20),
   whatsapp_opt_in: z.boolean().default(false),
+  avatar_url: z.string().min(1, "A profile picture is required"),
 });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
@@ -61,7 +69,18 @@ export default function Register() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [isPending, setIsPending] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  
+
+  // Profile-picture upload state
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Post-registration "become a member?" prompt state
+  const [visitorId, setVisitorId] = useState<string | null>(null);
+  const [showMembershipPrompt, setShowMembershipPrompt] = useState(false);
+  const [membershipChoice, setMembershipChoice] = useState<"yes" | "no" | null>(null);
+  const [isSavingIntent, setIsSavingIntent] = useState(false);
+
   // Wizard state
   const [step, setStep] = useState(1);
   const totalSteps = 3;
@@ -94,14 +113,65 @@ export default function Register() {
       parent_name: "",
       parent_phone: "",
       whatsapp_opt_in: false,
+      avatar_url: "",
     },
     mode: "onTouched",
   });
 
+  const avatarUrl = form.watch("avatar_url");
+
+  async function handlePhotoSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Allow re-selecting the same file later
+    e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPhotoError("Please choose an image file (JPG or PNG).");
+      return;
+    }
+    setPhotoError(null);
+    setIsUploadingPhoto(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/register/photo", { method: "POST", body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPhotoError(data.error || "Upload failed. Please try again.");
+        return;
+      }
+      form.setValue("avatar_url", data.url, { shouldValidate: true, shouldDirty: true });
+    } catch {
+      setPhotoError("Upload failed — please check your connection and try again.");
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  }
+
+  async function handleMembershipChoice(wants: boolean) {
+    setIsSavingIntent(true);
+    try {
+      if (visitorId) {
+        await fetch("/api/register/membership-intent", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visitor_id: visitorId, wants_membership: wants }),
+        });
+      }
+    } catch {
+      // Non-blocking — they're already registered; intent is a nice-to-have.
+    } finally {
+      setIsSavingIntent(false);
+      setMembershipChoice(wants ? "yes" : "no");
+      setShowMembershipPrompt(false);
+      setIsSuccess(true);
+    }
+  }
+
   const nextStep = async () => {
     let fieldsToValidate: (keyof RegisterFormValues)[] = [];
     if (step === 1) {
-      fieldsToValidate = ["full_name", "phone_number", "email", "gender", "age"];
+      fieldsToValidate = ["avatar_url", "full_name", "phone_number", "email", "gender", "age"];
     } else if (step === 2) {
       fieldsToValidate = ["school", "how_did_you_hear"];
     }
@@ -139,6 +209,7 @@ export default function Register() {
           parent_name: data.parent_name,
           parent_phone: data.parent_phone,
           whatsapp_opt_in: data.whatsapp_opt_in,
+          avatar_url: data.avatar_url,
         }),
       });
 
@@ -147,7 +218,10 @@ export default function Register() {
           sessionStorage.setItem("jg_pending_signup_email", data.email);
           sessionStorage.setItem("jg_pending_signup_name", data.full_name);
         }
-        setIsSuccess(true);
+        const body = await response.json().catch(() => ({}));
+        if (body?.visitor?.id) setVisitorId(body.visitor.id);
+        // Pop up the "become a member?" question before the success screen.
+        setShowMembershipPrompt(true);
         return;
       }
 
@@ -179,7 +253,9 @@ export default function Register() {
               </div>
               <CardTitle className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">You're in!</CardTitle>
               <CardDescription className="text-base mt-2 text-muted-foreground">
-                A leader will review your registration and you'll receive an email once approved. See you on Friday.
+                {membershipChoice === "yes"
+                  ? "Awesome — we've noted that you'd like to become a member! A leader will check you in and help you join. See you on Friday."
+                  : "A leader will review your registration and check you in shortly. See you on Friday!"}
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-6 pb-8">
@@ -253,6 +329,64 @@ export default function Register() {
                 
                 {/* Step 1: Personal Details */}
                 <div className={step === 1 ? "space-y-4 animate-in fade-in slide-in-from-right-4 duration-300" : "hidden"}>
+                  {/* Required profile picture */}
+                  <FormField
+                    control={form.control}
+                    name="avatar_url"
+                    render={() => (
+                      <FormItem>
+                        <FormLabel className="text-foreground">Profile Picture *</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center gap-4">
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              capture="user"
+                              className="hidden"
+                              onChange={handlePhotoSelected}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploadingPhoto}
+                              className="relative w-20 h-20 rounded-full border-2 border-dashed border-border bg-muted flex items-center justify-center overflow-hidden shrink-0 hover:border-primary transition-colors disabled:opacity-60"
+                            >
+                              {isUploadingPhoto ? (
+                                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                              ) : avatarUrl ? (
+                                <img src={avatarUrl} alt="Your profile" className="w-full h-full object-cover" />
+                              ) : (
+                                <Camera className="w-7 h-7 text-muted-foreground" />
+                              )}
+                            </button>
+                            <div className="text-sm">
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isUploadingPhoto}
+                                className="font-semibold text-primary hover:underline disabled:opacity-60"
+                              >
+                                {avatarUrl ? "Change photo" : "Add a photo"}
+                              </button>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                Required — a clear photo of you (max 2MB).
+                              </p>
+                              {avatarUrl && (
+                                <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                                  <Check className="w-3 h-3" /> Photo added
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </FormControl>
+                        {photoError && (
+                          <p className="text-sm text-destructive mt-1">{photoError}</p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                      control={form.control}
                      name="full_name"
@@ -570,6 +704,41 @@ export default function Register() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Post-registration: "Become a member?" pop-up ── */}
+      <Dialog open={showMembershipPrompt} onOpenChange={() => { /* must choose */ }}>
+        <DialogContent className="rounded-2xl max-w-sm" hideClose>
+          <DialogHeader>
+            <div className="mx-auto w-14 h-14 bg-primary/10 border border-primary/20 rounded-full flex items-center justify-center mb-2">
+              <Sparkles className="w-7 h-7 text-primary" />
+            </div>
+            <DialogTitle className="text-center font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">
+              You're registered! 🎉
+            </DialogTitle>
+            <DialogDescription className="text-center text-base pt-1">
+              Welcome to Jeremiah Generation Youth. Would you like to become a
+              <span className="font-semibold text-foreground"> member</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 pt-2">
+            <Button
+              onClick={() => handleMembershipChoice(true)}
+              disabled={isSavingIntent}
+              className="w-full h-12 rounded-xl text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {isSavingIntent ? <Loader2 className="w-4 h-4 animate-spin" /> : "Yes, I'd love to join!"}
+            </Button>
+            <Button
+              onClick={() => handleMembershipChoice(false)}
+              disabled={isSavingIntent}
+              variant="outline"
+              className="w-full h-12 rounded-xl text-base"
+            >
+              No, just visiting for now
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

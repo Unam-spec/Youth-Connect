@@ -155,6 +155,8 @@ export interface PendingCheckIn {
   school?: string | null;
   parent_phone?: string | null;
   how_did_you_hear?: string | null;
+  avatar_url?: string | null;
+  wants_membership?: boolean;
 }
 
 export function CheckInCard({
@@ -177,15 +179,23 @@ export function CheckInCard({
       }`}
     >
       <div className="flex items-start gap-3">
-        <div
-          className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
-            isFirstTimer
-              ? "bg-amber-500/15 text-amber-700"
-              : "bg-primary/10 text-primary"
-          }`}
-        >
-          {req.name?.charAt(0)?.toUpperCase() ?? "?"}
-        </div>
+        {req.avatar_url ? (
+          <img
+            src={req.avatar_url}
+            alt={req.name}
+            className="h-9 w-9 rounded-full object-cover shrink-0 border border-border"
+          />
+        ) : (
+          <div
+            className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${
+              isFirstTimer
+                ? "bg-amber-500/15 text-amber-700"
+                : "bg-primary/10 text-primary"
+            }`}
+          >
+            {req.name?.charAt(0)?.toUpperCase() ?? "?"}
+          </div>
+        )}
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-semibold text-sm">{req.name}</p>
@@ -195,6 +205,14 @@ export function CheckInCard({
                 className="text-xs text-amber-700 border-amber-500/40 bg-amber-500/10 py-0"
               >
                 First Timer
+              </Badge>
+            )}
+            {!isFirstTimer && req.type === "visitor" && req.wants_membership && (
+              <Badge
+                variant="outline"
+                className="text-xs text-primary border-primary/40 bg-primary/10 py-0"
+              >
+                Wants membership
               </Badge>
             )}
           </div>

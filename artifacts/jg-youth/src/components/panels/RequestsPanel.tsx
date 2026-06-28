@@ -104,9 +104,17 @@ export function RequestsPanel({
               <div key={req.id} className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex flex-col sm:flex-row gap-4 sm:items-start sm:justify-between hover:border-amber-500/50 transition-colors">
                 <div className="space-y-3 flex-1">
                   <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
-                      {req.name?.charAt(0)?.toUpperCase() ?? "?"}
-                    </div>
+                    {req.avatar_url ? (
+                      <img
+                        src={req.avatar_url}
+                        alt={req.name}
+                        className="h-10 w-10 rounded-full object-cover shrink-0 border border-amber-500/30"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-full flex items-center justify-center text-sm font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+                        {req.name?.charAt(0)?.toUpperCase() ?? "?"}
+                      </div>
+                    )}
                     <div>
                       <p className="font-bold text-base text-foreground flex items-center gap-2">
                         {req.name}

@@ -23,6 +23,11 @@ ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "whatsapp_opt_in" boolean NOT NU
 ALTER TABLE "visitors" ADD COLUMN IF NOT EXISTS "parent_name" text;
 ALTER TABLE "visitors" ADD COLUMN IF NOT EXISTS "whatsapp_opt_in" boolean NOT NULL DEFAULT false;
 
+-- First-timer profile picture (required at registration) + membership intent flag
+-- (set by the post-registration "become a member?" prompt). 2026-06.
+ALTER TABLE "visitors" ADD COLUMN IF NOT EXISTS "avatar_url" text;
+ALTER TABLE "visitors" ADD COLUMN IF NOT EXISTS "wants_membership" boolean NOT NULL DEFAULT false;
+
 -- Ensure avatar_url column exists (added in v0.9)
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "avatar_url" text;
 

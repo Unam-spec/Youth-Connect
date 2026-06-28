@@ -22,6 +22,7 @@ import {
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { getLeaderSession } from "@/lib/auth";
 import { useApiFetch } from "@/lib/api";
+import { openWhatsApp } from "@/lib/whatsapp";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -77,16 +78,6 @@ const STAGE_COLORS: Record<number, string> = {
   8: "#EF4444",
 };
 
-// Format phone number for wa.me link
-const getWaMeLink = (phone: string, text: string) => {
-  let cleanPhone = phone.replace(/[^0-9+]/g, "");
-  if (cleanPhone.startsWith("0")) {
-    cleanPhone = "27" + cleanPhone.slice(1);
-  } else if (cleanPhone.startsWith("+")) {
-    cleanPhone = cleanPhone.slice(1);
-  }
-  return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
-};
 
 export default function FollowUpHub() {
   const session = getLeaderSession();
@@ -484,7 +475,7 @@ export default function FollowUpHub() {
                                 return;
                               }
                               const cleanMsg = entry.message_preview.replace(" — JG Youth Team", "");
-                              window.open(getWaMeLink(entry.phone, cleanMsg), "_blank");
+                              openWhatsApp(entry.phone, cleanMsg);
                               markAsSent.mutate(entry.id);
                             }}
                             disabled={markAsSent.isPending}
@@ -613,7 +604,7 @@ export default function FollowUpHub() {
                                 return;
                               }
                               const msg = `Hi ${member.full_name.split(" ")[0]},\n\nWe have an upcoming event: *${selectedEvent.title}* on ${new Date(selectedEvent.date).toLocaleDateString()} at ${selectedEvent.time}!\n\nPlease check the JG Youth Connect app to RSVP.\n\n— JG Youth Team`;
-                              window.open(getWaMeLink(member.phone, msg), "_blank");
+                              openWhatsApp(member.phone, msg);
                             }}
                           >
                             <Send className="mr-2 h-3 w-3" />

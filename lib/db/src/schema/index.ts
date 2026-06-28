@@ -197,6 +197,11 @@ export const visitorsTable = pgTable("visitors", {
   school: text("school"),
   parent_phone: text("parent_phone"),
   parent_name: text("parent_name"),
+  avatar_url: text("avatar_url"),
+  // Set true when a first-timer answers "yes, I want to become a member" in the
+  // post-registration prompt. Drives which leader queue their check-in lands in:
+  // true → member/membership check-ins, false → first-timer check-in approvals.
+  wants_membership: boolean("wants_membership").notNull().default(false),
   whatsapp_opt_in: boolean("whatsapp_opt_in").notNull().default(false),
   session_date: date("session_date").notNull(),
   status: checkInRequestStatusEnum("status").notNull().default("pending"),

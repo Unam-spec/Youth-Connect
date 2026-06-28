@@ -35,6 +35,7 @@ import {
   type DashboardSectionKey,
 } from "@/components/dashboard-layout";
 import { getLeaderSession, setLeaderSession, LeaderSession } from "@/lib/auth";
+import { openWhatsApp } from "@/lib/whatsapp";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -153,6 +154,8 @@ interface PendingCheckIn {
   school?: string | null;
   parent_phone?: string | null;
   how_did_you_hear?: string | null;
+  avatar_url?: string | null;
+  wants_membership?: boolean;
 }
 
 interface LeaderPin {
@@ -503,13 +506,15 @@ export default function Dashboard() {
     if (section === "manage") fetchLeaderPins();
   }, [section, fetchLeaderPins]);
 
-  // Split check-in requests by type
+  // Split check-in requests across the two leader queues. A first-timer who
+  // chose "become a member" in the post-registration prompt (wants_membership)
+  // moves into the member check-in queue; everyone else stays a first-timer.
   const pendingMemberCheckIns = useMemo(
-    () => pendingCheckIns.filter((r) => r.type === "member"),
+    () => pendingCheckIns.filter((r) => r.type === "member" || r.wants_membership),
     [pendingCheckIns],
   );
   const pendingFirstTimers = useMemo(
-    () => pendingCheckIns.filter((r) => r.type === "visitor"),
+    () => pendingCheckIns.filter((r) => r.type === "visitor" && !r.wants_membership),
     [pendingCheckIns],
   );
 
@@ -804,11 +809,14 @@ export default function Dashboard() {
         return;
       }
       toast({ title: `PIN set for ${settingPinFor.full_name}` });
-      
-      if (waWindow && settingPinFor.phone) {
+
+      if (settingPinFor.phone) {
         const message = `Hi ${settingPinFor.full_name.split(" ")[0]}, your leader PIN for JG Youth Connect has been set to: ${leaderPinInput}. Please use this PIN to log in to the Leader Dashboard.`;
-        const phone = settingPinFor.phone.replace(/\D/g, "");
-        waWindow.location.href = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+        // Normalises SA "0…" numbers to "27…" and falls back to the current tab
+        // if the pre-opened window was blocked (common on mobile).
+        openWhatsApp(settingPinFor.phone, message, waWindow);
+      } else if (waWindow) {
+        waWindow.close();
       }
 
       setSettingPinFor(null);
@@ -922,6 +930,14 @@ export default function Dashboard() {
       return;
     }
 
+    // Optimistically drop the request from the list so the card disappears
+    // instantly — no waiting on the round-trip before the UI responds.
+    const reqKey = getListMembershipRequestsQueryKey({ status: "pending" });
+    const previousRequests = queryClient.getQueryData<any[]>(reqKey);
+    queryClient.setQueryData<any[]>(reqKey, (old) =>
+      (old ?? []).filter((r) => r.id !== requestId),
+    );
+
     const mutation = action === "approve" ? approveRequest : rejectRequest;
     mutation.mutate(
       { id: requestId },
@@ -931,15 +947,18 @@ export default function Dashboard() {
             title:
               action === "approve" ? "Request approved" : "Request rejected",
           });
-          // Invalidate only after a short delay to avoid flash of empty list
-          setTimeout(() => refreshDashboard(), 400);
+          // Refresh KPIs/members in the background; the card is already gone.
+          refreshDashboard();
         },
-        onError: (error: Error) =>
+        onError: (error: Error) => {
+          // Roll back the optimistic removal so the request reappears.
+          if (previousRequests) queryClient.setQueryData(reqKey, previousRequests);
           toast({
             title: "Request update failed",
             description: error.message,
             variant: "destructive",
-          }),
+          });
+        },
       },
     );
   }
@@ -966,12 +985,16 @@ export default function Dashboard() {
       return;
     }
 
+    // Remove the card immediately; restore it if the request fails.
+    const previous = pendingCheckIns;
+    setPendingCheckIns((prev) => prev.filter((r) => r.id !== requestId));
     try {
       const res = await apiFetch(`/api/checkin/requests/${requestId}/approve`, {
         method: "PATCH",
       });
       if (!res.ok) {
         const err = await res.json();
+        setPendingCheckIns(previous);
         toast({
           title: "Approval failed",
           description: err.error,
@@ -980,9 +1003,9 @@ export default function Dashboard() {
         return;
       }
       toast({ title: "Check-in approved" });
-      setPendingCheckIns((prev) => prev.filter((r) => r.id !== requestId));
       refreshDashboard();
     } catch {
+      setPendingCheckIns(previous);
       toast({ title: "Approval failed", variant: "destructive" });
     }
   }
@@ -1009,12 +1032,16 @@ export default function Dashboard() {
       return;
     }
 
+    // Remove the card immediately; restore it if the request fails.
+    const previous = pendingCheckIns;
+    setPendingCheckIns((prev) => prev.filter((r) => r.id !== requestId));
     try {
       const res = await apiFetch(`/api/checkin/requests/${requestId}/reject`, {
         method: "PATCH",
       });
       if (!res.ok) {
         const err = await res.json();
+        setPendingCheckIns(previous);
         toast({
           title: "Rejection failed",
           description: err.error,
@@ -1023,8 +1050,8 @@ export default function Dashboard() {
         return;
       }
       toast({ title: "Check-in rejected" });
-      setPendingCheckIns((prev) => prev.filter((r) => r.id !== requestId));
     } catch {
+      setPendingCheckIns(previous);
       toast({ title: "Rejection failed", variant: "destructive" });
     }
   }

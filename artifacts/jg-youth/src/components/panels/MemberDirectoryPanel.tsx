@@ -7,6 +7,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { getListProfilesQueryKey, useMergeProfiles } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { useApiFetch } from "@/lib/api";
+import { openWhatsApp } from "@/lib/whatsapp";
 import { useDebouncedValue } from "@/lib/useDebounce";
 import { DashCard, SectionTitle, SkeletonRows, RoleBadge, EmptyState } from "./shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -288,9 +289,8 @@ export function MemberDirectoryPanel({
                             toast({ title: "Invitation sent", description: "The visitor will receive an email." });
                             
                             if (profile.phone) {
-                              const phoneNum = profile.phone.replace(/[^0-9]/g, "");
-                              const message = encodeURIComponent(`Hi ${profile.full_name?.split(" ")[0] || "there"},\n\nYou have been invited to become a full member of Jeremiah Generation Youth!\n\nPlease log in to accept the invitation and see upcoming events: ${window.location.origin}/sign-up\n\n- JG Youth Team`);
-                              window.open(`https://wa.me/${phoneNum}?text=${message}`, "_blank");
+                              const message = `Hi ${profile.full_name?.split(" ")[0] || "there"},\n\nYou have been invited to become a full member of Jeremiah Generation Youth!\n\nPlease log in to accept the invitation and see upcoming events: ${window.location.origin}/sign-up\n\n- JG Youth Team`;
+                              openWhatsApp(profile.phone, message);
                             }
                           } catch (err: any) {
                             toast({ title: "Error", description: err.message || "Failed to send invitation.", variant: "destructive" });
