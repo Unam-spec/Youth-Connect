@@ -43,6 +43,8 @@ export function MemberDirectoryPanel({
   const [search, setSearch] = useState("");
   // Debounce so each keystroke doesn't fire a profiles request (300ms idle).
   const debouncedSearch = useDebouncedValue(search, 300);
+  const [group, setGroup] = useState<"members" | "leaders">("members");
+  const [sort, setSort] = useState<"name" | "newest" | "oldest">("name");
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const apiFetch = useApiFetch();
   const PAGE_SIZE = 50;
@@ -59,13 +61,15 @@ export function MemberDirectoryPanel({
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: [...getListProfilesQueryKey(), "infinite", debouncedSearch],
+    queryKey: [...getListProfilesQueryKey(), "infinite", group, sort, debouncedSearch],
     initialPageParam: 1,
     queryFn: async ({ pageParam }) => {
       const qs = new URLSearchParams({
         page: String(pageParam),
         pageSize: String(PAGE_SIZE),
       });
+      qs.set("group", group);
+      qs.set("sort", sort);
       if (debouncedSearch) qs.set("search", debouncedSearch);
       const res = await apiFetch(`/api/profiles?${qs.toString()}`);
       if (!res.ok) throw new Error("Failed to load members");
@@ -131,6 +135,37 @@ export function MemberDirectoryPanel({
             className="pl-9 bg-card"
           />
         </div>
+      </div>
+
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex rounded-xl border border-border bg-card p-1">
+          {([
+            { key: "members", label: "Members" },
+            { key: "leaders", label: "Leaders" },
+          ] as const).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setGroup(t.key)}
+              className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
+                group === t.key
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <select
+          value={sort}
+          onChange={(e) => setSort(e.target.value as "name" | "newest" | "oldest")}
+          className="h-9 rounded-xl border border-border bg-card px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          aria-label="Sort members"
+        >
+          <option value="name">Sort: A–Z</option>
+          <option value="newest">Sort: Newest first</option>
+          <option value="oldest">Sort: Oldest first</option>
+        </select>
       </div>
 
       {isProfilesLoading ? (
