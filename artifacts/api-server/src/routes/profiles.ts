@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { getAuth, clerkClient } from "@clerk/express";
-import { eq, ilike, or, and, count, inArray, sql, ne } from "drizzle-orm";
+import { eq, ilike, or, and, count, inArray, sql, ne, asc, desc } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import {
@@ -27,6 +27,7 @@ import { deleteProfileCascade } from "../lib/deleteProfileCascade";
 import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembershipRequest";
 import { mergeProfiles } from "../lib/mergeProfiles";
 import { validateDob, computeAge } from "../lib/age";
+import { resolveDirectoryListParams } from "../lib/directoryListParams";
 
 const router = Router();
 
@@ -430,40 +431,27 @@ router.get(
 
 router.get("/profiles", requireLeaderSession("leader"), async (req: Request, res: Response) => {
   try {
-    const search = typeof req.query.search === "string" ? req.query.search : undefined;
-    const role = typeof req.query.role === "string" ? req.query.role : undefined;
+    const { roles, sort, search, pageSize, offset } = resolveDirectoryListParams(req.query);
 
-    // Enforce pagination boundaries (default page: 1, pageSize: 50, max limit: 100)
-    const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
-    const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize ?? "50"), 10)));
-    const offset = (page - 1) * pageSize;
-
-    let whereClause;
-    if (role && search) {
-      whereClause = and(
-        eq(profilesTable.role, role as any),
-        or(
+    const roleFilter = roles ? inArray(profilesTable.role, roles) : undefined;
+    const searchFilter = search
+      ? or(
           ilike(profilesTable.full_name, `%${search}%`),
           ilike(profilesTable.phone, `%${search}%`),
-        ),
-      );
-    } else if (role) {
-      whereClause = eq(profilesTable.role, role as any);
-    } else if (search) {
-      whereClause = or(
-        ilike(profilesTable.full_name, `%${search}%`),
-        ilike(profilesTable.phone, `%${search}%`),
-      );
-    }
+        )
+      : undefined;
+    const whereClause =
+      roleFilter && searchFilter
+        ? and(roleFilter, searchFilter)
+        : (roleFilter ?? searchFilter);
 
-    // 1. Fetch total count
-    const [countResult] = await db
-      .select({ value: count() })
-      .from(profilesTable)
-      .where(whereClause);
-    const total = countResult?.value ? Number(countResult.value) : 0;
+    const orderBy =
+      sort === "newest"
+        ? desc(profilesTable.created_at)
+        : sort === "oldest"
+          ? asc(profilesTable.created_at)
+          : sql`lower(${profilesTable.full_name}) asc`;
 
-    // 2. Fetch paginated records
     const profiles = await db
       .select({
         id: profilesTable.id,
@@ -476,6 +464,9 @@ router.get("/profiles", requireLeaderSession("leader"), async (req: Request, res
         parent_name: profilesTable.parent_name,
         whatsapp_opt_in: profilesTable.whatsapp_opt_in,
         avatar_url: profilesTable.avatar_url,
+        gender: profilesTable.gender,
+        age: profilesTable.age,
+        date_of_birth: profilesTable.date_of_birth,
         created_at: profilesTable.created_at,
         can_create_events: profilesTable.can_create_events,
         can_view_kpis: profilesTable.can_view_kpis,
@@ -484,6 +475,7 @@ router.get("/profiles", requireLeaderSession("leader"), async (req: Request, res
       })
       .from(profilesTable)
       .where(whereClause)
+      .orderBy(orderBy)
       .limit(pageSize)
       .offset(offset);
 
