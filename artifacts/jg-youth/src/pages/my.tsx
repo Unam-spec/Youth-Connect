@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { WATERBERG_SCHOOLS, SA_UNIVERSITIES, NONE_SCHOOL } from "@/lib/schools";
-import { computeAge, MIN_AGE, MAX_AGE, todaySAST } from "@/lib/age";
+import { computeAge, MIN_AGE, MAX_AGE, todaySAST, isBirthdayToday } from "@/lib/age";
 import {
   Dialog,
   DialogContent,
@@ -256,6 +256,10 @@ export default function MyDashboard() {
   const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
   const [birthdayInput, setBirthdayInput] = useState("");
   const [isSavingBirthday, setIsSavingBirthday] = useState(false);
+  const birthdayKey = `bday_dismissed_${todaySAST()}`;
+  const [bdayDismissed, setBdayDismissed] = useState(
+    () => typeof localStorage !== "undefined" && !!localStorage.getItem(`bday_dismissed_${todaySAST()}`),
+  );
   const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -294,6 +298,8 @@ export default function MyDashboard() {
 
   // Show prompt if profile loaded and missing phone/name OR missing school/parent details
   const profileLoaded = !isProfileLoading && !!profile;
+  const showBirthdayBanner =
+    profileLoaded && isBirthdayToday((profile as any).date_of_birth) && !bdayDismissed;
   const needsPhone = profileLoaded && !profile!.phone;
   const needsName = profileLoaded && (!profile!.full_name || profile!.full_name === "New Member");
   const needsSchoolOrParent = profileLoaded && (!profile!.school || !profile!.parent_phone || !(profile as any).parent_name);
@@ -525,6 +531,29 @@ export default function MyDashboard() {
       </Dialog>
       
       <div className="max-w-4xl mx-auto space-y-10 py-6 px-4">
+
+        {showBirthdayBanner && (
+          <div className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-r from-primary/15 via-primary/10 to-transparent p-5 flex items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl animate-bounce">🎂</span>
+              <div>
+                <p className="text-lg font-bold text-foreground">
+                  Happy Birthday, {(profile!.full_name ?? "friend").split(" ")[0]}! 🎉
+                </p>
+                <p className="text-sm text-muted-foreground">Wishing you an amazing day from all of us at JG Youth.</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                localStorage.setItem(birthdayKey, "1");
+                setBdayDismissed(true);
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg shrink-0"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
 
         {showServiceBanner && (
           <div className="rounded-2xl border border-border bg-card p-4 flex items-center justify-between gap-3 animate-fade-in">
