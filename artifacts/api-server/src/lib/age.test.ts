@@ -46,3 +46,57 @@ describe("validateDob", () => {
     expect(validateDob("29-06-2008").ok).toBe(false);
   });
 });
+
+import {
+  daysUntilBirthday,
+  isBirthdayToday,
+  isBirthdayThisWeek,
+  ageTurning,
+} from "./age";
+
+describe("daysUntilBirthday", () => {
+  it("is 0 on the birthday", () => {
+    expect(daysUntilBirthday("2008-06-29", "2026-06-29")).toBe(0);
+  });
+  it("counts forward to a later-this-year birthday", () => {
+    expect(daysUntilBirthday("2008-07-02", "2026-06-29")).toBe(3);
+  });
+  it("wraps to next year when the birthday already passed", () => {
+    expect(daysUntilBirthday("2008-06-28", "2026-06-29")).toBe(364);
+  });
+  it("treats Feb 29 as Feb 28 in a non-leap year", () => {
+    expect(daysUntilBirthday("2008-02-29", "2025-02-28")).toBe(0);
+  });
+  it("returns null for missing/invalid input", () => {
+    expect(daysUntilBirthday(null, "2026-06-29")).toBeNull();
+    expect(daysUntilBirthday("nope", "2026-06-29")).toBeNull();
+  });
+});
+
+describe("isBirthdayToday / isBirthdayThisWeek", () => {
+  it("isBirthdayToday true only on the day", () => {
+    expect(isBirthdayToday("2008-06-29", "2026-06-29")).toBe(true);
+    expect(isBirthdayToday("2008-06-30", "2026-06-29")).toBe(false);
+  });
+  it("isBirthdayThisWeek includes day 6 and today, excludes day 7", () => {
+    expect(isBirthdayThisWeek("2008-06-29", "2026-06-29")).toBe(true); // 0
+    expect(isBirthdayThisWeek("2008-07-05", "2026-06-29")).toBe(true); // 6
+    expect(isBirthdayThisWeek("2008-07-06", "2026-06-29")).toBe(false); // 7
+  });
+});
+
+describe("ageTurning", () => {
+  it("is the current age on the birthday itself", () => {
+    expect(ageTurning("2008-06-29", "2026-06-29")).toBe(18);
+  });
+  it("is the next age for an upcoming birthday", () => {
+    expect(ageTurning("2008-07-02", "2026-06-29")).toBe(18);
+  });
+  it("handles a Dec->Jan year wrap", () => {
+    // Born 2009-01-02; on 2026-12-31 the next birthday is 2027-01-02 → turning 18.
+    expect(ageTurning("2009-01-02", "2026-12-31")).toBe(18);
+  });
+  it("returns null for invalid input", () => {
+    expect(ageTurning(null, "2026-06-29")).toBeNull();
+  });
+});
