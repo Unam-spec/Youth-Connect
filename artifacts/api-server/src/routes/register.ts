@@ -4,6 +4,7 @@ import multer from "multer";
 import { eq } from "drizzle-orm";
 import { db, visitorsTable, checkInRequestsTable } from "@workspace/db";
 import { isCheckinOpenNow } from "../lib/checkinSchedule";
+import { validateDob } from "../lib/age";
 import { publishActivity } from "../lib/activityStream";
 import { uploadAvatar, FileTooLargeError } from "../storage/avatarUpload";
 
@@ -64,7 +65,7 @@ router.post("/register", async (req, res) => {
       });
     }
 
-    const { full_name, phone_number, email, gender, age, how_did_you_hear, school, parent_phone, parent_name, whatsapp_opt_in, avatar_url } =
+    const { full_name, phone_number, email, gender, age, date_of_birth, how_did_you_hear, school, parent_phone, parent_name, whatsapp_opt_in, avatar_url } =
       req.body;
 
     // ── Required field validation ──────────────────────────────────────────────
@@ -87,9 +88,6 @@ router.post("/register", async (req, res) => {
         error: "gender is required and must be male, female, or other",
       });
     }
-    if (age === undefined || age === null || age === "") {
-      return res.status(400).json({ error: "age is required" });
-    }
     if (
       !how_did_you_hear ||
       typeof how_did_you_hear !== "string" ||
@@ -98,12 +96,25 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ error: "how_did_you_hear is required" });
     }
 
-    // ── Type coercions ─────────────────────────────────────────────────────────
-    const ageInt = parseInt(String(age), 10);
-    if (isNaN(ageInt) || ageInt < 1 || ageInt > 120) {
-      return res
-        .status(400)
-        .json({ error: "age must be a valid number between 1 and 120" });
+    // ── Age from date of birth (preferred) or legacy raw age ────────────────────
+    // Prefer date_of_birth (new clients). Fall back to a raw age only if an older
+    // cached client posts without it. One of the two is required.
+    let ageInt: number;
+    let dobValue: string | null = null;
+    if (date_of_birth !== undefined && date_of_birth !== null && date_of_birth !== "") {
+      const v = validateDob(date_of_birth);
+      if (!v.ok) return res.status(400).json({ error: v.error });
+      ageInt = v.age!;
+      dobValue = String(date_of_birth).trim();
+    } else if (age !== undefined && age !== null && age !== "") {
+      ageInt = parseInt(String(age), 10);
+      if (isNaN(ageInt) || ageInt < 1 || ageInt > 120) {
+        return res
+          .status(400)
+          .json({ error: "age must be a valid number between 1 and 120" });
+      }
+    } else {
+      return res.status(400).json({ error: "date_of_birth is required" });
     }
 
     // Convert empty string email to null
@@ -123,6 +134,7 @@ router.post("/register", async (req, res) => {
         email: emailValue,
         gender: gender as "male" | "female" | "other",
         age: ageInt,
+        date_of_birth: dobValue,
         how_did_you_hear: how_did_you_hear.trim(),
         school: school && typeof school === 'string' && school.trim() ? school.trim() : null,
         parent_phone: parent_phone && typeof parent_phone === 'string' && parent_phone.trim() ? parent_phone.trim() : null,
