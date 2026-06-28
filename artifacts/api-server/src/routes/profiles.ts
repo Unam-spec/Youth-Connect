@@ -26,6 +26,7 @@ import { normalizePhone } from "../lib/phone";
 import { deleteProfileCascade } from "../lib/deleteProfileCascade";
 import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembershipRequest";
 import { mergeProfiles } from "../lib/mergeProfiles";
+import { validateDob, computeAge } from "../lib/age";
 
 const router = Router();
 
@@ -103,8 +104,6 @@ router.get("/profiles/me", async (req: Request, res: Response) => {
           email,
           phone,
           role: "visitor",
-          gender: "other",
-          age: 0,
           heard_from: "clerk_signup",
         })
         .returning();
@@ -142,9 +141,21 @@ router.patch("/profiles/me", async (req: Request, res: Response) => {
     if (parsed.data.phone !== undefined && (await phoneInUse(parsed.data.phone, existing.id))) {
       return res.status(409).json({ error: "This number is already registered", duplicate: true });
     }
+    const updateData: Record<string, unknown> = { ...parsed.data };
+    const dob = (req.body ?? {}).date_of_birth;
+    if (dob !== undefined) {
+      if (dob === null || dob === "") {
+        updateData.date_of_birth = null;
+      } else {
+        const v = validateDob(dob);
+        if (!v.ok) return res.status(400).json({ error: v.error });
+        updateData.date_of_birth = String(dob).trim();
+        updateData.age = v.age;
+      }
+    }
     const [updated] = await db
       .update(profilesTable)
-      .set(parsed.data)
+      .set(updateData)
       .where(eq(profilesTable.clerk_id, clerkId))
       .returning();
     return res.json(updated);
@@ -395,6 +406,9 @@ router.get(
           parent_name: profilesTable.parent_name,
           whatsapp_opt_in: profilesTable.whatsapp_opt_in,
           avatar_url: profilesTable.avatar_url,
+          gender: profilesTable.gender,
+          age: profilesTable.age,
+          date_of_birth: profilesTable.date_of_birth,
           created_at: profilesTable.created_at,
           can_create_events: profilesTable.can_create_events,
           can_view_kpis: profilesTable.can_view_kpis,
@@ -650,13 +664,23 @@ router.patch("/profiles/:id/permissions", requireLeaderSession("super_admin"), a
 // PATCH /profiles/:id - Update member profile info (protected: leaders)
 router.patch("/profiles/:id", requireLeaderSession("leader"), async (req: Request, res: Response) => {
   try {
-    const { full_name, phone, email, gender, age, school, parent_phone, parent_name, whatsapp_opt_in, avatar_url } = req.body;
+    const { full_name, phone, email, gender, age, date_of_birth, school, parent_phone, parent_name, whatsapp_opt_in, avatar_url } = req.body;
     const updateData: Record<string, any> = {};
     if (full_name !== undefined) updateData.full_name = full_name;
     if (phone !== undefined) updateData.phone = phone;
     if (email !== undefined) updateData.email = email;
     if (gender !== undefined) updateData.gender = gender;
     if (age !== undefined) updateData.age = age === null ? null : parseInt(String(age), 10);
+    if (date_of_birth !== undefined) {
+      if (date_of_birth === null || date_of_birth === "") {
+        updateData.date_of_birth = null;
+      } else {
+        const v = validateDob(date_of_birth);
+        if (!v.ok) return res.status(400).json({ error: v.error });
+        updateData.date_of_birth = String(date_of_birth).trim();
+        updateData.age = v.age; // DOB is authoritative when provided
+      }
+    }
     if (school !== undefined) updateData.school = school;
     if (parent_phone !== undefined) updateData.parent_phone = parent_phone;
     if (parent_name !== undefined) updateData.parent_name = parent_name;
