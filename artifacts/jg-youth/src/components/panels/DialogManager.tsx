@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { QRCodeSVG } from "qrcode.react";
 import { User, GraduationCap, BookOpen, Check } from "lucide-react";
 import { SCHOOL_OPTIONS } from "@/lib/schools";
+import { computeAge } from "@/lib/age";
 
 export interface DialogManagerProps {
   showSessionQrCodeDialog: boolean;
@@ -29,8 +30,8 @@ export interface DialogManagerProps {
   setEditEmail: (v: string) => void;
   editGender: string;
   setEditGender: (v: any) => void;
-  editAge: number;
-  setEditAge: (v: number) => void;
+  editDateOfBirth: string;
+  setEditDateOfBirth: (v: string) => void;
   editSchool: string;
   setEditSchool: (v: string) => void;
   editShowSchoolDropdown: boolean;
@@ -143,14 +144,17 @@ export function DialogManager(props: DialogManagerProps) {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="edit-age" className="text-foreground">Age</Label>
+                <Label htmlFor="edit-dob" className="text-foreground">Date of Birth</Label>
                 <Input
-                  id="edit-age"
-                  type="number"
-                  value={props.editAge}
-                  onChange={(e) => props.setEditAge(parseInt(e.target.value) || 0)}
+                  id="edit-dob"
+                  type="date"
+                  value={props.editDateOfBirth}
+                  onChange={(e) => props.setEditDateOfBirth(e.target.value)}
                   className="bg-card border-border rounded-xl"
                 />
+                <p className="text-xs text-muted-foreground">
+                  Age: {computeAge(props.editDateOfBirth) ?? "—"}
+                </p>
               </div>
             </div>
 

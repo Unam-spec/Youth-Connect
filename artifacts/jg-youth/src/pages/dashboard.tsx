@@ -250,7 +250,7 @@ export default function Dashboard() {
   const [editParentName, setEditParentName] = useState("");
   const [editParentPhone, setEditParentPhone] = useState("");
   const [editWhatsappOptIn, setEditWhatsappOptIn] = useState(false);
-  const [editAge, setEditAge] = useState(18);
+  const [editDateOfBirth, setEditDateOfBirth] = useState("");
   const [editGender, setEditGender] = useState<"male" | "female">("male");
   const [editShowSchoolDropdown, setEditShowSchoolDropdown] = useState(false);
   const [isSavingEdit, setIsSavingEdit] = useState(false);
@@ -268,7 +268,7 @@ export default function Dashboard() {
     setEditParentName(profile.parent_name ?? "");
     setEditParentPhone(profile.parent_phone ?? "");
     setEditWhatsappOptIn(!!profile.whatsapp_opt_in);
-    setEditAge(profile.age ?? 18);
+    setEditDateOfBirth(profile.date_of_birth ?? "");
     setEditGender(profile.gender === "female" ? "female" : "male");
     setShowEditDialog(true);
   }
@@ -291,7 +291,7 @@ export default function Dashboard() {
           parent_name: editParentName.trim() || null,
           parent_phone: editParentPhone.trim() || null,
           whatsapp_opt_in: editWhatsappOptIn,
-          age: editAge ? parseInt(String(editAge), 10) : null,
+          date_of_birth: editDateOfBirth || null,
           gender: editGender,
         }),
       });
@@ -1322,8 +1322,8 @@ export default function Dashboard() {
         setEditEmail={setEditEmail}
         editGender={editGender}
         setEditGender={setEditGender}
-        editAge={editAge}
-        setEditAge={setEditAge}
+        editDateOfBirth={editDateOfBirth}
+        setEditDateOfBirth={setEditDateOfBirth}
         editSchool={editSchool}
         setEditSchool={setEditSchool}
         editShowSchoolDropdown={editShowSchoolDropdown}
