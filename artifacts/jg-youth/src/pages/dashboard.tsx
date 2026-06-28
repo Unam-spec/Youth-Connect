@@ -90,6 +90,7 @@ import {
 import { QRCodeSVG } from "qrcode.react";
 import { AttendancePanel } from "@/components/panels/AttendancePanel";
 import { MemberDirectoryPanel } from "@/components/panels/MemberDirectoryPanel";
+import { BirthdaysPanel } from "@/components/panels/BirthdaysPanel";
 import { PinAccountsPanel } from "@/components/panels/PinAccountsPanel";
 import { EventsPanel } from "@/components/panels/EventsPanel";
 import { RequestsPanel } from "@/components/panels/RequestsPanel";
@@ -1222,6 +1223,7 @@ export default function Dashboard() {
           </TabsContent>
 
           <TabsContent value="members" className="mt-0 space-y-6">
+            <BirthdaysPanel />
             <PinAccountsPanel />
             <RequestsPanel
               pendingFirstTimers={pendingFirstTimers}
