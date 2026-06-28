@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { WATERBERG_SCHOOLS, SA_UNIVERSITIES, NONE_SCHOOL } from "@/lib/schools";
+import { computeAge, MIN_AGE, MAX_AGE, todaySAST } from "@/lib/age";
 import {
   Dialog,
   DialogContent,
@@ -252,6 +253,9 @@ export default function MyDashboard() {
   const [promptParentPhone, setPromptParentPhone] = useState("");
   const [promptWhatsappOptIn, setPromptWhatsappOptIn] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
+  const [birthdayInput, setBirthdayInput] = useState("");
+  const [isSavingBirthday, setIsSavingBirthday] = useState(false);
   const [showSchoolDropdown, setShowSchoolDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -309,6 +313,47 @@ export default function MyDashboard() {
     setPromptParentName((profile as any).parent_name ?? "");
     setPromptParentPhone((profile as any).parent_phone ?? "");
     setPromptWhatsappOptIn(!!(profile as any).whatsapp_opt_in);
+  }
+
+  // Show the birthday prompt to members who have no date_of_birth yet, unless
+  // they dismissed it before. Independent of (and lower priority than) the
+  // profile-completion prompt.
+  const needsBirthday =
+    profileLoaded &&
+    !(profile as any).date_of_birth &&
+    !localStorage.getItem("dismissed_birthday_prompt");
+
+  if (needsBirthday && !shouldPrompt && !showBirthdayPrompt && birthdayInput === "") {
+    setShowBirthdayPrompt(true);
+  }
+
+  async function handleSaveBirthday() {
+    const a = computeAge(birthdayInput);
+    if (a === null || a < MIN_AGE || a > MAX_AGE || birthdayInput > todaySAST()) {
+      toast({ title: "Enter a valid date of birth", variant: "destructive" });
+      return;
+    }
+    setIsSavingBirthday(true);
+    try {
+      const res = await fetch("/api/profiles/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date_of_birth: birthdayInput }),
+      });
+      if (!res.ok) throw new Error();
+      queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
+      toast({ title: "Birthday saved 🎂" });
+      setShowBirthdayPrompt(false);
+    } catch {
+      toast({ title: "Could not save your birthday", variant: "destructive" });
+    } finally {
+      setIsSavingBirthday(false);
+    }
+  }
+
+  function dismissBirthdayPrompt() {
+    localStorage.setItem("dismissed_birthday_prompt", "true");
+    setShowBirthdayPrompt(false);
   }
 
   async function handleSaveProfile() {
@@ -1166,6 +1211,41 @@ export default function MyDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+      <Dialog open={showBirthdayPrompt} onOpenChange={(o) => { if (!o) dismissBirthdayPrompt(); }}>
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl font-semibold tracking-tight">
+              Add your birthday 🎂
+            </DialogTitle>
+            <DialogDescription className="text-center pt-1">
+              So we can celebrate you and keep your age up to date.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="birthday-input">Date of birth</Label>
+            <Input
+              id="birthday-input"
+              type="date"
+              max={todaySAST()}
+              value={birthdayInput}
+              onChange={(e) => setBirthdayInput(e.target.value)}
+              className="bg-card border-border rounded-xl"
+            />
+            {computeAge(birthdayInput) !== null && (
+              <p className="text-xs text-muted-foreground">Age: {computeAge(birthdayInput)}</p>
+            )}
+          </div>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            <Button onClick={handleSaveBirthday} disabled={isSavingBirthday} className="w-full rounded-xl">
+              {isSavingBirthday ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="ghost" onClick={dismissBirthdayPrompt} className="w-full rounded-xl">
+              Maybe later
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
         <DialogContent className="max-w-2xl bg-transparent border-0 shadow-none p-0 flex flex-col items-center justify-center">
           {lightboxImage && (
