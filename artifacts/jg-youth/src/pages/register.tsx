@@ -38,6 +38,7 @@ import {
 import { AlertCircle, CheckCircle2, ChevronLeft, GraduationCap, Check, BookOpen, User, XCircle, ArrowRight, Camera, Loader2, Sparkles } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { WATERBERG_SCHOOLS, SA_UNIVERSITIES, NONE_SCHOOL } from "@/lib/schools";
+import { computeAge, MIN_AGE, MAX_AGE, todaySAST } from "@/lib/age";
 
 // ─── Client-side validation schema ────────────────────────────────────────────
 const registerSchema = z.object({
@@ -50,11 +51,16 @@ const registerSchema = z.object({
   gender: z.enum(["male", "female"], {
     required_error: "Please select a gender",
   }),
-  age: z.coerce
-    .number({ invalid_type_error: "Age must be a number" })
-    .int("Age must be a whole number")
-    .min(10, "Age must be at least 10")
-    .max(100, "Age must be at most 100"),
+  date_of_birth: z
+    .string()
+    .min(1, "Date of birth is required")
+    .refine((v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v <= todaySAST(), {
+      message: "Enter a valid date of birth (not in the future)",
+    })
+    .refine((v) => {
+      const a = computeAge(v);
+      return a !== null && a >= MIN_AGE && a <= MAX_AGE;
+    }, { message: `Age must be between ${MIN_AGE} and ${MAX_AGE}` }),
   how_did_you_hear: z.string().min(2, "Please tell us how you heard about us"),
   school: z.string().min(2, "School/University is required"),
   parent_name: z.string().min(2, "Parent/Guardian name is required"),
@@ -106,8 +112,8 @@ export default function Register() {
       full_name: "",
       phone_number: "",
       email: "",
-      gender: "male",
-      age: 18,
+      gender: "" as any,
+      date_of_birth: "",
       how_did_you_hear: "",
       school: "",
       parent_name: "",
@@ -171,7 +177,7 @@ export default function Register() {
   const nextStep = async () => {
     let fieldsToValidate: (keyof RegisterFormValues)[] = [];
     if (step === 1) {
-      fieldsToValidate = ["avatar_url", "full_name", "phone_number", "email", "gender", "age"];
+      fieldsToValidate = ["avatar_url", "full_name", "phone_number", "email", "gender", "date_of_birth"];
     } else if (step === 2) {
       fieldsToValidate = ["school", "how_did_you_hear"];
     }
@@ -203,7 +209,7 @@ export default function Register() {
           phone_number: data.phone_number,
           email: data.email === "" ? null : (data.email ?? null),
           gender: data.gender,
-          age: parseInt(String(data.age), 10),
+          date_of_birth: data.date_of_birth,
           how_did_you_hear: data.how_did_you_hear,
           school: data.school,
           parent_name: data.parent_name,
@@ -468,22 +474,27 @@ export default function Register() {
                     />
                     <FormField
                       control={form.control}
-                      name="age"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-foreground">Age *</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min={10}
-                              max={100}
-                              className="bg-card border-border text-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      name="date_of_birth"
+                      render={({ field }) => {
+                        const liveAge = computeAge(field.value);
+                        return (
+                          <FormItem>
+                            <FormLabel className="text-foreground">Date of Birth *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="date"
+                                max={todaySAST()}
+                                className="bg-card border-border text-foreground focus:border-primary focus:ring-primary rounded-xl h-11"
+                                {...field}
+                              />
+                            </FormControl>
+                            {liveAge !== null && (
+                              <p className="text-xs text-muted-foreground mt-1">Age: {liveAge}</p>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   </div>
                 </div>
