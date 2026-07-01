@@ -106,6 +106,18 @@ export interface VisitorRegistration {
   clerk_id?: string | null;
 }
 
+/**
+ * Restrict the audience by gender. null = everyone.
+ * @nullable
+ */
+export type EventTargetGender = typeof EventTargetGender[keyof typeof EventTargetGender] | null;
+
+
+export const EventTargetGender = {
+  male: 'male',
+  female: 'female',
+} as const;
+
 export interface EventRequirement {
   label: string;
   required: boolean;
@@ -130,12 +142,29 @@ export interface Event {
   /** @nullable */
   custom_requirements?: EventRequirement[] | null;
   is_public: boolean;
+  /**
+     * Restrict the audience by gender. null = everyone.
+     * @nullable
+     */
+  target_gender?: EventTargetGender;
   /** @nullable */
   rsvp_count?: number | null;
   /** @nullable */
   attendance_count?: number | null;
   created_at: string;
 }
+
+/**
+ * Restrict the audience by gender. null = everyone.
+ * @nullable
+ */
+export type EventInputTargetGender = typeof EventInputTargetGender[keyof typeof EventInputTargetGender] | null;
+
+
+export const EventInputTargetGender = {
+  male: 'male',
+  female: 'female',
+} as const;
 
 export interface EventInput {
   title: string;
@@ -151,7 +180,24 @@ export interface EventInput {
   age_max?: number | null;
   custom_requirements?: EventRequirement[];
   is_public?: boolean;
+  /**
+     * Restrict the audience by gender. null = everyone.
+     * @nullable
+     */
+  target_gender?: EventInputTargetGender;
 }
+
+/**
+ * Restrict the audience by gender. null = everyone.
+ * @nullable
+ */
+export type EventUpdateTargetGender = typeof EventUpdateTargetGender[keyof typeof EventUpdateTargetGender] | null;
+
+
+export const EventUpdateTargetGender = {
+  male: 'male',
+  female: 'female',
+} as const;
 
 export interface EventUpdate {
   title?: string;
@@ -167,6 +213,11 @@ export interface EventUpdate {
   age_max?: number | null;
   custom_requirements?: EventRequirement[];
   is_public?: boolean;
+  /**
+     * Restrict the audience by gender. null = everyone.
+     * @nullable
+     */
+  target_gender?: EventUpdateTargetGender;
 }
 
 export interface EventStats {

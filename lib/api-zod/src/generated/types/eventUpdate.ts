@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { EventRequirement } from './eventRequirement';
+import type { EventUpdateTargetGender } from './eventUpdateTargetGender';
 
 export interface EventUpdate {
   title?: string;
@@ -21,4 +22,9 @@ export interface EventUpdate {
   age_max?: number | null;
   custom_requirements?: EventRequirement[];
   is_public?: boolean;
+  /**
+     * Restrict the audience by gender. null = everyone.
+     * @nullable
+     */
+  target_gender?: EventUpdateTargetGender;
 }

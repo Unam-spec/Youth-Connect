@@ -5,6 +5,7 @@
  * Jeremiah Generation Youth API
  * OpenAPI spec version: 0.1.0
  */
+import type { EventInputTargetGender } from './eventInputTargetGender';
 import type { EventRequirement } from './eventRequirement';
 
 export interface EventInput {
@@ -21,4 +22,9 @@ export interface EventInput {
   age_max?: number | null;
   custom_requirements?: EventRequirement[];
   is_public?: boolean;
+  /**
+     * Restrict the audience by gender. null = everyone.
+     * @nullable
+     */
+  target_gender?: EventInputTargetGender;
 }

@@ -956,6 +956,10 @@ components:
             $ref: "#/components/schemas/EventRequirement"
         is_public:
           type: boolean
+        target_gender:
+          type: ["string", "null"]
+          enum: [male, female, null]
+          description: Restrict the audience by gender. null = everyone.
         rsvp_count:
           type: ["integer", "null"]
         attendance_count:
@@ -1001,6 +1005,10 @@ components:
         is_public:
           type: boolean
           default: true
+        target_gender:
+          type: ["string", "null"]
+          enum: [male, female, null]
+          description: Restrict the audience by gender. null = everyone.
 
     EventUpdate:
       type: object
@@ -1028,6 +1036,10 @@ components:
             $ref: "#/components/schemas/EventRequirement"
         is_public:
           type: boolean
+        target_gender:
+          type: ["string", "null"]
+          enum: [male, female, null]
+          description: Restrict the audience by gender. null = everyone.
 
     EventStats:
       type: object

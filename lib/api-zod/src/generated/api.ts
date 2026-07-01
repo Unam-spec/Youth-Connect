@@ -240,6 +240,7 @@ export const ListEventsResponseItem = zod.object({
   "required": zod.boolean()
 })).nullish(),
   "is_public": zod.boolean(),
+  "target_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullish().describe('Restrict the audience by gender. null = everyone.'),
   "rsvp_count": zod.number().nullish(),
   "attendance_count": zod.number().nullish(),
   "created_at": zod.coerce.date()
@@ -265,7 +266,8 @@ export const CreateEventBody = zod.object({
   "label": zod.string(),
   "required": zod.boolean()
 })).optional(),
-  "is_public": zod.boolean().default(createEventBodyIsPublicDefault)
+  "is_public": zod.boolean().default(createEventBodyIsPublicDefault),
+  "target_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullish().describe('Restrict the audience by gender. null = everyone.')
 })
 
 
@@ -292,6 +294,7 @@ export const GetEventResponse = zod.object({
   "required": zod.boolean()
 })).nullish(),
   "is_public": zod.boolean(),
+  "target_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullish().describe('Restrict the audience by gender. null = everyone.'),
   "rsvp_count": zod.number().nullish(),
   "attendance_count": zod.number().nullish(),
   "created_at": zod.coerce.date()
@@ -318,7 +321,8 @@ export const UpdateEventBody = zod.object({
   "label": zod.string(),
   "required": zod.boolean()
 })).optional(),
-  "is_public": zod.boolean().optional()
+  "is_public": zod.boolean().optional(),
+  "target_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullish().describe('Restrict the audience by gender. null = everyone.')
 })
 
 export const UpdateEventResponse = zod.object({
@@ -337,6 +341,7 @@ export const UpdateEventResponse = zod.object({
   "required": zod.boolean()
 })).nullish(),
   "is_public": zod.boolean(),
+  "target_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullish().describe('Restrict the audience by gender. null = everyone.'),
   "rsvp_count": zod.number().nullish(),
   "attendance_count": zod.number().nullish(),
   "created_at": zod.coerce.date()
@@ -493,6 +498,7 @@ export const ListMyRsvpsResponseItem = zod.object({
   "required": zod.boolean()
 })).nullish(),
   "is_public": zod.boolean(),
+  "target_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullish().describe('Restrict the audience by gender. null = everyone.'),
   "rsvp_count": zod.number().nullish(),
   "attendance_count": zod.number().nullish(),
   "created_at": zod.coerce.date()
@@ -530,6 +536,7 @@ export const ListEventRsvpsResponseItem = zod.object({
   "required": zod.boolean()
 })).nullish(),
   "is_public": zod.boolean(),
+  "target_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullish().describe('Restrict the audience by gender. null = everyone.'),
   "rsvp_count": zod.number().nullish(),
   "attendance_count": zod.number().nullish(),
   "created_at": zod.coerce.date()
@@ -571,6 +578,7 @@ export const UpsertRsvpResponse = zod.object({
   "required": zod.boolean()
 })).nullish(),
   "is_public": zod.boolean(),
+  "target_gender": zod.union([zod.literal('male'),zod.literal('female'),zod.literal(null)]).nullish().describe('Restrict the audience by gender. null = everyone.'),
   "rsvp_count": zod.number().nullish(),
   "attendance_count": zod.number().nullish(),
   "created_at": zod.coerce.date()

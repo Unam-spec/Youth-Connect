@@ -110,6 +110,9 @@ export const eventsTable = pgTable("events", {
   age_max: integer("age_max"),
   custom_requirements: jsonb("custom_requirements"),
   is_public: boolean("is_public").notNull().default(true),
+  // Restrict the audience by gender. null = everyone; "male"/"female" = that
+  // group only. ("other" is never targeted — such members see "all" events.)
+  target_gender: genderEnum("target_gender"),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

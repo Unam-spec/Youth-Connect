@@ -73,6 +73,31 @@ function isInsideFridayWindow(): boolean {
   return totalMinutes >= start && totalMinutes < end;
 }
 
+// ── Gender counts (for the event/broadcast audience preview) ──────────────────
+router.get("/dashboard/gender-counts", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    const rows = await db
+      .select({ gender: profilesTable.gender, total: count() })
+      .from(profilesTable)
+      .where(eq(profilesTable.role, "member"))
+      .groupBy(profilesTable.gender);
+
+    const counts = { male: 0, female: 0, other: 0, unspecified: 0, total: 0 };
+    for (const row of rows) {
+      const n = Number(row.total);
+      counts.total += n;
+      if (row.gender === "male") counts.male += n;
+      else if (row.gender === "female") counts.female += n;
+      else if (row.gender === "other") counts.other += n;
+      else counts.unspecified += n;
+    }
+    return res.json(counts);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── KPIs (cached) ─────────────────────────────────────────────────────────────
 router.get("/dashboard/kpis", async (req, res) => {
   try {

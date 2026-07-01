@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { Calendar, Trash2, MapPin, Users, Globe, ImagePlus, X } from "lucide-react";
+import { useAuth } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -8,8 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { DashCard, SectionTitle, SkeletonRows, EmptyState } from "./shared";
+
+interface GenderCounts {
+  male: number;
+  female: number;
+  other: number;
+  unspecified: number;
+  total: number;
+}
 
 interface EventsPanelProps {
   sessionRole: string;
@@ -31,9 +41,35 @@ export function EventsPanel({
   setDeleteEventName,
 }: EventsPanelProps) {
   const { toast } = useToast();
+  const { getToken } = useAuth();
   const { data: events, isLoading: isEventsLoading } = useListEvents(undefined, {
     query: { queryKey: getListEventsQueryKey() },
   });
+
+  // Member counts per gender, for the "who will this reach?" preview.
+  const [genderCounts, setGenderCounts] = useState<GenderCounts | null>(null);
+  useEffect(() => {
+    if (!canCreateEvents) return;
+    (async () => {
+      try {
+        const headers: Record<string, string> = {};
+        try {
+          const t = await getToken();
+          if (t) headers["Authorization"] = `Bearer ${t}`;
+        } catch {}
+        try {
+          const s = localStorage.getItem("jg_leader_session");
+          if (s) {
+            const p = JSON.parse(s);
+            if (Date.now() < p.expires_at) headers["x-leader-session"] = s;
+          }
+        } catch {}
+        const apiBase = import.meta.env.VITE_API_URL || "";
+        const res = await fetch(`${apiBase}/api/dashboard/gender-counts`, { headers });
+        if (res.ok) setGenderCounts(await res.json());
+      } catch {}
+    })();
+  }, [canCreateEvents, getToken]);
 
   const handlePosterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -88,6 +124,19 @@ export function EventsPanel({
                       ) : (
                         <Badge variant="outline" className="text-[10px] bg-muted text-muted-foreground border-border py-0 h-4">
                           Internal
+                        </Badge>
+                      )}
+                      {event.target_gender && (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "text-[10px] py-0 h-4 border",
+                            event.target_gender === "male"
+                              ? "bg-blue-500/10 text-blue-500 border-blue-500/20"
+                              : "bg-rose-500/10 text-rose-500 border-rose-500/20",
+                          )}
+                        >
+                          {event.target_gender === "male" ? "Guys only" : "Girls only"}
                         </Badge>
                       )}
                     </h4>
@@ -256,6 +305,42 @@ export function EventsPanel({
                   className="bg-card border-border"
                 />
               </div>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label className="text-xs text-muted-foreground">Who is this for?</Label>
+              <div className="flex gap-2">
+                {[
+                  { value: "", label: "Everyone" },
+                  { value: "male", label: "Guys only" },
+                  { value: "female", label: "Girls only" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value || "all"}
+                    type="button"
+                    onClick={() => setEventForm({ ...eventForm, target_gender: opt.value })}
+                    className={cn(
+                      "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                      (eventForm.target_gender || "") === opt.value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card text-muted-foreground hover:border-primary/40",
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {eventForm.target_gender && genderCounts && (
+                <p className="text-[11px] text-muted-foreground">
+                  Reaches{" "}
+                  <span className="font-semibold text-foreground">
+                    {eventForm.target_gender === "male" ? genderCounts.male : genderCounts.female}
+                  </span>{" "}
+                  of {genderCounts.total} members
+                  {genderCounts.unspecified > 0 &&
+                    ` · ${genderCounts.unspecified} have no gender set (won't receive it)`}
+                  . Leaders are always notified.
+                </p>
+              )}
             </div>
             <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-muted/40 md:col-span-2">
               <div className="space-y-0.5">

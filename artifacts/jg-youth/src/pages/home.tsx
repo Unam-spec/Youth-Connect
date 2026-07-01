@@ -8,6 +8,7 @@ import { format } from "date-fns";
 import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, KeyRound } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
+import { isEventVisibleTo } from "@/lib/eventVisibility";
 
 function PublicHome() {
   const [, setLocation] = useLocation();
@@ -19,6 +20,8 @@ function PublicHome() {
     { public_only: true, upcoming: true },
     { query: { enabled: true, queryKey: getListEventsQueryKey({ public_only: true, upcoming: true }) } },
   );
+  // Anonymous landing page: only show events for everyone, not gender-targeted ones.
+  const visibleEvents = (events ?? []).filter((e) => isEventVisibleTo(e, null));
 
   return (
     <Layout>
@@ -131,8 +134,8 @@ function PublicHome() {
                   </CardContent>
                 </Card>
               ))
-            ) : events && events.length > 0 ? (
-              events.map((event) => (
+            ) : visibleEvents.length > 0 ? (
+              visibleEvents.map((event) => (
                 <Card key={event.id} className="flex flex-col overflow-hidden">
                   {event.poster_url && (
                     <img

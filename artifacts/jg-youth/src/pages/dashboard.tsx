@@ -343,6 +343,7 @@ export default function Dashboard() {
     age_min: "",
     age_max: "",
     is_public: true,
+    target_gender: "", // "" = everyone, "male", "female"
   });
 
   // ── All react-query hooks ────────────────────────────────────────────────
@@ -646,6 +647,7 @@ export default function Dashboard() {
           age_max: eventForm.age_max ? Number(eventForm.age_max) : null,
           custom_requirements: [],
           is_public: eventForm.is_public,
+          target_gender: (eventForm.target_gender || null) as "male" | "female" | null,
         },
       },
       {
@@ -660,6 +662,7 @@ export default function Dashboard() {
             age_min: "",
             age_max: "",
             is_public: true,
+            target_gender: "",
           });
           toast({ title: "Event created" });
           refreshDashboard();

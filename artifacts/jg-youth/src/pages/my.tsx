@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Layout } from "@/components/layout";
 import { getLeaderSession } from "@/lib/auth";
+import { isEventVisibleTo } from "@/lib/eventVisibility";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -136,6 +137,10 @@ export default function MyDashboard() {
     { upcoming: true },
     { query: { enabled: true, queryKey: getListEventsQueryKey({ upcoming: true }) } },
   );
+  // Hide gender-targeted events that aren't for this member.
+  const visibleEvents = (events ?? []).filter((e) =>
+    isEventVisibleTo(e, profile?.gender),
+  );
   const { data: rsvps, isLoading: isRsvpsLoading } = useListMyRsvps({
     query: { enabled: !!profile, queryKey: getListMyRsvpsQueryKey() },
   });
@@ -256,6 +261,8 @@ export default function MyDashboard() {
   const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
   const [birthdayInput, setBirthdayInput] = useState("");
   const [isSavingBirthday, setIsSavingBirthday] = useState(false);
+  const [showGenderPrompt, setShowGenderPrompt] = useState(false);
+  const [isSavingGender, setIsSavingGender] = useState(false);
   const birthdayKey = `bday_dismissed_${todaySAST()}`;
   const [bdayDismissed, setBdayDismissed] = useState(
     () => typeof localStorage !== "undefined" && !!localStorage.getItem(`bday_dismissed_${todaySAST()}`),
@@ -360,6 +367,36 @@ export default function MyDashboard() {
   function dismissBirthdayPrompt() {
     localStorage.setItem("dismissed_birthday_prompt", "true");
     setShowBirthdayPrompt(false);
+  }
+
+  // Lowest-priority prompt: ask legacy members with no gender to set it, so they
+  // can receive gender-targeted events. One-time (dismissable).
+  const needsGender =
+    profileLoaded &&
+    !profile!.gender &&
+    !localStorage.getItem("dismissed_gender_prompt");
+
+  if (needsGender && !shouldPrompt && !showBirthdayPrompt && !showGenderPrompt) {
+    setShowGenderPrompt(true);
+  }
+
+  async function handleSaveGender(value: "male" | "female") {
+    setIsSavingGender(true);
+    try {
+      await updateProfile.mutateAsync({ data: { gender: value } });
+      queryClient.invalidateQueries({ queryKey: getGetMyProfileQueryKey() });
+      toast({ title: "Thanks — saved" });
+      setShowGenderPrompt(false);
+    } catch {
+      toast({ title: "Could not save. Please try again.", variant: "destructive" });
+    } finally {
+      setIsSavingGender(false);
+    }
+  }
+
+  function dismissGenderPrompt() {
+    localStorage.setItem("dismissed_gender_prompt", "true");
+    setShowGenderPrompt(false);
   }
 
   async function handleSaveProfile() {
@@ -824,8 +861,8 @@ export default function MyDashboard() {
                   Array.from({ length: 2 }).map((_, i) => (
                     <Skeleton key={i} className="h-52 w-full rounded-2xl" />
                   ))
-                ) : events && events.length > 0 ? (
-                  events.map((event) => {
+                ) : visibleEvents.length > 0 ? (
+                  visibleEvents.map((event) => {
                     const status = getRsvpStatus(event.id);
                     return (
                       <Card key={event.id} className="flex flex-col rounded-2xl border-border overflow-hidden">
@@ -1321,6 +1358,41 @@ export default function MyDashboard() {
               {isSavingBirthday ? "Saving…" : "Save"}
             </Button>
             <Button variant="ghost" onClick={dismissBirthdayPrompt} className="w-full rounded-xl">
+              Maybe later
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showGenderPrompt} onOpenChange={(o) => { if (!o) dismissGenderPrompt(); }}>
+        <DialogContent className="rounded-2xl max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center text-2xl font-semibold tracking-tight">
+              A quick question
+            </DialogTitle>
+            <DialogDescription className="text-center pt-1">
+              So we can send you events and updates meant for you.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3 py-2">
+            <Button
+              onClick={() => handleSaveGender("male")}
+              disabled={isSavingGender}
+              variant="outline"
+              className="h-16 rounded-xl text-base"
+            >
+              I'm a guy
+            </Button>
+            <Button
+              onClick={() => handleSaveGender("female")}
+              disabled={isSavingGender}
+              variant="outline"
+              className="h-16 rounded-xl text-base"
+            >
+              I'm a girl
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={dismissGenderPrompt} className="w-full rounded-xl">
               Maybe later
             </Button>
           </DialogFooter>

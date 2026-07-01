@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { EventRequirement } from './eventRequirement';
+import type { EventTargetGender } from './eventTargetGender';
 
 export interface Event {
   id: string;
@@ -26,6 +27,11 @@ export interface Event {
   /** @nullable */
   custom_requirements?: EventRequirement[] | null;
   is_public: boolean;
+  /**
+     * Restrict the audience by gender. null = everyone.
+     * @nullable
+     */
+  target_gender?: EventTargetGender;
   /** @nullable */
   rsvp_count?: number | null;
   /** @nullable */

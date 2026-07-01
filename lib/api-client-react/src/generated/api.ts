@@ -1568,7 +1568,7 @@ export const getListMyRsvpsUrl = () => {
 
 
 
-  return `/api/rsvps/my`
+  return `/api/rsvps`
 }
 
 /**
@@ -1591,7 +1591,7 @@ export const listMyRsvps = async ( options?: RequestInit): Promise<Rsvp[]> => {
 
 export const getListMyRsvpsQueryKey = () => {
     return [
-    `/api/rsvps/my`
+    `/api/rsvps`
     ] as const;
     }
 

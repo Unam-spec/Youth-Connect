@@ -34,6 +34,10 @@ ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "avatar_url" text;
 -- Ensure events.poster_url column exists (event poster image, stored as data URL)
 ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "poster_url" text;
 
+-- Gender targeting: restrict an event's audience (null = everyone). Reuses the
+-- existing "gender" enum already used by profiles.gender.
+ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "target_gender" gender;
+
 
 -- Ensure link verification columns exist
 ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "link_token" text;
@@ -98,6 +102,8 @@ CREATE INDEX IF NOT EXISTS idx_attendance_session_date ON attendance (session_da
 CREATE INDEX IF NOT EXISTS idx_attendance_profile_id ON attendance (profile_id);
 -- membership_requests.status: pending requests list on the manage dashboard.
 CREATE INDEX IF NOT EXISTS idx_membership_requests_status ON membership_requests (status);
+-- profiles.gender: gender-targeted broadcasts + gender analytics breakdowns.
+CREATE INDEX IF NOT EXISTS idx_profiles_gender ON profiles (gender);
 
 -- Configurable check-in schedule (added 2026-06): single-row settings + per-weekday windows.
 CREATE TABLE IF NOT EXISTS "checkin_settings" (

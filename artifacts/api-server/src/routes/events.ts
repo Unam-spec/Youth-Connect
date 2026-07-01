@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { eq, and, gte, sql, count } from "drizzle-orm";
+import { eq, and, or, gte, sql, count, inArray } from "drizzle-orm";
 import {
   db,
   eventsTable,
@@ -84,6 +84,7 @@ router.post("/events", requireLeaderSession("leader"), async (req: Request, res:
         age_max: parsed.data.age_max ?? null,
         custom_requirements: parsed.data.custom_requirements ?? null,
         is_public: parsed.data.is_public ?? true,
+        target_gender: parsed.data.target_gender ?? null,
         created_by: req.leaderId ?? null,
       })
       .returning();
@@ -92,11 +93,21 @@ router.post("/events", requireLeaderSession("leader"), async (req: Request, res:
 
     // Queue email notifications for new public events
     if (event.is_public) {
-      const { inArray } = await import("drizzle-orm");
+      // Gender-targeted events only email the matching members; leaders and
+      // super-admins are always notified so they stay aware of every event.
+      const audienceFilter = event.target_gender
+        ? or(
+            inArray(profilesTable.role, ["leader", "super_admin"]),
+            and(
+              eq(profilesTable.role, "member"),
+              eq(profilesTable.gender, event.target_gender),
+            ),
+          )
+        : inArray(profilesTable.role, ["member", "leader", "super_admin"]);
       const recipients = await db
         .select({ email: profilesTable.email, full_name: profilesTable.full_name })
         .from(profilesTable)
-        .where(inArray(profilesTable.role, ["member", "leader", "super_admin"]));
+        .where(audienceFilter);
 
       let SouthAfricaDate = "";
       try {
