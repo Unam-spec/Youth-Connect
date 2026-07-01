@@ -105,11 +105,9 @@ const CHART_COLORS = {
 
 const PIE_COLORS = [CHART_COLORS.emerald, CHART_COLORS.rose];
 
-// Display label + colour per gender bucket for the Gender Breakdown module.
 const GENDER_META: Record<string, { label: string; color: string }> = {
   male: { label: "Guys", color: CHART_COLORS.blue },
   female: { label: "Girls", color: CHART_COLORS.rose },
-  other: { label: "Other", color: CHART_COLORS.amber },
   unspecified: { label: "Not set", color: "hsl(215, 16%, 47%)" },
 };
 

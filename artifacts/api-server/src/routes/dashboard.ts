@@ -82,14 +82,13 @@ router.get("/dashboard/gender-counts", requireLeaderSession("leader"), async (re
       .where(eq(profilesTable.role, "member"))
       .groupBy(profilesTable.gender);
 
-    const counts = { male: 0, female: 0, other: 0, unspecified: 0, total: 0 };
+    const counts = { male: 0, female: 0, unspecified: 0, total: 0 };
     for (const row of rows) {
       const n = Number(row.total);
       counts.total += n;
       if (row.gender === "male") counts.male += n;
       else if (row.gender === "female") counts.female += n;
-      else if (row.gender === "other") counts.other += n;
-      else counts.unspecified += n;
+      else counts.unspecified += n; // any legacy "other" + null
     }
     return res.json(counts);
   } catch (err) {
@@ -357,18 +356,17 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
       )
       .groupBy(profilesTable.gender);
 
-    const genderBucket = (g: string | null): "male" | "female" | "other" | "unspecified" =>
-      g === "male" ? "male" : g === "female" ? "female" : g === "other" ? "other" : "unspecified";
+    const genderBucket = (g: string | null): "male" | "female" | "unspecified" =>
+      g === "male" ? "male" : g === "female" ? "female" : "unspecified";
     const gb: Record<string, { gender: string; total: number; active: number; dormant: number }> = {
       male: { gender: "male", total: 0, active: 0, dormant: 0 },
       female: { gender: "female", total: 0, active: 0, dormant: 0 },
-      other: { gender: "other", total: 0, active: 0, dormant: 0 },
       unspecified: { gender: "unspecified", total: 0, active: 0, dormant: 0 },
     };
     for (const r of genderTotals) gb[genderBucket(r.gender)].total += Number(r.total);
     for (const r of genderActive) gb[genderBucket(r.gender)].active += Number(r.active);
     for (const k of Object.keys(gb)) gb[k].dormant = Math.max(0, gb[k].total - gb[k].active);
-    const genderBreakdown = [gb.male, gb.female, gb.other, gb.unspecified];
+    const genderBreakdown = [gb.male, gb.female, gb.unspecified];
 
     // ── 4b. No-email (PIN) accounts ──────────────────────────────────────
     // PIN accounts are the username+PIN signups (no email); identified by a
