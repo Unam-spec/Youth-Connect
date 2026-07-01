@@ -79,6 +79,12 @@ interface AnalyticsData {
     total_checkins: number;
     last_checkin: string;
   }[];
+  gender_breakdown?: {
+    gender: string;
+    total: number;
+    active: number;
+    dormant: number;
+  }[];
 }
 
 // ── Chart colors ───────────────────────────────────────────────────────────────
@@ -98,6 +104,14 @@ const CHART_COLORS = {
 };
 
 const PIE_COLORS = [CHART_COLORS.emerald, CHART_COLORS.rose];
+
+// Display label + colour per gender bucket for the Gender Breakdown module.
+const GENDER_META: Record<string, { label: string; color: string }> = {
+  male: { label: "Guys", color: CHART_COLORS.blue },
+  female: { label: "Girls", color: CHART_COLORS.rose },
+  other: { label: "Other", color: CHART_COLORS.amber },
+  unspecified: { label: "Not set", color: "hsl(215, 16%, 47%)" },
+};
 
 // ── Custom tooltip ─────────────────────────────────────────────────────────────
 function ChartTooltip({
@@ -274,6 +288,8 @@ export default function Analytics() {
   }
 
   const s = data?.summary;
+  const genderData = data?.gender_breakdown ?? [];
+  const genderTotal = genderData.reduce((sum, g) => sum + g.total, 0);
 
   return (
     <DashboardLayout active="analytics">
@@ -572,6 +588,117 @@ export default function Analytics() {
                     </span>
                   </div>
                 </div>
+              </div>
+            )}
+          </ChartCard>
+        </div>
+
+        {/* ── Gender Breakdown ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ChartCard
+            title="Gender Breakdown"
+            icon={<Users className="h-4 w-4 text-blue-500" />}
+          >
+            {loading ? (
+              <Skeleton className="h-64 w-full rounded-lg" />
+            ) : genderTotal > 0 ? (
+              <div className="flex flex-col items-center">
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={genderData
+                        .filter((g) => g.total > 0)
+                        .map((g) => ({
+                          name: GENDER_META[g.gender]?.label ?? g.gender,
+                          value: g.total,
+                        }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={80}
+                      paddingAngle={4}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {genderData
+                        .filter((g) => g.total > 0)
+                        .map((g) => (
+                          <Cell
+                            key={g.gender}
+                            fill={GENDER_META[g.gender]?.color ?? CHART_COLORS.primary}
+                          />
+                        ))}
+                    </Pie>
+                    <Tooltip content={<ChartTooltip />} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap justify-center gap-3 mt-2">
+                  {genderData.map((g) => (
+                    <div key={g.gender} className="flex items-center gap-1.5">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{ backgroundColor: GENDER_META[g.gender]?.color }}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {GENDER_META[g.gender]?.label ?? g.gender} ({g.total}
+                        {genderTotal > 0
+                          ? ` · ${Math.round((g.total / genderTotal) * 100)}%`
+                          : ""}
+                        )
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">
+                No member data yet
+              </div>
+            )}
+          </ChartCard>
+
+          <ChartCard
+            title="Engagement by Gender"
+            icon={<UserCheck className="h-4 w-4 text-emerald-500" />}
+          >
+            {loading ? (
+              <Skeleton className="h-64 w-full rounded-lg" />
+            ) : genderTotal > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart
+                  data={genderData.map((g) => ({
+                    gender: GENDER_META[g.gender]?.label ?? g.gender,
+                    Active: g.active,
+                    Dormant: g.dormant,
+                  }))}
+                  margin={{ top: 5, right: 5, left: -20, bottom: 5 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(215, 20%, 20%)"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="gender"
+                    tick={{ fontSize: 11, fill: "hsl(215, 16%, 57%)" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: "hsl(215, 16%, 57%)" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  <Bar dataKey="Active" fill={CHART_COLORS.emerald} radius={[6, 6, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="Dormant" fill={CHART_COLORS.rose} radius={[6, 6, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-64 flex items-center justify-center text-sm text-muted-foreground">
+                No member data yet
               </div>
             )}
           </ChartCard>

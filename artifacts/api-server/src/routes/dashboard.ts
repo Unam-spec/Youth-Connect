@@ -335,6 +335,41 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
     const activeMembers = Number(activeMembersRow?.count ?? 0);
     const dormantMembers = Math.max(0, totalMembers - activeMembers);
 
+    // ── 4a. Gender breakdown (total + active per gender) ─────────────────
+    const genderTotals = await db
+      .select({ gender: profilesTable.gender, total: count() })
+      .from(profilesTable)
+      .where(inArray(profilesTable.role, ["member", "leader", "super_admin"]))
+      .groupBy(profilesTable.gender);
+
+    const genderActive = await db
+      .select({
+        gender: profilesTable.gender,
+        active: sql<number>`count(distinct ${profilesTable.id})`,
+      })
+      .from(profilesTable)
+      .innerJoin(attendanceTable, eq(attendanceTable.profile_id, profilesTable.id))
+      .where(
+        and(
+          inArray(profilesTable.role, ["member", "leader", "super_admin"]),
+          sql`${attendanceTable.session_date}::date >= ${twoWeeksAgo}::date`,
+        ),
+      )
+      .groupBy(profilesTable.gender);
+
+    const genderBucket = (g: string | null): "male" | "female" | "other" | "unspecified" =>
+      g === "male" ? "male" : g === "female" ? "female" : g === "other" ? "other" : "unspecified";
+    const gb: Record<string, { gender: string; total: number; active: number; dormant: number }> = {
+      male: { gender: "male", total: 0, active: 0, dormant: 0 },
+      female: { gender: "female", total: 0, active: 0, dormant: 0 },
+      other: { gender: "other", total: 0, active: 0, dormant: 0 },
+      unspecified: { gender: "unspecified", total: 0, active: 0, dormant: 0 },
+    };
+    for (const r of genderTotals) gb[genderBucket(r.gender)].total += Number(r.total);
+    for (const r of genderActive) gb[genderBucket(r.gender)].active += Number(r.active);
+    for (const k of Object.keys(gb)) gb[k].dormant = Math.max(0, gb[k].total - gb[k].active);
+    const genderBreakdown = [gb.male, gb.female, gb.other, gb.unspecified];
+
     // ── 4b. No-email (PIN) accounts ──────────────────────────────────────
     // PIN accounts are the username+PIN signups (no email); identified by a
     // non-null username — the only flow that sets one. They start as visitors
@@ -482,6 +517,7 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
         total_checkins: Number(s.total_checkins),
         last_checkin: s.last_checkin,
       })),
+      gender_breakdown: genderBreakdown,
     };
 
     await setCache(cacheKey, result, CACHE_TTL_ANALYTICS);
