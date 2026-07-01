@@ -1,10 +1,18 @@
 import { logger } from "../lib/logger";
+import { downscaleAvatar } from "./downscaleAvatar";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+/**
+ * Upper bound on an uploaded avatar before compression. This is just a memory
+ * guard — the image is always downscaled to <=100KB afterwards, so we can
+ * comfortably accept full-resolution phone photos.
+ */
+export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
+
 export class FileTooLargeError extends Error {
-  constructor(message = "File exceeds the 2MB size limit") {
+  constructor(message = "File exceeds the 10MB size limit") {
     super(message);
     this.name = "FileTooLargeError";
   }
@@ -15,10 +23,12 @@ export async function uploadAvatar(
   buffer: Buffer,
   mimeType: string
 ): Promise<string> {
-  // Enforce 2MB file size limit (2,097,152 bytes)
-  const maxBytes = 2 * 1024 * 1024;
-  if (buffer.length > maxBytes) {
+  if (buffer.length > MAX_UPLOAD_BYTES) {
     throw new FileTooLargeError();
+  }
+
+  if (!mimeType.startsWith("image/")) {
+    throw new Error(`Unsupported avatar type: ${mimeType}`);
   }
 
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -26,20 +36,23 @@ export async function uploadAvatar(
     throw new Error("Supabase Storage credentials are not configured");
   }
 
-  const ext = mimeType.split("/")[1]?.split(";")[0]?.replace("jpeg", "jpg") || "png";
-  const filename = `${profileId}-${Date.now()}.${ext}`;
+  // Normalise + compress to a <=100KB JPEG regardless of what was uploaded.
+  const processed = await downscaleAvatar(buffer);
+  const filename = `${profileId}-${Date.now()}.jpg`;
   const uploadUrl = `${SUPABASE_URL}/storage/v1/object/avatars/${filename}`;
 
-  logger.info(`[supabase-storage] Uploading avatar file ${filename} (${buffer.length} bytes) to Supabase...`);
+  logger.info(
+    `[supabase-storage] Uploading avatar ${filename} (${buffer.length} → ${processed.length} bytes) to Supabase...`,
+  );
 
   const response = await fetch(uploadUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": mimeType,
+      "Content-Type": "image/jpeg",
       "x-upsert": "true",
     },
-    body: buffer,
+    body: processed,
   });
 
   if (!response.ok) {

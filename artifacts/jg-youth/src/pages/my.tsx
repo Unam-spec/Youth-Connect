@@ -45,7 +45,7 @@ import { StreakWidget } from "@/components/member/StreakWidget";
 import { OnboardingTour, type TourStep } from "@/components/member/OnboardingTour";
 
 export default function MyDashboard() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const [, setLocation] = useLocation();
 
   // ── Member-experience features: feedback / preferences / streak / tour ───────
@@ -425,6 +425,38 @@ export default function MyDashboard() {
     setIsCameraActive(false);
   }
 
+  // Upload an image to Supabase Storage via the backend (which compresses it to
+  // <=100KB) and return the public URL. Replaces the old base64-in-the-DB path.
+  async function uploadAvatarFile(blob: Blob, filename: string): Promise<string> {
+    const headers: Record<string, string> = {};
+    try {
+      const token = await getToken();
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+    } catch {}
+    try {
+      const sessionStr = localStorage.getItem("jg_leader_session");
+      if (sessionStr) {
+        const s = JSON.parse(sessionStr);
+        if (Date.now() < s.expires_at) headers["x-leader-session"] = sessionStr;
+      }
+    } catch {}
+
+    const fd = new FormData();
+    fd.append("file", blob, filename);
+    const apiBase = import.meta.env.VITE_API_URL || "";
+    const res = await fetch(`${apiBase}/api/profiles/avatar/upload`, {
+      method: "POST",
+      headers,
+      body: fd,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Upload failed");
+    }
+    const data = await res.json();
+    return data.url as string;
+  }
+
   async function capturePhoto() {
     if (!videoRef.current) return;
     const video = videoRef.current;
@@ -433,29 +465,49 @@ export default function MyDashboard() {
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
-    if (ctx) {
-      const sx = (video.videoWidth - size) / 2;
-      const sy = (video.videoHeight - size) / 2;
-      ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-      stopCamera();
-      await saveAvatar(dataUrl);
+    if (!ctx) return;
+    const sx = (video.videoWidth - size) / 2;
+    const sy = (video.videoHeight - size) / 2;
+    ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
+    stopCamera();
+
+    setIsSavingAvatar(true);
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error("Capture failed"))),
+          "image/jpeg",
+          0.9,
+        ),
+      );
+      const url = await uploadAvatarFile(blob, "camera.jpg");
+      await saveAvatar(url);
+    } catch {
+      toast({ title: "Failed to update profile picture", variant: "destructive" });
+      setIsSavingAvatar(false);
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        toast({ title: "File too large", description: "Please upload an image smaller than 2MB.", variant: "destructive" });
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        await saveAvatar(base64String);
-      };
-      reader.readAsDataURL(file);
+    e.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please choose an image file", variant: "destructive" });
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: "File too large", description: "Please upload an image smaller than 10MB.", variant: "destructive" });
+      return;
+    }
+
+    setIsSavingAvatar(true);
+    try {
+      const url = await uploadAvatarFile(file, file.name || "avatar.jpg");
+      await saveAvatar(url);
+    } catch {
+      toast({ title: "Failed to update profile picture", variant: "destructive" });
+      setIsSavingAvatar(false);
     }
   };
 

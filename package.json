@@ -40,7 +40,8 @@
       "bcrypt",
       "esbuild",
       "@clerk/shared",
-      "core-js"
+      "core-js",
+      "sharp"
     ]
   }
 }

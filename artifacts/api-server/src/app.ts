@@ -12,9 +12,11 @@ import pinoHttp from "pino-http";
 import { clerkMiddleware } from "@clerk/express";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { serverTiming } from "./lib/serverTiming";
 
 const app: Express = express();
 app.set("trust proxy", 1);
+app.use(serverTiming);
 
 app.use(
   pinoHttp({

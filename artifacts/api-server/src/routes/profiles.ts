@@ -733,11 +733,11 @@ router.delete("/profiles/:id", requireLeaderSession("super_admin"), async (req: 
 
 // ── Avatar Upload Endpoint ───────────────────────────────────────────────────
 import multer from "multer";
-import { uploadAvatar, FileTooLargeError } from "../storage/avatarUpload";
+import { uploadAvatar, FileTooLargeError, MAX_UPLOAD_BYTES } from "../storage/avatarUpload";
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 }, // Enforce 2MB limit in multer
+  limits: { fileSize: MAX_UPLOAD_BYTES }, // image is compressed to <=100KB after upload
 });
 
 router.post("/profiles/avatar/upload", upload.single("file"), async (req: Request, res: Response) => {
@@ -758,7 +758,7 @@ router.post("/profiles/avatar/upload", upload.single("file"), async (req: Reques
     return res.json({ url: publicUrl });
   } catch (err: any) {
     if (err instanceof FileTooLargeError || err.code === "LIMIT_FILE_SIZE") {
-      return res.status(413).json({ error: "File exceeds the 2MB size limit. Please upload a smaller image." });
+      return res.status(413).json({ error: "File exceeds the 10MB size limit. Please upload a smaller image." });
     }
     req.log.error(err);
     return res.status(500).json({ error: err.message || "Failed to upload avatar" });

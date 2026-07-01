@@ -6,13 +6,13 @@ import { db, visitorsTable, checkInRequestsTable } from "@workspace/db";
 import { isCheckinOpenNow } from "../lib/checkinSchedule";
 import { validateDob } from "../lib/age";
 import { publishActivity } from "../lib/activityStream";
-import { uploadAvatar, FileTooLargeError } from "../storage/avatarUpload";
+import { uploadAvatar, FileTooLargeError, MAX_UPLOAD_BYTES } from "../storage/avatarUpload";
 
 const router = Router();
 
 const photoUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+  limits: { fileSize: MAX_UPLOAD_BYTES }, // image is compressed to <=100KB after upload
 });
 
 // POST /api/register/photo — public profile-picture upload for first-timers.
