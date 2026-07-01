@@ -10,10 +10,11 @@ async function makeBigNoisyJpeg(size = 1400): Promise<Buffer> {
     .toBuffer();
 }
 
-describe("uploadAvatar", () => {
+describe("uploadAvatar (Cloudinary)", () => {
   beforeEach(() => {
-    process.env.SUPABASE_URL = "https://example.supabase.co";
-    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
+    process.env.CLOUDINARY_CLOUD_NAME = "demo";
+    process.env.CLOUDINARY_API_KEY = "test-key";
+    process.env.CLOUDINARY_API_SECRET = "test-secret";
     vi.resetModules();
   });
 
@@ -21,16 +22,22 @@ describe("uploadAvatar", () => {
     vi.unstubAllGlobals();
   });
 
-  it("uploads a compressed (<=100KB) jpeg and returns a public URL", async () => {
+  it("uploads a compressed (<=100KB) jpeg and returns the secure_url", async () => {
     const big = await makeBigNoisyJpeg();
     expect(big.length).toBeGreaterThan(100 * 1024);
 
-    let capturedBody: Buffer | undefined;
-    let capturedContentType: string | undefined;
-    const fetchMock = vi.fn(async (_url: string, init: any) => {
-      capturedBody = init.body as Buffer;
-      capturedContentType = init.headers["Content-Type"];
-      return { ok: true, text: async () => "" } as Response;
+    let capturedUrl: string | undefined;
+    let capturedBody: unknown;
+    const fetchMock = vi.fn(async (url: string, init: any) => {
+      capturedUrl = url;
+      capturedBody = init.body;
+      return {
+        ok: true,
+        json: async () => ({
+          secure_url:
+            "https://res.cloudinary.com/demo/image/upload/v1/avatars/profile-123.jpg",
+        }),
+      } as Response;
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -38,10 +45,17 @@ describe("uploadAvatar", () => {
     const url = await uploadAvatar("profile-123", big, "image/png");
 
     expect(fetchMock).toHaveBeenCalledOnce();
-    expect(capturedBody!.length).toBeLessThanOrEqual(100 * 1024);
-    expect(capturedContentType).toBe("image/jpeg");
-    expect(url).toContain("/storage/v1/object/public/avatars/profile-123-");
-    expect(url).toMatch(/\.jpg$/);
+    expect(capturedUrl).toBe("https://api.cloudinary.com/v1_1/demo/image/upload");
+
+    // The file sent to Cloudinary is the compressed JPEG.
+    const file = (capturedBody as FormData).get("file") as Blob;
+    expect(file.size).toBeLessThanOrEqual(100 * 1024);
+    // A signature is included (signed upload).
+    expect((capturedBody as FormData).get("signature")).toBeTruthy();
+
+    expect(url).toBe(
+      "https://res.cloudinary.com/demo/image/upload/v1/avatars/profile-123.jpg",
+    );
   });
 
   it("rejects a non-image mime type", async () => {
@@ -50,5 +64,22 @@ describe("uploadAvatar", () => {
     await expect(
       uploadAvatar("profile-123", Buffer.from("not an image"), "application/pdf"),
     ).rejects.toThrow(/Unsupported avatar type/);
+  });
+
+  it("throws when Cloudinary credentials are missing", async () => {
+    delete process.env.CLOUDINARY_CLOUD_NAME;
+    delete process.env.CLOUDINARY_API_KEY;
+    delete process.env.CLOUDINARY_API_SECRET;
+    vi.resetModules();
+    vi.stubGlobal("fetch", vi.fn());
+    const small = await sharp({
+      create: { width: 64, height: 64, channels: 3, background: { r: 1, g: 2, b: 3 } },
+    })
+      .jpeg()
+      .toBuffer();
+    const { uploadAvatar } = await import("./avatarUpload");
+    await expect(uploadAvatar("p1", small, "image/jpeg")).rejects.toThrow(
+      /Cloudinary credentials are not configured/,
+    );
   });
 });

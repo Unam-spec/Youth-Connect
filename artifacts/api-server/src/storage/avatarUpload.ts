@@ -1,8 +1,13 @@
+import crypto from "node:crypto";
 import { logger } from "../lib/logger";
 import { downscaleAvatar } from "./downscaleAvatar";
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// Avatars are hosted on Cloudinary (free tier, separate bandwidth quota) so they
+// never count against Supabase's egress cap. The image is still compressed to
+// <=100KB before upload.
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME;
+const CLOUDINARY_API_KEY = process.env.CLOUDINARY_API_KEY;
+const CLOUDINARY_API_SECRET = process.env.CLOUDINARY_API_SECRET;
 
 /**
  * Upper bound on an uploaded avatar before compression. This is just a memory
@@ -31,37 +36,51 @@ export async function uploadAvatar(
     throw new Error(`Unsupported avatar type: ${mimeType}`);
   }
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    logger.warn("[supabase-storage] SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing — skipping storage upload");
-    throw new Error("Supabase Storage credentials are not configured");
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+    logger.warn("[cloudinary] CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET missing — skipping avatar upload");
+    throw new Error("Cloudinary credentials are not configured");
   }
 
   // Normalise + compress to a <=100KB JPEG regardless of what was uploaded.
   const processed = await downscaleAvatar(buffer);
-  const filename = `${profileId}-${Date.now()}.jpg`;
-  const uploadUrl = `${SUPABASE_URL}/storage/v1/object/avatars/${filename}`;
+
+  // Signed upload: sign every param we send except file, api_key and
+  // resource_type, sorted alphabetically, then append the API secret (SHA-1).
+  const timestamp = Math.floor(Date.now() / 1000);
+  const publicId = `avatars/${profileId}`;
+  const signable = `overwrite=true&public_id=${publicId}&timestamp=${timestamp}`;
+  const signature = crypto
+    .createHash("sha1")
+    .update(signable + CLOUDINARY_API_SECRET)
+    .digest("hex");
+
+  const form = new FormData();
+  form.append("file", new Blob([new Uint8Array(processed)], { type: "image/jpeg" }), "avatar.jpg");
+  form.append("api_key", CLOUDINARY_API_KEY);
+  form.append("timestamp", String(timestamp));
+  form.append("public_id", publicId);
+  form.append("overwrite", "true");
+  form.append("signature", signature);
 
   logger.info(
-    `[supabase-storage] Uploading avatar ${filename} (${buffer.length} → ${processed.length} bytes) to Supabase...`,
+    `[cloudinary] Uploading avatar ${publicId} (${buffer.length} → ${processed.length} bytes)...`,
   );
 
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-      "Content-Type": "image/jpeg",
-      "x-upsert": "true",
-    },
-    body: processed,
-  });
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    { method: "POST", body: form },
+  );
 
   if (!response.ok) {
     const errorText = await response.text();
-    logger.error({ errorText, status: response.status }, "[supabase-storage] Failed to upload avatar to Supabase Storage");
-    throw new Error(`Failed to upload avatar to Supabase: ${errorText}`);
+    logger.error({ errorText, status: response.status }, "[cloudinary] Failed to upload avatar");
+    throw new Error(`Failed to upload avatar to Cloudinary: ${errorText}`);
   }
 
-  const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/avatars/${filename}`;
-  logger.info(`[supabase-storage] Successfully uploaded avatar. Public URL: ${publicUrl}`);
-  return publicUrl;
+  const data = (await response.json()) as { secure_url?: string };
+  if (!data.secure_url) {
+    throw new Error("Cloudinary response did not include a secure_url");
+  }
+  logger.info(`[cloudinary] Uploaded avatar. URL: ${data.secure_url}`);
+  return data.secure_url;
 }

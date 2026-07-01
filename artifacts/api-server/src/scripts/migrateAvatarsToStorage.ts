@@ -7,12 +7,13 @@ import { logger } from "../lib/logger";
 
 /**
  * One-shot backfill: find every profile whose avatar_url is an inline base64
- * `data:` URI, compress it (uploadAvatar downscales to <=100KB), move it into
- * Supabase Storage, and repoint the row at the public URL.
+ * `data:` URI, compress it (uploadAvatar downscales to <=100KB), upload it to
+ * Cloudinary, and repoint the row at the hosted URL. Because it never writes to
+ * Supabase Storage, it works even while the Supabase project is egress-restricted.
  *
  * Idempotent: rows already pointing at a URL are skipped, so it is safe to
- * re-run. Run locally against production with DATABASE_URL, SUPABASE_URL and
- * SUPABASE_SERVICE_ROLE_KEY set:
+ * re-run. Run locally against production with DATABASE_URL, CLOUDINARY_CLOUD_NAME,
+ * CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET set:
  *
  *   pnpm --filter @workspace/api-server run migrate:avatars
  */
