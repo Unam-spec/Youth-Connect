@@ -9,7 +9,7 @@ import {
 
 describe("stageForRole", () => {
   it("keeps the member/visitor 2/4/6/8 ladder", () => {
-    for (const role of ["member", "visitor"]) {
+    for (const role of ["member", "visitor"] as const) {
       expect(stageForRole(role, 0)).toBeNull();
       expect(stageForRole(role, 1)).toBeNull();
       expect(stageForRole(role, 2)).toBe(2);
@@ -22,7 +22,7 @@ describe("stageForRole", () => {
   });
 
   it("uses the stricter 1/2/4 ladder for leaders and super admins", () => {
-    for (const role of ["leader", "super_admin"]) {
+    for (const role of ["leader", "super_admin"] as const) {
       expect(stageForRole(role, 0)).toBeNull();
       expect(stageForRole(role, 1)).toBe(1);
       expect(stageForRole(role, 2)).toBe(2);

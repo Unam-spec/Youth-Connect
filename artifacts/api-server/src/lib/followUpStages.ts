@@ -6,14 +6,15 @@
  * (4 is terminal). Each audience has its own whatsapp_templates
  * `template_type` so the message tone can differ per role.
  */
+import type { ProfileRole } from "./directoryListParams";
 
-export function isStaffRole(role: string): boolean {
+export function isStaffRole(role: ProfileRole): boolean {
   return role === "leader" || role === "super_admin";
 }
 
 /** Follow-up stage (in weeks) for a role + weeks absent, or null if not due. */
 export function stageForRole(
-  role: string,
+  role: ProfileRole,
   weeks: number | null | undefined,
 ): number | null {
   if (weeks == null) return null;
@@ -31,7 +32,7 @@ export function stageForRole(
 }
 
 /** whatsapp_templates.template_type holding a given role's follow-up set. */
-export function templateTypeForRole(role: string): string {
+export function templateTypeForRole(role: ProfileRole): string {
   if (role === "leader") return "follow_up_leader";
   if (role === "super_admin") return "follow_up_super_admin";
   return "follow_up";
@@ -62,7 +63,7 @@ export function applyTemplateVars(
 
 /** Built-in fallback when no template exists for a role + stage. */
 export function defaultFollowUpMessage(
-  role: string,
+  role: ProfileRole,
   stage: number,
   firstName: string,
 ): string {
