@@ -42,6 +42,7 @@
     "qrcode.react": "^4.2.0",
     "sharp": "^0.33.5",
     "twilio": "^5.7.0",
+    "web-push": "^3.6.7",
     "zod": "^3.25.76"
   },
   "devDependencies": {
@@ -52,6 +53,7 @@
     "@types/node": "^25.3.3",
     "@types/nodemailer": "^6.4.17",
     "@types/pg": "^8.18.0",
+    "@types/web-push": "^3.6.4",
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.9",
     "pino-pretty": "^13",
