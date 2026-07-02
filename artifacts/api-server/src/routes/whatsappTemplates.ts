@@ -9,7 +9,7 @@ import {
 } from "@workspace/db";
 import { and } from "drizzle-orm";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
-import { applyTemplateVars } from "../lib/followUpStages";
+import { applyTemplateVars, APP_URL } from "../lib/followUpStages";
 
 const router = Router();
 
@@ -113,6 +113,7 @@ router.patch("/whatsapp-templates/:id", requireLeaderSession("leader"), async (r
           const newPreview = applyTemplateVars(updated.message_text, {
             User: firstName,
             Leader: "JG Youth Team",
+            Link: APP_URL,
           });
 
           await db

@@ -26,6 +26,7 @@ import {
   isStaffRole,
   stageForRole,
   templateTypeForRole,
+  APP_URL,
 } from "../lib/followUpStages";
 import { logger } from "../lib/logger";
 
@@ -274,6 +275,7 @@ export async function generateFollowUpQueue(): Promise<number> {
       ? applyTemplateVars(template.message_text, {
           User: firstName(row.full_name),
           Leader: "JG Youth Team",
+          Link: APP_URL,
         })
       : defaultFollowUpMessage(row.role, stage, firstName(row.full_name));
 

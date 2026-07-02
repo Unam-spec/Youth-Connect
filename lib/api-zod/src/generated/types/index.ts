@@ -13,6 +13,8 @@ export * from './attendanceRecord';
 export * from './attendanceRecordCheckInMethod';
 export * from './checkInInput';
 export * from './checkInInputCheckInMethod';
+export * from './checkinSchedule';
+export * from './checkinWindow';
 export * from './dashboardKpis';
 export * from './event';
 export * from './eventInput';

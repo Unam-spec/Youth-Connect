@@ -678,6 +678,19 @@ paths:
                 $ref: "#/components/schemas/SuccessMessage"
 
   # Check-in search
+  /checkin/schedule:
+    get:
+      operationId: getCheckinSchedule
+      tags: [checkin]
+      summary: Get current check-in schedule (windows)
+      responses:
+        "200":
+          description: Current check-in schedule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CheckinSchedule"
+
   /checkin/search:
     get:
       operationId: searchForCheckIn
@@ -1363,3 +1376,30 @@ components:
           type: integer
         event_title:
           type: ["string", "null"]
+
+    CheckinWindow:
+      type: object
+      required: [day_of_week, start_time, end_time, enabled]
+      properties:
+        day_of_week:
+          type: integer
+          description: "0=Sun ... 6=Sat"
+        start_time:
+          type: string
+          description: "HH:MM format"
+        end_time:
+          type: string
+          description: "HH:MM format"
+        enabled:
+          type: boolean
+
+    CheckinSchedule:
+      type: object
+      required: [restrict_to_schedule, windows]
+      properties:
+        restrict_to_schedule:
+          type: boolean
+        windows:
+          type: array
+          items:
+            $ref: "#/components/schemas/CheckinWindow"

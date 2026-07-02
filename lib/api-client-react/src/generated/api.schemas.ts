@@ -478,6 +478,21 @@ export interface AttendanceHistoryEntry {
   event_title?: string | null;
 }
 
+export interface CheckinWindow {
+  /** 0=Sun ... 6=Sat */
+  day_of_week: number;
+  /** HH:MM format */
+  start_time: string;
+  /** HH:MM format */
+  end_time: string;
+  enabled: boolean;
+}
+
+export interface CheckinSchedule {
+  restrict_to_schedule: boolean;
+  windows: CheckinWindow[];
+}
+
 export type ListProfilesParams = {
 role?: ListProfilesRole;
 search?: string;

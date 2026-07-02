@@ -24,6 +24,7 @@ import type {
   AttendanceHistoryEntry,
   AttendanceRecord,
   CheckInInput,
+  CheckinSchedule,
   DashboardKpis,
   Event,
   EventInput,
@@ -2509,6 +2510,83 @@ export const useUpdateLeaderPin = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getUpdateLeaderPinMutationOptions(options));
     }
+
+export const getGetCheckinScheduleUrl = () => {
+
+
+
+
+  return `/api/checkin/schedule`
+}
+
+/**
+ * @summary Get current check-in schedule (windows)
+ */
+export const getCheckinSchedule = async ( options?: RequestInit): Promise<CheckinSchedule> => {
+
+  return customFetch<CheckinSchedule>(getGetCheckinScheduleUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetCheckinScheduleQueryKey = () => {
+    return [
+    `/api/checkin/schedule`
+    ] as const;
+    }
+
+
+export const getGetCheckinScheduleQueryOptions = <TData = Awaited<ReturnType<typeof getCheckinSchedule>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinSchedule>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetCheckinScheduleQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getCheckinSchedule>>> = ({ signal }) => getCheckinSchedule({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getCheckinSchedule>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetCheckinScheduleQueryResult = NonNullable<Awaited<ReturnType<typeof getCheckinSchedule>>>
+export type GetCheckinScheduleQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get current check-in schedule (windows)
+ */
+
+export function useGetCheckinSchedule<TData = Awaited<ReturnType<typeof getCheckinSchedule>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getCheckinSchedule>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetCheckinScheduleQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getSearchForCheckInUrl = (params: SearchForCheckInParams,) => {
   const normalizedParams = new URLSearchParams();
