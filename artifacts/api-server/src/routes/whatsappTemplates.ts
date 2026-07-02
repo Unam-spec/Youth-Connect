@@ -9,6 +9,7 @@ import {
 } from "@workspace/db";
 import { and } from "drizzle-orm";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { applyTemplateVars } from "../lib/followUpStages";
 
 const router = Router();
 
@@ -109,9 +110,10 @@ router.patch("/whatsapp-templates/:id", requireLeaderSession("leader"), async (r
       if (pendingQueue.length > 0) {
         for (const item of pendingQueue) {
           const firstName = item.full_name?.split(" ")[0] || "there";
-          const newPreview = updated.message_text
-            .split("[User]").join(firstName)
-            .split("[Leader]").join("JG Youth Team");
+          const newPreview = applyTemplateVars(updated.message_text, {
+            User: firstName,
+            Leader: "JG Youth Team",
+          });
 
           await db
             .update(followUpQueueTable)

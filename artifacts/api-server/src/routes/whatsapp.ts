@@ -14,100 +14,6 @@ import { generateFollowUpQueue } from "../jobs/followUpGenerator";
 
 const router = Router();
 
-// Follow-up milestones (weeks absent) that map to `whatsapp_templates.stage_weeks`.
-const STAGES = [2, 4, 6, 8] as const;
-type Stage = (typeof STAGES)[number];
-
-/** Map weeks-absent to the highest milestone reached (>=2), else null. */
-function stageFor(weeks: number | null | undefined): Stage | null {
-  if (weeks == null || weeks < 2) return null;
-  if (weeks >= 8) return 8;
-  if (weeks >= 6) return 6;
-  if (weeks >= 4) return 4;
-  return 2;
-}
-
-function firstName(name: string | null | undefined): string {
-  return (name ?? "").trim().split(/\s+/)[0] ?? "";
-}
-
-// ── GET /whatsapp/follow-ups ────────────────────────────────────────────────────
-// Members/visitors absent 2+ weeks, grouped by 2/4/6/8-week milestone.
-// Now includes people who registered but never attended (synced with Analytics).
-router.get(
-  "/whatsapp/follow-ups",
-  requireLeaderSession("leader"),
-  async (req: Request, res: Response) => {
-    try {
-      // People who HAVE checked in before
-      const attendedRows = await db
-        .select({
-          id: profilesTable.id,
-          full_name: profilesTable.full_name,
-          phone: profilesTable.phone,
-          whatsapp_opt_in: profilesTable.whatsapp_opt_in,
-          last_checkin: sql<string>`max(${attendanceTable.session_date})`,
-          weeks_absent: sql<number>`floor((current_date - max(${attendanceTable.session_date}::date)) / 7)::int`,
-        })
-        .from(profilesTable)
-        .innerJoin(attendanceTable, eq(profilesTable.id, attendanceTable.profile_id))
-        .where(inArray(profilesTable.role, ["member", "visitor"]))
-        .groupBy(
-          profilesTable.id,
-          profilesTable.full_name,
-          profilesTable.phone,
-          profilesTable.whatsapp_opt_in,
-        )
-        .having(
-          sql`max(${attendanceTable.session_date}::date) <= (current_date - interval '2 weeks')`,
-        );
-
-      // People who NEVER checked in (weeks since registration)
-      const neverAttendedRows = await db
-        .select({
-          id: profilesTable.id,
-          full_name: profilesTable.full_name,
-          phone: profilesTable.phone,
-          whatsapp_opt_in: profilesTable.whatsapp_opt_in,
-          last_checkin: sql<string | null>`NULL`,
-          weeks_absent: sql<number>`floor(EXTRACT(EPOCH FROM age(current_date, ${profilesTable.created_at}::date)) / 604800)::int`,
-        })
-        .from(profilesTable)
-        .leftJoin(attendanceTable, eq(profilesTable.id, attendanceTable.profile_id))
-        .where(
-          and(
-            inArray(profilesTable.role, ["member", "visitor"]),
-            sql`${profilesTable.created_at}::date <= (current_date - interval '2 weeks')`,
-          ),
-        )
-        .groupBy(
-          profilesTable.id,
-          profilesTable.full_name,
-          profilesTable.phone,
-          profilesTable.whatsapp_opt_in,
-          profilesTable.created_at,
-        )
-        .having(sql`count(${attendanceTable.id}) = 0`);
-
-      const allRows = [...attendedRows, ...neverAttendedRows];
-
-      const groups: Record<string, unknown[]> = { "2": [], "4": [], "6": [], "8": [] };
-      let total = 0;
-      for (const r of allRows) {
-        const weeks = Number(r.weeks_absent);
-        const stage = stageFor(weeks);
-        if (!stage) continue;
-        groups[String(stage)].push({ ...r, weeks_absent: weeks, stage_weeks: stage });
-        total++;
-      }
-
-      return res.json({ total, groups });
-    } catch (err) {
-      req.log.error(err);
-      return res.status(500).json({ error: "Internal server error" });
-    }
-  },
-);
 
 // ── GET /whatsapp/event-recipients ────────────────────────────────────────────
 // Returns opted-in members to broadcast an event to.
@@ -162,6 +68,7 @@ router.get(
           profile_id: followUpQueueTable.profile_id,
           full_name: profilesTable.full_name,
           phone: profilesTable.phone,
+          role: profilesTable.role,
           stage_weeks: followUpQueueTable.stage_weeks,
           weeks_absent: followUpQueueTable.weeks_absent,
           message_preview: followUpQueueTable.message_preview,
