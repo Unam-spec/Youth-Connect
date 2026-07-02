@@ -3,12 +3,13 @@
  *
  * Checks the `whatsapp_automation_settings` table every 60 s and, when the
  * configured day + time matches "right now" (SAST), generates pending entries
- * in `follow_up_queue` for every member/visitor who is 2/4/6/8+ weeks absent.
+ * in `follow_up_queue` for everyone overdue: members/visitors at 2/4/6/8
+ * weeks absent, leaders/super admins on a stricter 1/2/4-week ladder.
  *
  * Messages are NOT sent automatically – leaders review & approve them in the
  * Follow-up Hub UI first.
  */
-import { eq, and, inArray, sql, count, notInArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import {
   db,
   profilesTable,
@@ -18,25 +19,15 @@ import {
   followUpQueueTable,
   checkinWindowsTable,
 } from "@workspace/db";
-function applyTemplateVars(text: string, vars: Record<string, string>): string {
-  let result = text;
-  for (const [k, v] of Object.entries(vars)) {
-    result = result.replace(new RegExp(`{{${k}}}`, "g"), v);
-  }
-  return result;
-}
+import {
+  applyTemplateVars,
+  defaultFollowUpMessage,
+  FOLLOW_UP_TEMPLATE_TYPES,
+  isStaffRole,
+  stageForRole,
+  templateTypeForRole,
+} from "../lib/followUpStages";
 import { logger } from "../lib/logger";
-
-const STAGES = [2, 4, 6, 8] as const;
-type Stage = (typeof STAGES)[number];
-
-function stageFor(weeks: number | null | undefined): Stage | null {
-  if (weeks == null || weeks < 2) return null;
-  if (weeks >= 8) return 8;
-  if (weeks >= 6) return 6;
-  if (weeks >= 4) return 4;
-  return 2;
-}
 
 function firstName(name: string | null | undefined): string {
   return (name ?? "").trim().split(/\s+/)[0] ?? "";
@@ -79,6 +70,7 @@ export async function generateCheckinReminders(): Promise<number> {
       id: profilesTable.id,
       full_name: profilesTable.full_name,
       phone: profilesTable.phone,
+      role: profilesTable.role,
     })
     .from(profilesTable)
     .leftJoin(
@@ -90,7 +82,12 @@ export async function generateCheckinReminders(): Promise<number> {
     )
     .where(
       and(
-        inArray(profilesTable.role, ["member", "visitor"]),
+        inArray(profilesTable.role, [
+          "member",
+          "visitor",
+          "leader",
+          "super_admin",
+        ]),
         eq(profilesTable.whatsapp_opt_in, true),
         sql`btrim(${profilesTable.phone}) <> ''`,
         sql`${attendanceTable.id} IS NULL`, // No check-in today
@@ -128,7 +125,9 @@ export async function generateCheckinReminders(): Promise<number> {
       profile_id: row.id,
       stage_weeks: 0,
       weeks_absent: 0,
-      message_preview: `Hi ${firstName(row.full_name)}, don't forget to check in for JG Youth tonight!`,
+      message_preview: isStaffRole(row.role)
+        ? `Hi ${firstName(row.full_name)}, leaders check in too — don't forget to check in for JG Youth tonight!`
+        : `Hi ${firstName(row.full_name)}, don't forget to check in for JG Youth tonight!`,
       template_id: null,
       status: "pending",
     });
@@ -163,14 +162,27 @@ export async function generateFollowUpQueue(): Promise<number> {
       id: profilesTable.id,
       full_name: profilesTable.full_name,
       phone: profilesTable.phone,
+      role: profilesTable.role,
       weeks_absent: sql<number>`floor((current_date - max(${attendanceTable.session_date}::date)) / 7)::int`,
     })
     .from(profilesTable)
     .innerJoin(attendanceTable, eq(profilesTable.id, attendanceTable.profile_id))
-    .where(inArray(profilesTable.role, ["member", "visitor"]))
-    .groupBy(profilesTable.id, profilesTable.full_name, profilesTable.phone)
+    .where(
+      inArray(profilesTable.role, [
+        "member",
+        "visitor",
+        "leader",
+        "super_admin",
+      ]),
+    )
+    .groupBy(
+      profilesTable.id,
+      profilesTable.full_name,
+      profilesTable.phone,
+      profilesTable.role,
+    )
     .having(
-      sql`max(${attendanceTable.session_date}::date) <= (current_date - interval '2 weeks')`,
+      sql`max(${attendanceTable.session_date}::date) <= (current_date - interval '1 week')`,
     );
 
   // Query: members who have NEVER checked in (weeks since registration)
@@ -181,20 +193,27 @@ export async function generateFollowUpQueue(): Promise<number> {
         id: profilesTable.id,
         full_name: profilesTable.full_name,
         phone: profilesTable.phone,
+        role: profilesTable.role,
         weeks_absent: sql<number>`floor(EXTRACT(EPOCH FROM age(current_date, ${profilesTable.created_at}::date)) / 604800)::int`,
       })
       .from(profilesTable)
       .leftJoin(attendanceTable, eq(profilesTable.id, attendanceTable.profile_id))
       .where(
         and(
-          inArray(profilesTable.role, ["member", "visitor"]),
-          sql`${profilesTable.created_at}::date <= (current_date - interval '2 weeks')`,
+          inArray(profilesTable.role, [
+            "member",
+            "visitor",
+            "leader",
+            "super_admin",
+          ]),
+          sql`${profilesTable.created_at}::date <= (current_date - interval '1 week')`,
         ),
       )
       .groupBy(
         profilesTable.id,
         profilesTable.full_name,
         profilesTable.phone,
+        profilesTable.role,
         profilesTable.created_at,
       )
       .having(sql`count(${attendanceTable.id}) = 0`);
@@ -203,15 +222,19 @@ export async function generateFollowUpQueue(): Promise<number> {
   const allOverdue = [...attendedRows, ...neverAttendedRows];
   if (allOverdue.length === 0) return 0;
 
-  // 3. Load follow_up templates
+  // 3. Load follow-up templates for every audience (member/leader/super-admin)
   const templates = await db
     .select()
     .from(whatsappTemplatesTable)
-    .where(eq(whatsappTemplatesTable.template_type, "follow_up"));
+    .where(
+      inArray(whatsappTemplatesTable.template_type, FOLLOW_UP_TEMPLATE_TYPES),
+    );
 
-  const templateByStage: Record<number, (typeof templates)[0]> = {};
+  const templateByKey: Record<string, (typeof templates)[0]> = {};
   for (const t of templates) {
-    if (t.stage_weeks != null) templateByStage[t.stage_weeks] = t;
+    if (t.stage_weeks != null) {
+      templateByKey[`${t.template_type}:${t.stage_weeks}`] = t;
+    }
   }
 
   // 4. Check which profiles already have a pending entry at this stage
@@ -240,19 +263,19 @@ export async function generateFollowUpQueue(): Promise<number> {
 
   for (const row of allOverdue) {
     const weeks = Number(row.weeks_absent);
-    const stage = stageFor(weeks);
+    const stage = stageForRole(row.role, weeks);
     if (!stage) continue;
 
     // Skip if already queued at this stage
     if (existingSet.has(`${row.id}:${stage}`)) continue;
 
-    const template = templateByStage[stage];
+    const template = templateByKey[`${templateTypeForRole(row.role)}:${stage}`];
     const messagePreview = template
       ? applyTemplateVars(template.message_text, {
           User: firstName(row.full_name),
           Leader: "JG Youth Team",
         })
-      : `Follow-up (${stage}w): Hi ${firstName(row.full_name)}, we miss you at JG Youth!`;
+      : defaultFollowUpMessage(row.role, stage, firstName(row.full_name));
 
     inserts.push({
       profile_id: row.id,
