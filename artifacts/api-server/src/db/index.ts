@@ -167,6 +167,25 @@ INSERT INTO "whatsapp_templates" ("template_type", "stage_weeks", "message_text"
   ) AS seed(template_type, stage_weeks, message_text, color_hex)
   WHERE NOT EXISTS (SELECT 1 FROM "whatsapp_templates");
 
+-- Seed leader & super-admin follow-up templates (2026-07): stricter 1/2/4-week
+-- ladder with role-appropriate tone. Guarded PER TYPE (not on an empty table)
+-- so databases that already have member templates pick these up on boot.
+INSERT INTO "whatsapp_templates" ("template_type", "stage_weeks", "message_text", "color_hex")
+  SELECT * FROM (VALUES
+    ('follow_up_leader', 1, 'Hi [User]! 👋 We missed you at JG Youth this week — the team isn''t the same without you. See you this Friday? — [Leader]', '#60A5FA'),
+    ('follow_up_leader', 2, 'Hey [User], it''s been two weeks since we''ve seen you at JG Youth. The youth look up to you and we''d love to have you back leading with us. Is everything okay? — [Leader]', '#FACC15'),
+    ('follow_up_leader', 4, 'Hi [User], it''s been a month since you''ve been at JG Youth. We''re thinking of you and would really value catching up — please reach out when you can. — [Leader]', '#EF4444')
+  ) AS seed(template_type, stage_weeks, message_text, color_hex)
+  WHERE NOT EXISTS (SELECT 1 FROM "whatsapp_templates" WHERE "template_type" = 'follow_up_leader');
+
+INSERT INTO "whatsapp_templates" ("template_type", "stage_weeks", "message_text", "color_hex")
+  SELECT * FROM (VALUES
+    ('follow_up_super_admin', 1, 'Hi [User]! 👋 We missed you at JG Youth this week. Hope all is well — see you Friday? — [Leader]', '#60A5FA'),
+    ('follow_up_super_admin', 2, 'Hey [User], two weeks without you at JG Youth! The team needs your leadership — anything we can help carry? — [Leader]', '#FACC15'),
+    ('follow_up_super_admin', 4, 'Hi [User], it''s been a month since we''ve seen you at JG Youth. Let''s catch up soon — the ministry misses you. — [Leader]', '#EF4444')
+  ) AS seed(template_type, stage_weeks, message_text, color_hex)
+  WHERE NOT EXISTS (SELECT 1 FROM "whatsapp_templates" WHERE "template_type" = 'follow_up_super_admin');
+
 -- Feedback prompt settings (2026-06): single-row, editable copy + cadence for the
 -- recurring member feedback prompt. Seeded with defaults only when empty.
 CREATE TABLE IF NOT EXISTS "feedback_settings" (
