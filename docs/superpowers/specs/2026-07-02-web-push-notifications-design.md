@@ -70,7 +70,7 @@ Hooks into the existing follow-up generator tick (`jobs/followUpGenerator.ts`), 
 | Trigger | Message | Tap opens |
 |---|---|---|
 | Check-in window opens | "Check-in is open! Tap to check in 🙌" | `/checkin` |
-| Leader notifies event | "📅 {title} — {day, time}. Tap for details" | `/events/{id}` |
+| Leader notifies event | "📅 {title} — {day, time}. Tap for details" | `/my` (no event-detail page exists; the dashboard lists events) |
 
 Tone: short and warm. Channel trust is protected by leader-initiated-only event blasts and the 24h cap.
 
