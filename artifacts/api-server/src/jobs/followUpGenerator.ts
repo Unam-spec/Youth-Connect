@@ -65,7 +65,7 @@ export async function generateCheckinReminders(): Promise<number> {
 
   // Members who have opted into WhatsApp and have a phone number,
   // but do NOT have an attendance record for today.
-  const overdueMembers = await db
+  const overdueProfiles = await db
     .select({
       id: profilesTable.id,
       full_name: profilesTable.full_name,
@@ -94,7 +94,7 @@ export async function generateCheckinReminders(): Promise<number> {
       ),
     );
 
-  if (overdueMembers.length === 0) return 0;
+  if (overdueProfiles.length === 0) return 0;
 
   // Check which profiles already have a check-in reminder (stage_weeks: 0) generated today
   const existingPending = await db
@@ -118,7 +118,7 @@ export async function generateCheckinReminders(): Promise<number> {
     status: "pending";
   }[] = [];
 
-  for (const row of overdueMembers) {
+  for (const row of overdueProfiles) {
     if (existingSet.has(row.id)) continue;
     
     inserts.push({
@@ -153,7 +153,7 @@ export async function generateFollowUpQueue(): Promise<number> {
     .limit(1);
   if (!settings || !settings.enabled) return 0;
 
-  // 2. Find members who are 2+ weeks overdue
+  // 2. Find everyone overdue (1+ week; role ladder decides who is actually due)
   const includeNever = settings.include_never_attended;
 
   // Query: members who HAVE checked in before
