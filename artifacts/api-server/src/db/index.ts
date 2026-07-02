@@ -258,6 +258,29 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN null;
 END $$;
+
+-- Web push (2026-07): browser push subscriptions + automated-send dedupe log.
+CREATE TABLE IF NOT EXISTS "push_subscriptions" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "profile_id" uuid NOT NULL REFERENCES "profiles"("id") ON DELETE CASCADE,
+  "endpoint" text NOT NULL UNIQUE,
+  "p256dh" text NOT NULL,
+  "auth" text NOT NULL,
+  "user_agent" text,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_profile_id ON push_subscriptions (profile_id);
+
+CREATE TABLE IF NOT EXISTS "push_send_log" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "kind" text NOT NULL,
+  "sent_on" date NOT NULL,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "push_send_log_kind_sent_on_unique" UNIQUE ("kind", "sent_on")
+);
+
+-- 24h cap for leader "Notify members" event pushes.
+ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "last_notified_at" timestamp with time zone;
 `;
 
 export async function runMigrations() {
