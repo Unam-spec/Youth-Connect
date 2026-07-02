@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Redirect } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { MessageSquare, Loader2, Save, Megaphone } from "lucide-react";
+import { MessageSquare, Loader2, Save, Megaphone, ShieldCheck, Crown } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { getLeaderSession } from "@/lib/auth";
 import { useApiFetch } from "@/lib/api";
@@ -22,13 +22,17 @@ interface WhatsappTemplate {
 
 const PLACEHOLDER_HINTS: Record<string, string[]> = {
   follow_up: ["[User]", "[Leader]"],
+  follow_up_leader: ["[User]", "[Leader]"],
+  follow_up_super_admin: ["[User]", "[Leader]"],
   event_creation: ["[User]", "[Event]", "[Date]", "[Time]", "[Location]"],
 };
 
+const FOLLOW_UP_TYPES = ["follow_up", "follow_up_leader", "follow_up_super_admin"];
+
 function stageLabel(t: WhatsappTemplate): string {
   if (t.template_type === "event_creation") return "Event announcement";
-  if (t.template_type === "follow_up" && t.stage_weeks != null)
-    return `${t.stage_weeks} weeks absent`;
+  if (FOLLOW_UP_TYPES.includes(t.template_type) && t.stage_weeks != null)
+    return `${t.stage_weeks} week${t.stage_weeks === 1 ? "" : "s"} absent`;
   return t.template_type;
 }
 
@@ -155,6 +159,12 @@ export default function Templates() {
   const eventTemplates = (templates ?? []).filter(
     (t) => t.template_type === "event_creation",
   );
+  const leaderFollowUps = (templates ?? [])
+    .filter((t) => t.template_type === "follow_up_leader")
+    .sort((a, b) => (a.stage_weeks ?? 0) - (b.stage_weeks ?? 0));
+  const adminFollowUps = (templates ?? [])
+    .filter((t) => t.template_type === "follow_up_super_admin")
+    .sort((a, b) => (a.stage_weeks ?? 0) - (b.stage_weeks ?? 0));
 
   return (
     <DashboardLayout active="templates">
@@ -207,7 +217,7 @@ export default function Templates() {
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 text-muted-foreground" />
                 <h2 className="text-sm font-semibold text-foreground">
-                  Follow-up messages (by weeks absent)
+                  Member follow-ups (by weeks absent)
                 </h2>
               </div>
               {followUps.length > 0 ? (
@@ -219,6 +229,46 @@ export default function Templates() {
               ) : (
                 <p className="text-sm text-muted-foreground">
                   No follow-up templates configured.
+                </p>
+              )}
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold text-foreground">
+                  Leader follow-ups (stricter 1/2/4-week ladder)
+                </h2>
+              </div>
+              {leaderFollowUps.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {leaderFollowUps.map((t) => (
+                    <TemplateCard key={t.id} template={t} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No leader follow-up templates configured.
+                </p>
+              )}
+            </section>
+
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Crown className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold text-foreground">
+                  Super admin follow-ups (stricter 1/2/4-week ladder)
+                </h2>
+              </div>
+              {adminFollowUps.length > 0 ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {adminFollowUps.map((t) => (
+                    <TemplateCard key={t.id} template={t} />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No super admin follow-up templates configured.
                 </p>
               )}
             </section>
