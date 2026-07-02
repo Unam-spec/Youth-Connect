@@ -33,6 +33,7 @@ interface QueueEntry {
   profile_id: string;
   full_name: string | null;
   phone: string | null;
+  role: string | null;
   stage_weeks: number;
   weeks_absent: number;
   message_preview: string;
@@ -72,10 +73,16 @@ const UPCOMING_EVENTS_KEY = ["upcoming-events"];
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 const STAGE_COLORS: Record<number, string> = {
+  1: "#60A5FA",
   2: "#FACC15",
   4: "#FB923C",
   6: "#F87171",
   8: "#EF4444",
+};
+
+const ROLE_BADGES: Record<string, { label: string; className: string }> = {
+  leader: { label: "Leader", className: "bg-violet-500/15 text-violet-600" },
+  super_admin: { label: "Super Admin", className: "bg-pink-500/15 text-pink-600" },
 };
 
 
@@ -260,7 +267,7 @@ export default function FollowUpHub() {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Follow-ups & Reminders</h2>
-                <p className="text-sm text-muted-foreground">Generated queue of members absent for 2+ weeks, plus check-in reminders.</p>
+                <p className="text-sm text-muted-foreground">Generated queue of members absent 2+ weeks and leaders/admins absent 1+ week, plus check-in reminders.</p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <Button
@@ -443,6 +450,13 @@ export default function FollowUpHub() {
                           >
                             {badgeText}
                           </span>
+                          {entry.role && ROLE_BADGES[entry.role] && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${ROLE_BADGES[entry.role].className}`}
+                            >
+                              {ROLE_BADGES[entry.role].label}
+                            </span>
+                          )}
                         </div>
 
                         {/* Person info */}
@@ -527,6 +541,9 @@ export default function FollowUpHub() {
                           {entry.full_name}
                         </p>
                         <p className="text-xs text-muted-foreground">
+                          {entry.role && ROLE_BADGES[entry.role]
+                            ? `${ROLE_BADGES[entry.role].label} · `
+                            : ""}
                           {entry.stage_weeks === 0 ? "Check-in Reminder" : `${entry.stage_weeks}w stage`}
                         </p>
                       </div>
