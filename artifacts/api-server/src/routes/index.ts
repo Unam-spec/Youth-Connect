@@ -16,6 +16,7 @@ import feedbacksRouter from "./feedbacks";
 import whatsappTemplatesRouter from "./whatsappTemplates";
 import whatsappRouter from "./whatsapp";
 import birthdaysRouter from "./birthdays";
+import pushRouter from "./push";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(adminRouter);
 router.use(feedbacksRouter);
 router.use(whatsappTemplatesRouter);
 router.use(whatsappRouter);
+router.use(pushRouter);
 
 export default router;
