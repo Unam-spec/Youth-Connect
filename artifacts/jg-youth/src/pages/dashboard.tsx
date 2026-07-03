@@ -102,7 +102,7 @@ import { CheckInSchedulePanel } from "@/components/panels/CheckInSchedulePanel";
 import { DeleteConfirmPanel } from "@/components/panels/DeleteConfirmPanel";
 import { DialogManager } from "@/components/panels/DialogManager";
 import { KpiCard } from "@/components/panels/shared";
-import { Activity, Download, Settings } from "lucide-react";
+import { Activity, Download, Settings, MonitorSmartphone } from "lucide-react";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -1108,6 +1108,14 @@ export default function Dashboard() {
                   >
                     <QrCode className="h-4 w-4 mr-2" />
                     {isGeneratingQr ? "Generating…" : "Session QR"}
+                  </Button>
+                  <Button
+                    onClick={() => (window.location.href = "/kiosk")}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <MonitorSmartphone className="h-4 w-4 mr-2" />
+                    Kiosk Mode
                   </Button>
                 </>
               )}
