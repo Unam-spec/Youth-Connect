@@ -9,6 +9,7 @@ import {
   time,
   jsonb,
   pgEnum,
+  unique,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -113,6 +114,8 @@ export const eventsTable = pgTable("events", {
   // Restrict the audience by gender. null = everyone; "male"/"female" = that
   // group only. ("other" is never targeted — such members see "all" events.)
   target_gender: genderEnum("target_gender"),
+  // Set when a leader push-notifies members about this event (24h re-notify cap).
+  last_notified_at: timestamp("last_notified_at", { withTimezone: true }),
   created_at: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -466,4 +469,38 @@ export type FollowUpQueueEntry = typeof followUpQueueTable.$inferSelect;
 export type InsertFollowUpQueueEntry = z.infer<
   typeof insertFollowUpQueueSchema
 >;
+
+// Web push (2026-07): one row per browser/device push subscription.
+export const pushSubscriptionsTable = pgTable("push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  profile_id: uuid("profile_id")
+    .notNull()
+    .references(() => profilesTable.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  user_agent: text("user_agent"),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// Restart-safe dedupe for automated pushes: one row per (kind, day) fired.
+export const pushSendLogTable = pgTable(
+  "push_send_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    kind: text("kind").notNull(),
+    sent_on: date("sent_on").notNull(),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    kindSentOnUnique: unique("push_send_log_kind_sent_on_unique").on(
+      t.kind,
+      t.sent_on,
+    ),
+  }),
+);
 

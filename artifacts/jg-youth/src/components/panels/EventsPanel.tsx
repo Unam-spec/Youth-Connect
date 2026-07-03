@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
-import { Calendar, Trash2, MapPin, Users, Globe, ImagePlus, X } from "lucide-react";
+import { Calendar, Trash2, MapPin, Users, Globe, ImagePlus, X, Bell, Loader2 } from "lucide-react";
 import { useAuth } from "@clerk/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +70,60 @@ export function EventsPanel({
       } catch {}
     })();
   }, [canCreateEvents, getToken]);
+
+  // Web push blast for one event ("Notify members"). The backend enforces a
+  // 24h re-notify cap (429) and gender targeting.
+  const [notifyingId, setNotifyingId] = useState<string | null>(null);
+
+  const handleNotifyMembers = async (event: any) => {
+    setNotifyingId(event.id);
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      try {
+        const t = await getToken();
+        if (t) headers["Authorization"] = `Bearer ${t}`;
+      } catch {}
+      try {
+        const s = localStorage.getItem("jg_leader_session");
+        if (s) {
+          const p = JSON.parse(s);
+          if (Date.now() < p.expires_at) headers["x-leader-session"] = s;
+        }
+      } catch {}
+      const apiBase = import.meta.env.VITE_API_URL || "";
+      const res = await fetch(`${apiBase}/api/events/${event.id}/notify`, {
+        method: "POST",
+        headers,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.ok) {
+        toast({
+          title: "Members notified 🔔",
+          description: `Reached ${body.sent} device${body.sent === 1 ? "" : "s"}.`,
+        });
+      } else if (res.status === 429) {
+        toast({
+          title: "Already announced",
+          description: "This event was already announced in the last 24 hours.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Could not notify members",
+          description: body.error || "Something went wrong.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Could not notify members",
+        description: "Network error — please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setNotifyingId(null);
+    }
+  };
 
   const handlePosterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,19 +216,38 @@ export function EventsPanel({
                       )}
                     </div>
                   </div>
-                  {sessionRole === "super_admin" && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setDeleteEventId(event.id);
-                        setDeleteEventName(event.title);
-                      }}
-                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 h-8"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {canCreateEvents && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleNotifyMembers(event)}
+                        disabled={notifyingId === event.id}
+                        title="Send a push notification about this event"
+                        className="h-8"
+                      >
+                        {notifyingId === event.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Bell className="h-4 w-4" />
+                        )}
+                        <span className="ml-1 hidden sm:inline">Notify</span>
+                      </Button>
+                    )}
+                    {sessionRole === "super_admin" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setDeleteEventId(event.id);
+                          setDeleteEventName(event.title);
+                        }}
+                        className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0 h-8"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

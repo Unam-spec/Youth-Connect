@@ -18,7 +18,10 @@ import {
   whatsappAutomationSettingsTable,
   followUpQueueTable,
   checkinWindowsTable,
+  pushSendLogTable,
 } from "@workspace/db";
+import { windowJustOpened, checkinOpenPayload } from "../lib/pushLogic";
+import { sendPushToProfiles } from "../lib/pushSender";
 import {
   applyTemplateVars,
   defaultFollowUpMessage,
@@ -26,6 +29,7 @@ import {
   isStaffRole,
   stageForRole,
   templateTypeForRole,
+  APP_URL,
 } from "../lib/followUpStages";
 import { logger } from "../lib/logger";
 
@@ -274,6 +278,7 @@ export async function generateFollowUpQueue(): Promise<number> {
       ? applyTemplateVars(template.message_text, {
           User: firstName(row.full_name),
           Leader: "JG Youth Team",
+          Link: APP_URL,
         })
       : defaultFollowUpMessage(row.role, stage, firstName(row.full_name));
 
@@ -351,6 +356,37 @@ async function tick() {
         logger.info("[followUpGenerator] Check-in reminder window hit (-1h) — generating queue…");
         const count = await generateCheckinReminders();
         logger.info({ count }, "[followUpGenerator] Check-in reminders generation complete");
+      }
+    }
+
+    // --- 3. Check-in OPEN push — free web push to every subscriber the moment
+    // the window opens. Dedupe is DB-backed (push_send_log) so a Render restart
+    // inside the grace period cannot double-send.
+    if (activeWindow.length > 0) {
+      const w = activeWindow[0];
+      const opened = windowJustOpened(
+        [
+          {
+            day_of_week: w.day_of_week,
+            start_time: w.start_time,
+            end_time: w.end_time,
+            enabled: w.enabled,
+          },
+        ],
+        dayOfWeek,
+        hhmm,
+      );
+      if (opened) {
+        const claimed = await db
+          .insert(pushSendLogTable)
+          .values({ kind: "checkin_open", sent_on: today })
+          .onConflictDoNothing()
+          .returning();
+        if (claimed.length > 0) {
+          logger.info("[followUpGenerator] Check-in window opened — sending push…");
+          const sent = await sendPushToProfiles("all", checkinOpenPayload());
+          logger.info({ sent }, "[followUpGenerator] Check-in open push complete");
+        }
       }
     }
 

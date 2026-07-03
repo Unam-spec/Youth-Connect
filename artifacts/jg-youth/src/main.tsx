@@ -26,6 +26,13 @@ window.addEventListener("unhandledrejection", (event) => {
     window.location.replace("/sign-in");
   }
 });
+// Register the push/PWA service worker (no-op where unsupported).
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch((err) => {
+    console.error("Service worker registration failed:", err);
+  });
+}
+
 createRoot(document.getElementById("root")!).render(
   <Sentry.ErrorBoundary fallback={<p>Something went wrong.</p>}>
     <App />

@@ -847,6 +847,20 @@ export const UpdateLeaderPinResponse = zod.object({
 
 
 /**
+ * @summary Get current check-in schedule (windows)
+ */
+export const GetCheckinScheduleResponse = zod.object({
+  "restrict_to_schedule": zod.boolean(),
+  "windows": zod.array(zod.object({
+  "day_of_week": zod.number().describe('0=Sun ... 6=Sat'),
+  "start_time": zod.string().describe('HH:MM format'),
+  "end_time": zod.string().describe('HH:MM format'),
+  "enabled": zod.boolean()
+}))
+})
+
+
+/**
  * @summary Search members/visitors by name or phone for check-in
  */
 export const SearchForCheckInQueryParams = zod.object({

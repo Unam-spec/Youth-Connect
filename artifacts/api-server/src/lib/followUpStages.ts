@@ -45,6 +45,9 @@ export const FOLLOW_UP_TEMPLATE_TYPES = [
   "follow_up_super_admin",
 ];
 
+/** The public app URL, used as the [Link] placeholder value in templates. */
+export const APP_URL = "https://jgyouth.vercel.app/sign-in";
+
 /**
  * Replace template placeholders. Templates are documented with the
  * square-bracket form ([User], [Leader]); the curly form ({{User}}) is kept
@@ -68,7 +71,7 @@ export function defaultFollowUpMessage(
   firstName: string,
 ): string {
   if (isStaffRole(role)) {
-    return `Follow-up (${stage}w): Hi ${firstName}, we've missed you at JG Youth — the team isn't the same without you!`;
+    return `Follow-up (${stage}w): Hi ${firstName}, we've missed you at JG Youth — the team isn't the same without you! Sign in here: ${APP_URL}`;
   }
-  return `Follow-up (${stage}w): Hi ${firstName}, we miss you at JG Youth!`;
+  return `Follow-up (${stage}w): Hi ${firstName}, we miss you at JG Youth! Sign in here: ${APP_URL}`;
 }

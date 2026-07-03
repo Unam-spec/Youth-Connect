@@ -93,7 +93,7 @@ describe("defaultFollowUpMessage", () => {
 
   it("keeps the member fallback wording", () => {
     expect(defaultFollowUpMessage("member", 2, "Karabo")).toBe(
-      "Follow-up (2w): Hi Karabo, we miss you at JG Youth!",
+      "Follow-up (2w): Hi Karabo, we miss you at JG Youth! Sign in here: https://jgyouth.vercel.app/sign-in",
     );
   });
 });

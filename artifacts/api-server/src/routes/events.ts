@@ -10,6 +10,8 @@ import {
 } from "@workspace/db";
 import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { eventNotifyAllowed, eventPushPayload } from "../lib/pushLogic";
+import { sendPushToProfiles } from "../lib/pushSender";
 
 const router = Router();
 
@@ -191,6 +193,65 @@ router.post("/events", requireLeaderSession("leader"), async (req: Request, res:
     return res.status(500).json({ error: "Internal server error" });
   }
 });
+
+// POST /events/:id/notify — push-notify the event's audience (protected: leader).
+// Respects target_gender; staff always included; max one blast per event per 24h.
+router.post(
+  "/events/:id/notify",
+  requireLeaderSession("leader"),
+  async (req: Request, res: Response) => {
+    try {
+      const [event] = await db
+        .select()
+        .from(eventsTable)
+        .where(eq(eventsTable.id, req.params.id as string));
+      if (!event) return res.status(404).json({ error: "Event not found" });
+
+      if (!eventNotifyAllowed(event.last_notified_at ?? null)) {
+        return res
+          .status(429)
+          .json({ error: "This event was already announced in the last 24 hours" });
+      }
+
+      // Gender-targeted events push to matching members/visitors; leaders and
+      // super-admins always hear about every event. Untargeted events push to
+      // every subscriber.
+      let profileIds: string[] | "all" = "all";
+      if (event.target_gender) {
+        const rows = await db
+          .select({ id: profilesTable.id })
+          .from(profilesTable)
+          .where(
+            or(
+              inArray(profilesTable.role, ["leader", "super_admin"]),
+              eq(profilesTable.gender, event.target_gender),
+            ),
+          );
+        profileIds = rows.map((r) => r.id);
+      }
+
+      const sent = await sendPushToProfiles(
+        profileIds,
+        eventPushPayload({
+          id: event.id,
+          title: event.title,
+          date: event.date,
+          time: event.time,
+        }),
+      );
+
+      await db
+        .update(eventsTable)
+        .set({ last_notified_at: new Date() })
+        .where(eq(eventsTable.id, event.id));
+
+      return res.json({ sent });
+    } catch (err) {
+      req.log.error(err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 // GET /events/:id - View single event details
 router.get("/events/:id", async (req: Request, res: Response) => {

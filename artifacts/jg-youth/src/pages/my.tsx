@@ -33,7 +33,9 @@ import {
 import { isPostServiceWindow, serviceBannerKey } from "@/lib/serviceBanner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload, Check, BookOpen, Star } from "lucide-react";
+import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload, Check, BookOpen, Star, Bell } from "lucide-react";
+import { useGetCheckinSchedule, getGetCheckinScheduleQueryKey } from "@workspace/api-client-react";
+import { isCheckinOpen } from "@/lib/checkinScheduleClient";
 import { Link, useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -43,6 +45,7 @@ import { Settings2 } from "lucide-react";
 import { FeedbackModal } from "@/components/member/FeedbackModal";
 import { PreferencesModal } from "@/components/member/PreferencesModal";
 import { StreakWidget } from "@/components/member/StreakWidget";
+import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
 import { OnboardingTour, type TourStep } from "@/components/member/OnboardingTour";
 
 export default function MyDashboard() {
@@ -147,6 +150,14 @@ export default function MyDashboard() {
   const { data: myAttendance, isLoading: isAttendanceLoading } = useGetMyAttendance({
     query: { enabled: !!profile, queryKey: getGetMyAttendanceQueryKey() },
   });
+
+  // Check-in reminder: fetch the schedule and determine if window is open + user hasn't checked in today
+  const { data: checkinSchedule } = useGetCheckinSchedule({
+    query: { queryKey: getGetCheckinScheduleQueryKey() },
+  });
+  const checkinWindowOpen = isCheckinOpen(checkinSchedule);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const checkedInToday = (myAttendance ?? []).some((a) => a.session_date === todayStr);
 
   // Fetch the editable feedback prompt config (public endpoint).
   useEffect(() => {
@@ -787,6 +798,30 @@ export default function MyDashboard() {
             </div>
           )}
         </section>
+
+        {/* Check-in Reminder Banner */}
+        {checkinWindowOpen && !checkedInToday && profileLoaded && (
+          <section className="animate-in fade-in slide-in-from-top-2 duration-500">
+            <Link href="/checkin">
+              <div className="relative overflow-hidden rounded-2xl border-2 border-primary/30 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent p-5 cursor-pointer hover:border-primary/50 transition-all hover:shadow-lg hover:shadow-primary/10">
+                <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
+                <div className="relative flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0 animate-pulse">
+                    <Bell className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm text-foreground">Check-in is open now! 🎉</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Tap here to check in for tonight's session</p>
+                  </div>
+                  <div className="text-primary font-semibold text-xs shrink-0">Check In →</div>
+                </div>
+              </div>
+            </Link>
+          </section>
+        )}
+
+        {/* Enable push notifications (platform-aware; hides where unsupported) */}
+        <NotificationSetupCard />
 
         {/* Check-In section */}
         <section ref={checkInSectionRef}>
