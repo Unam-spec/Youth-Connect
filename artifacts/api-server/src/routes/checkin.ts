@@ -37,8 +37,16 @@ router.get("/checkin/search", async (req, res) => {
     if (!query || query.length < 2) {
       return res.json([]);
     }
+    // Public endpoint — project to display fields only. A bare select() here
+    // used to leak pin_plain/pin_hash/session_token for any searchable profile.
     const profiles = await db
-      .select()
+      .select({
+        id: profilesTable.id,
+        full_name: profilesTable.full_name,
+        phone: profilesTable.phone,
+        avatar_url: profilesTable.avatar_url,
+        role: profilesTable.role,
+      })
       .from(profilesTable)
       .where(
         or(
