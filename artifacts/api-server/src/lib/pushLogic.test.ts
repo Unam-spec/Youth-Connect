@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  windowJustOpened,
+  checkinWindowOpenNow,
   eventNotifyAllowed,
   shouldDeleteSubscription,
   eventPushPayload,
@@ -15,29 +15,35 @@ const friday: PushWindow = {
   enabled: true,
 };
 
-describe("windowJustOpened", () => {
-  it("fires at the exact opening minute", () => {
-    expect(windowJustOpened([friday], 5, "18:30")).toBe(true);
+// Open-now semantics (not "just opened"): the push must still fire when the
+// server was asleep at the opening minute and only wakes mid-window. The
+// DB-unique (kind, sent_on) dedupe guarantees at most one send per day.
+describe("checkinWindowOpenNow", () => {
+  it("is open at the exact opening minute", () => {
+    expect(checkinWindowOpenNow([friday], 5, "18:30")).toBe(true);
   });
-  it("fires within the 2-minute grace period", () => {
-    expect(windowJustOpened([friday], 5, "18:32")).toBe(true);
+  it("is open mid-window (catch-up after a missed opening)", () => {
+    expect(checkinWindowOpenNow([friday], 5, "20:15")).toBe(true);
   });
-  it("does not fire before opening", () => {
-    expect(windowJustOpened([friday], 5, "18:29")).toBe(false);
+  it("is open on the last minute before close", () => {
+    expect(checkinWindowOpenNow([friday], 5, "21:59")).toBe(true);
   });
-  it("does not fire after the grace period", () => {
-    expect(windowJustOpened([friday], 5, "18:33")).toBe(false);
+  it("is closed before opening", () => {
+    expect(checkinWindowOpenNow([friday], 5, "18:29")).toBe(false);
   });
-  it("does not fire on another weekday", () => {
-    expect(windowJustOpened([friday], 4, "18:30")).toBe(false);
+  it("is closed at the end minute and after", () => {
+    expect(checkinWindowOpenNow([friday], 5, "22:00")).toBe(false);
+    expect(checkinWindowOpenNow([friday], 5, "23:30")).toBe(false);
+  });
+  it("is closed on another weekday", () => {
+    expect(checkinWindowOpenNow([friday], 4, "19:00")).toBe(false);
   });
   it("ignores disabled windows", () => {
-    expect(windowJustOpened([{ ...friday, enabled: false }], 5, "18:30")).toBe(false);
+    expect(checkinWindowOpenNow([{ ...friday, enabled: false }], 5, "19:00")).toBe(false);
   });
   it("ignores windows with blank times", () => {
-    expect(
-      windowJustOpened([{ ...friday, start_time: "" }], 5, "18:30"),
-    ).toBe(false);
+    expect(checkinWindowOpenNow([{ ...friday, start_time: "" }], 5, "19:00")).toBe(false);
+    expect(checkinWindowOpenNow([{ ...friday, end_time: "" }], 5, "19:00")).toBe(false);
   });
 });
 

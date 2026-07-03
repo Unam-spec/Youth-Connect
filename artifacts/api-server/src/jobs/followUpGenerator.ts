@@ -20,7 +20,7 @@ import {
   checkinWindowsTable,
   pushSendLogTable,
 } from "@workspace/db";
-import { windowJustOpened, checkinOpenPayload } from "../lib/pushLogic";
+import { checkinWindowOpenNow, checkinOpenPayload } from "../lib/pushLogic";
 import { sendPushToProfiles } from "../lib/pushSender";
 import {
   applyTemplateVars,
@@ -63,6 +63,8 @@ function getSastNow(): { dayOfWeek: number; hhmm: string } {
 /** Has the cron already fired in the current window? Prevents duplicates. */
 let lastFiredDate: string | null = null;
 let lastCheckinFiredDate: string | null = null;
+// In-memory shortcut only — the real dedupe is the push_send_log DB unique.
+let lastCheckinPushDate: string | null = null;
 
 export async function generateCheckinReminders(): Promise<number> {
   const today = new Date().toISOString().split("T")[0];
@@ -359,12 +361,14 @@ async function tick() {
       }
     }
 
-    // --- 3. Check-in OPEN push — free web push to every subscriber the moment
-    // the window opens. Dedupe is DB-backed (push_send_log) so a Render restart
-    // inside the grace period cannot double-send.
+    // --- 3. Check-in OPEN push — free web push to every subscriber while the
+    // window is open and today's push hasn't gone out yet. "Open now" (not
+    // "just opened") so a server that was asleep or restarting at the opening
+    // minute still sends on its first tick back. Dedupe is DB-backed
+    // (push_send_log unique on kind+sent_on) so it can never double-send.
     if (activeWindow.length > 0) {
       const w = activeWindow[0];
-      const opened = windowJustOpened(
+      const open = checkinWindowOpenNow(
         [
           {
             day_of_week: w.day_of_week,
@@ -376,14 +380,17 @@ async function tick() {
         dayOfWeek,
         hhmm,
       );
-      if (opened) {
+      if (open && lastCheckinPushDate !== today) {
         const claimed = await db
           .insert(pushSendLogTable)
           .values({ kind: "checkin_open", sent_on: today })
           .onConflictDoNothing()
           .returning();
+        // Claimed or already claimed by an earlier tick/instance — either way
+        // this process is done for today.
+        lastCheckinPushDate = today;
         if (claimed.length > 0) {
-          logger.info("[followUpGenerator] Check-in window opened — sending push…");
+          logger.info("[followUpGenerator] Check-in window open — sending push…");
           const sent = await sendPushToProfiles("all", checkinOpenPayload());
           logger.info({ sent }, "[followUpGenerator] Check-in open push complete");
         }

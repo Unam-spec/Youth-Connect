@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Bell, BellOff, Share, PlusSquare, Loader2 } from "lucide-react";
+import { Bell, BellOff, Share, PlusSquare, Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { apiFetch } from "@/lib/api";
 import {
   getPushSetupState,
   subscribeToPush,
@@ -20,6 +21,7 @@ export function NotificationSetupCard() {
   const { toast } = useToast();
   const [state, setState] = useState<PushSetupState | "loading">("loading");
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem(DISMISS_KEY) === "1",
   );
@@ -64,18 +66,52 @@ export function NotificationSetupCard() {
     toast({ title: "Notifications turned off" });
   };
 
+  const handleTest = async () => {
+    setTesting(true);
+    try {
+      const res = await apiFetch("/api/push/test", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.sent > 0) {
+        toast({
+          title: "Test sent 📬",
+          description: "You should get a notification on this device in a few seconds.",
+        });
+      } else {
+        toast({
+          title: "Test could not be delivered",
+          description: "Try turning notifications off and on again, then resend.",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Test failed",
+        description: "Network error — please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   if (state === "subscribed") {
     return (
       <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="flex items-center justify-between gap-3 py-3">
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Bell className="h-4 w-4 text-primary" />
             Notifications are on for this device.
           </p>
-          <Button variant="ghost" size="sm" onClick={handleDisable} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellOff className="h-4 w-4" />}
-            <span className="ml-1">Turn off</span>
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={handleTest} disabled={testing || busy}>
+              {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <span className="ml-1">Send test</span>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={handleDisable} disabled={busy || testing}>
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellOff className="h-4 w-4" />}
+              <span className="ml-1">Turn off</span>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );

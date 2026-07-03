@@ -16,10 +16,13 @@ export interface PushWindow {
 }
 
 /**
- * True when `hhmm` falls inside [start, start+2min] of an enabled window for
- * `dayOfWeek` — the 60s job tick is guaranteed to land in that grace period.
+ * True when `hhmm` falls inside [start, end) of an enabled window for
+ * `dayOfWeek`. Deliberately "open now", not "just opened": the process may
+ * have been asleep (Render idle spin-down) or restarting at the opening
+ * minute, so the first tick after it wakes must still send the push. The
+ * caller's DB-unique (kind, sent_on) claim keeps it to one send per day.
  */
-export function windowJustOpened(
+export function checkinWindowOpenNow(
   windows: PushWindow[],
   dayOfWeek: number,
   hhmm: string,
@@ -27,11 +30,13 @@ export function windowJustOpened(
   const [nowH, nowM] = hhmm.split(":").map(Number);
   const nowTotal = nowH * 60 + nowM;
   return windows.some((w) => {
-    if (!w.enabled || w.day_of_week !== dayOfWeek || !w.start_time) return false;
+    if (!w.enabled || w.day_of_week !== dayOfWeek || !w.start_time || !w.end_time) {
+      return false;
+    }
     const [sh, sm] = w.start_time.split(":").map(Number);
-    if (Number.isNaN(sh) || Number.isNaN(sm)) return false;
-    const delta = nowTotal - (sh * 60 + sm);
-    return delta >= 0 && delta <= 2;
+    const [eh, em] = w.end_time.split(":").map(Number);
+    if ([sh, sm, eh, em].some(Number.isNaN)) return false;
+    return nowTotal >= sh * 60 + sm && nowTotal < eh * 60 + em;
   });
 }
 
