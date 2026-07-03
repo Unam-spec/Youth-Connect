@@ -403,7 +403,8 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
       .where(inArray(profilesTable.role, ["member", "leader", "super_admin"]))
       .groupBy(profilesTable.id, profilesTable.full_name, profilesTable.phone)
       .having(sql`max(${attendanceTable.session_date}) IS NULL OR max(${attendanceTable.session_date}::date) < (current_date - interval '2 weeks')`)
-      .orderBy(sql`max(${attendanceTable.session_date}) ASC NULLS FIRST`)
+      // Most weeks absent first (never-attended count from registration).
+      .orderBy(sql`COALESCE(max(${attendanceTable.session_date}::date), ${profilesTable.created_at}::date) ASC`)
       .limit(20);
 
     // ── 6. Event attendance (per event, last 10 events) ──────────────────
@@ -577,7 +578,8 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
         sql`max(${attendanceTable.session_date}) IS NULL
             OR max(${attendanceTable.session_date}::date) < (current_date - interval '2 weeks')`,
       )
-      .orderBy(sql`max(${attendanceTable.session_date}) ASC NULLS FIRST`);
+      // Most weeks absent first (never-attended count from registration).
+      .orderBy(sql`COALESCE(max(${attendanceTable.session_date}::date), ${profilesTable.created_at}::date) ASC`);
 
     // ── 3. Visitor Tracking ─────────────────────────────────────────────
     const visitors = await db
