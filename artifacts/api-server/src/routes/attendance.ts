@@ -7,6 +7,7 @@ import {
   CheckInByNameBody,
 } from "@workspace/api-zod";
 import { publishActivity } from "../lib/activityStream";
+import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 
 const router = Router();
 
@@ -59,13 +60,28 @@ router.get("/attendance", async (req, res) => {
   }
 });
 
-router.post("/attendance", async (req, res) => {
+// Leader-gated: this records attendance directly (no approval queue), so only
+// leader UIs (kiosk, dashboard) may call it. It previously had no auth at all.
+router.post("/attendance", requireLeaderSession("leader"), async (req, res) => {
   try {
     const parsed = CheckInBody.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.flatten() });
     }
     const today = new Date().toISOString().split("T")[0];
+    const existing = await db
+      .select({ id: attendanceTable.id })
+      .from(attendanceTable)
+      .where(
+        and(
+          eq(attendanceTable.profile_id, parsed.data.profile_id),
+          eq(attendanceTable.session_date, today),
+        ),
+      )
+      .limit(1);
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "Already checked in today" });
+    }
     const [record] = await db
       .insert(attendanceTable)
       .values({
