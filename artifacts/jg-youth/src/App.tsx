@@ -32,6 +32,7 @@ import Templates from "@/pages/templates";
 import LeaderQr from "@/pages/leader-qr";
 import SessionQr from "@/pages/session-qr";
 import QrResolver from "@/pages/qr-resolver";
+import Kiosk from "@/pages/kiosk";
 
 const queryClient = new QueryClient();
 
@@ -241,6 +242,7 @@ function ClerkProviderWithRoutes() {
           <Route path="/dashboard/templates" component={Templates} />
           <Route path="/dashboard" component={Dashboard} />
           <Route path="/leader-qr" component={LeaderQr} />
+          <Route path="/kiosk" component={Kiosk} />
           <Route path="/session-qr" component={SessionQr} />
           <Route path="/qr/:slug" component={QrResolver} />
 
