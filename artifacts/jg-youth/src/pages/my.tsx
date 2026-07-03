@@ -45,6 +45,7 @@ import { Settings2 } from "lucide-react";
 import { FeedbackModal } from "@/components/member/FeedbackModal";
 import { PreferencesModal } from "@/components/member/PreferencesModal";
 import { StreakWidget } from "@/components/member/StreakWidget";
+import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
 import { OnboardingTour, type TourStep } from "@/components/member/OnboardingTour";
 
 export default function MyDashboard() {
@@ -818,6 +819,9 @@ export default function MyDashboard() {
             </Link>
           </section>
         )}
+
+        {/* Enable push notifications (platform-aware; hides where unsupported) */}
+        <NotificationSetupCard />
 
         {/* Check-In section */}
         <section ref={checkInSectionRef}>
