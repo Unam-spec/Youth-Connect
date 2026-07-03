@@ -16,10 +16,12 @@ import { useToast } from "@/hooks/use-toast";
 import { getPinSession, clearPinSession } from "@/lib/pinSession";
 import { apiFetch } from "@/lib/api";
 import { computeAge, todaySAST } from "@/lib/age";
-import { CheckCircle, Clock, LogOut, Loader2, Cake } from "lucide-react";
+import { CheckCircle, Clock, LogOut, Loader2, Cake, CalendarDays, MapPin } from "lucide-react";
 import { useLocation } from "wouter";
+import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
 
 interface Me { id: string; full_name: string; username: string | null; role: string; age: number | null; date_of_birth: string | null; }
+interface EventRow { id: string; title: string; date: string; time: string | null; location: string | null; }
 interface ScheduleWindow { day_of_week: number; start_time: string; end_time: string; enabled: boolean; }
 interface Schedule { restrict_to_schedule: boolean; windows: ScheduleWindow[]; }
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -39,6 +41,7 @@ export default function AccountHome() {
   const [loading, setLoading] = useState(true);
   const [checkingIn, setCheckingIn] = useState(false);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [events, setEvents] = useState<EventRow[]>([]);
 
   useEffect(() => {
     const session = getPinSession();
@@ -63,6 +66,11 @@ export default function AccountHome() {
     fetch("/api/checkin/schedule")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data) setSchedule(data); })
+      .catch(() => {});
+    // Upcoming public events (public read).
+    fetch("/api/events?public_only=true&upcoming=true")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: EventRow[]) => setEvents(Array.isArray(rows) ? rows.slice(0, 4) : []))
       .catch(() => {});
   }, [setLocation]);
 
@@ -170,6 +178,8 @@ export default function AccountHome() {
           </CardContent>
         </Card>
 
+        <NotificationSetupCard />
+
         <Card className="border border-border bg-card rounded-2xl">
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -188,6 +198,36 @@ export default function AccountHome() {
               </ul>
             ) : (
               <p className="text-sm text-muted-foreground">Check-in times will appear here.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border bg-card rounded-2xl">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-primary" /> Upcoming events
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {events.length > 0 ? (
+              <ul className="space-y-3">
+                {events.map((e) => (
+                  <li key={e.id} className="rounded-xl border border-border/60 px-3 py-2.5">
+                    <p className="font-medium text-sm">{e.title}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {e.date}
+                      {e.time ? ` · ${e.time}` : ""}
+                      {e.location ? (
+                        <span className="inline-flex items-center gap-1 ml-2">
+                          <MapPin className="w-3 h-3" /> {e.location}
+                        </span>
+                      ) : null}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No upcoming events yet — check back soon.</p>
             )}
           </CardContent>
         </Card>
