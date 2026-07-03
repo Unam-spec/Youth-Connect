@@ -391,8 +391,11 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
         full_name: profilesTable.full_name,
         phone: profilesTable.phone,
         last_checkin: sql<string>`max(${attendanceTable.session_date})`,
+        // Never-attended members have no check-in to count from; fall back to
+        // their registration date (same as the follow-up generator) so they
+        // show their true absence length instead of a misleading "1w".
         weeks_absent: sql<number>`
-          GREATEST(1, (current_date - max(${attendanceTable.session_date}::date)) / 7)
+          GREATEST(1, (current_date - COALESCE(max(${attendanceTable.session_date}::date), ${profilesTable.created_at}::date)) / 7)
         `,
       })
       .from(profilesTable)
@@ -554,8 +557,9 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
         email: profilesTable.email,
         role: profilesTable.role,
         last_checkin: sql<string>`max(${attendanceTable.session_date})`,
+        // Same never-attended fallback as the at-risk analytics query above.
         weeks_absent: sql<number>`
-          GREATEST(1, (current_date - max(${attendanceTable.session_date}::date)) / 7)
+          GREATEST(1, (current_date - COALESCE(max(${attendanceTable.session_date}::date), ${profilesTable.created_at}::date)) / 7)
         `,
         total_checkins: sql<number>`count(${attendanceTable.id})`,
       })
