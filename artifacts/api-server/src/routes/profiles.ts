@@ -21,6 +21,7 @@ import {
 } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { resolveAuth } from "../lib/permissions";
+import { resolveAccount } from "../lib/resolveAccount";
 import { parseMembersDirectoryQuery } from "../lib/membersDirectoryQuery";
 import { normalizePhone } from "../lib/phone";
 import { deleteProfileCascade } from "../lib/deleteProfileCascade";
@@ -126,19 +127,14 @@ router.get("/profiles/me", async (req: Request, res: Response) => {
   }
 });
 
-// PATCH /profiles/me - Self-update profile (Clerk-auth)
+// PATCH /profiles/me - Self-update profile (Clerk OR username+PIN session)
 router.patch("/profiles/me", async (req: Request, res: Response) => {
   try {
-    const auth = getAuth(req);
-    const clerkId = auth?.userId;
-    if (!clerkId) return res.status(401).json({ error: "Unauthorized" });
+    const existing = await resolveAccount(req);
+    if (!existing) return res.status(401).json({ error: "Unauthorized" });
     const parsed = UpdateMyProfileBody.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json({ error: parsed.error.flatten() });
-    const existing = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, clerkId),
-    });
-    if (!existing) return res.status(404).json({ error: "Profile not found" });
     if (parsed.data.phone !== undefined && (await phoneInUse(parsed.data.phone, existing.id))) {
       return res.status(409).json({ error: "This number is already registered", duplicate: true });
     }
@@ -157,7 +153,7 @@ router.patch("/profiles/me", async (req: Request, res: Response) => {
     const [updated] = await db
       .update(profilesTable)
       .set(updateData)
-      .where(eq(profilesTable.clerk_id, clerkId))
+      .where(eq(profilesTable.id, existing.id))
       .returning();
     return res.json(updated);
   } catch (err) {

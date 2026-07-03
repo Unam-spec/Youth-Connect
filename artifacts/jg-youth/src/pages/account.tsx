@@ -15,10 +15,11 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { getPinSession, clearPinSession } from "@/lib/pinSession";
 import { apiFetch } from "@/lib/api";
-import { CheckCircle, Clock, LogOut, Loader2 } from "lucide-react";
+import { computeAge, todaySAST } from "@/lib/age";
+import { CheckCircle, Clock, LogOut, Loader2, Cake } from "lucide-react";
 import { useLocation } from "wouter";
 
-interface Me { id: string; full_name: string; username: string | null; role: string; age: number | null; }
+interface Me { id: string; full_name: string; username: string | null; role: string; age: number | null; date_of_birth: string | null; }
 interface ScheduleWindow { day_of_week: number; start_time: string; end_time: string; enabled: boolean; }
 interface Schedule { restrict_to_schedule: boolean; windows: ScheduleWindow[]; }
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -85,6 +86,32 @@ export default function AccountHome() {
       }
     } finally {
       setCheckingIn(false);
+    }
+  }
+
+  const [dobDraft, setDobDraft] = useState("");
+  const [savingDob, setSavingDob] = useState(false);
+
+  async function saveBirthday() {
+    if (!dobDraft) return;
+    setSavingDob(true);
+    try {
+      const res = await apiFetch("/api/profiles/me", {
+        method: "PATCH",
+        body: JSON.stringify({ date_of_birth: dobDraft }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setMe((m) => (m ? { ...m, date_of_birth: dobDraft, age: computeAge(dobDraft) } : m));
+        setDobDraft("");
+        toast({ title: "Birthday saved" });
+      } else {
+        toast({ title: "Could not save birthday", description: data.error ?? "Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingDob(false);
     }
   }
 
@@ -162,6 +189,45 @@ export default function AccountHome() {
             ) : (
               <p className="text-sm text-muted-foreground">Check-in times will appear here.</p>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="border border-border bg-card rounded-2xl">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Cake className="w-4 h-4 text-primary" /> Your birthday
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {me?.date_of_birth ? (
+              <p className="text-sm">
+                <span className="font-medium tabular-nums">{me.date_of_birth}</span>
+                {me.age !== null && (
+                  <span className="text-muted-foreground"> · {me.age} years old</span>
+                )}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Add your birthday so we get your age right.
+              </p>
+            )}
+            <div className="flex gap-2">
+              <Input
+                type="date"
+                max={todaySAST()}
+                className="h-11"
+                value={dobDraft}
+                onChange={(e) => setDobDraft(e.target.value)}
+              />
+              <Button
+                variant="outline"
+                className="h-11 shrink-0"
+                onClick={saveBirthday}
+                disabled={!dobDraft || savingDob}
+              >
+                {savingDob ? <Loader2 className="w-4 h-4 animate-spin" /> : me?.date_of_birth ? "Update" : "Save"}
+              </Button>
+            </div>
           </CardContent>
         </Card>
 

@@ -9,6 +9,7 @@ import { resolveAccount } from "../lib/resolveAccount";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { canGrantMembership, CONSENT_AGE } from "../lib/membershipConsent";
 import { computeAge } from "../lib/age";
+import { resolveSignupAge } from "../lib/signupAge";
 
 const router = Router();
 
@@ -45,14 +46,9 @@ router.post("/auth/pin-signup", async (req, res) => {
     const pin = validatePin(body.pin);
     if (!pin.ok) return res.status(400).json({ error: pin.error });
 
-    const ageRaw = body.age;
-    const age =
-      ageRaw === undefined || ageRaw === null || ageRaw === ""
-        ? null
-        : parseInt(String(ageRaw), 10);
-    if (age !== null && (Number.isNaN(age) || age < 1 || age > 120)) {
-      return res.status(400).json({ error: "age must be a valid number between 1 and 120" });
-    }
+    // Prefer date_of_birth (new clients); fall back to a bare legacy age.
+    const resolved = resolveSignupAge(body);
+    if (!resolved.ok) return res.status(400).json({ error: resolved.error });
 
     const existing = await findByUsername(uname.value);
     if (existing) return res.status(409).json({ error: "That username is already taken." });
@@ -69,7 +65,8 @@ router.post("/auth/pin-signup", async (req, res) => {
           username: uname.value,
           pin_hash: pinHash,
           pin_plain: pin.value,
-          age,
+          date_of_birth: resolved.date_of_birth,
+          age: resolved.age,
           role: "visitor",
           parent_phone:
             typeof body.parent_phone === "string" && body.parent_phone.trim()
@@ -271,6 +268,7 @@ router.get("/pin-accounts", requireLeaderSession("leader"), async (req, res) => 
         username: profilesTable.username,
         pin_plain: profilesTable.pin_plain,
         age: profilesTable.age,
+        date_of_birth: profilesTable.date_of_birth,
         role: profilesTable.role,
         parent_phone: profilesTable.parent_phone,
         parent_name: profilesTable.parent_name,
@@ -278,7 +276,10 @@ router.get("/pin-accounts", requireLeaderSession("leader"), async (req, res) => 
       .from(profilesTable)
       .where(isNotNull(profilesTable.username))
       .orderBy(desc(profilesTable.created_at));
-    return res.json(rows);
+    // Live age from date_of_birth wins over the stored snapshot.
+    return res.json(
+      rows.map((r) => ({ ...r, age: computeAge(r.date_of_birth) ?? r.age })),
+    );
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -295,7 +296,9 @@ router.get("/auth/me", async (req, res) => {
       full_name: profile.full_name,
       username: profile.username,
       role: profile.role,
-      age: profile.age,
+      // Live age from date_of_birth wins over the stored snapshot.
+      age: computeAge(profile.date_of_birth) ?? profile.age,
+      date_of_birth: profile.date_of_birth,
     });
   } catch (err) {
     req.log.error(err);

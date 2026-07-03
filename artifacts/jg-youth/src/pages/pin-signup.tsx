@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { setPinSession } from "@/lib/pinSession";
 import { ChevronLeft, UserPlus } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { computeAge, MIN_AGE, MAX_AGE, todaySAST } from "@/lib/age";
 
 const schema = z
   .object({
@@ -24,10 +25,16 @@ const schema = z
       .min(3, "3-20 characters")
       .max(20, "3-20 characters")
       .regex(/^[a-zA-Z0-9_]+$/, "Letters, numbers, or underscore only"),
-    age: z
+    date_of_birth: z
       .string()
-      .regex(/^\d{1,3}$/, "Enter your age")
-      .refine((v) => Number(v) >= 1 && Number(v) <= 120, "Age must be 1-120"),
+      .min(1, "Date of birth is required")
+      .refine((v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v <= todaySAST(), {
+        message: "Enter a valid date of birth (not in the future)",
+      })
+      .refine((v) => {
+        const a = computeAge(v);
+        return a !== null && a >= MIN_AGE && a <= MAX_AGE;
+      }, `Age must be between ${MIN_AGE} and ${MAX_AGE}`),
     pin: z.string().regex(/^\d{4,6}$/, "PIN must be 4-6 digits"),
     confirm_pin: z.string(),
   })
@@ -45,7 +52,7 @@ export default function PinSignup() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { full_name: "", username: "", age: "", pin: "", confirm_pin: "" },
+    defaultValues: { full_name: "", username: "", date_of_birth: "", pin: "", confirm_pin: "" },
   });
 
   async function onSubmit(values: FormValues) {
@@ -58,7 +65,7 @@ export default function PinSignup() {
           full_name: values.full_name,
           username: values.username,
           pin: values.pin,
-          age: Number(values.age),
+          date_of_birth: values.date_of_birth,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -122,13 +129,19 @@ export default function PinSignup() {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="age" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Age</FormLabel>
-                    <FormControl><Input className="h-12" type="number" inputMode="numeric" placeholder="13" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                <FormField control={form.control} name="date_of_birth" render={({ field }) => {
+                  const liveAge = computeAge(field.value);
+                  return (
+                    <FormItem>
+                      <FormLabel>Date of birth</FormLabel>
+                      <FormControl><Input className="h-12" type="date" max={todaySAST()} {...field} /></FormControl>
+                      {liveAge !== null && (
+                        <p className="text-xs text-muted-foreground mt-1">Age: {liveAge}</p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }} />
                 <FormField control={form.control} name="pin" render={({ field }) => (
                   <FormItem>
                     <FormLabel>PIN (4-6 digits)</FormLabel>
