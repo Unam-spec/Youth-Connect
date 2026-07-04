@@ -62,6 +62,18 @@ export function checkinOpenPayload(): PushPayload {
   };
 }
 
+/** Sent to the member's own devices when a leader approves their check-in. */
+export function checkinApprovedPayload(fullName: string | null): PushPayload {
+  const first = fullName?.trim().split(/\s+/)[0];
+  return {
+    title: "JG Youth",
+    body: first
+      ? `${first}, you're checked in! ✅ See you inside.`
+      : "You're checked in! ✅ See you inside.",
+    url: "/my",
+  };
+}
+
 /** "📅 Youth Night" / "Friday, 10 July at 18:30 — tap for details" */
 export function eventPushPayload(event: {
   id: string;

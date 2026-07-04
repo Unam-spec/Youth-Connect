@@ -5,6 +5,7 @@ import {
   shouldDeleteSubscription,
   eventPushPayload,
   checkinOpenPayload,
+  checkinApprovedPayload,
   type PushWindow,
 } from "./pushLogic";
 
@@ -93,5 +94,12 @@ describe("payloads", () => {
     expect(p.body).toContain("18:30");
     expect(p.body).toContain("Friday");
     expect(p.url).toBe("/my");
+  });
+  it("approval payload confirms the check-in and greets by first name when given", () => {
+    const p = checkinApprovedPayload("Thandi Khumalo");
+    expect(p.body).toContain("Thandi");
+    expect(p.body.toLowerCase()).toContain("checked in");
+    const anon = checkinApprovedPayload(null);
+    expect(anon.body.toLowerCase()).toContain("checked in");
   });
 });

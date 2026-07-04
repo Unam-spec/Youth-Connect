@@ -5,10 +5,13 @@ import {
   db,
   profilesTable,
   attendanceTable,
+  checkInRequestsTable,
   membershipRequestsTable,
+  kioskSettingsTable,
 } from "@workspace/db";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
-import { validateDob } from "../lib/age";
+import { validateDob, todaySAST } from "../lib/age";
+import { validatePin } from "../lib/pin";
 import { publishActivity } from "../lib/activityStream";
 import {
   usernameFromName,
@@ -18,10 +21,72 @@ import {
 
 const router = Router();
 
-// POST /kiosk/register — leader registers a newcomer on the shared kiosk phone.
-// Creates a username+PIN visitor profile (login-capable on their own phone
-// later), records tonight's attendance, and returns the credentials once for
-// handoff. Leader-gated: the kiosk always runs under the leader's session.
+// Kiosk check-ins are NOT auto-approved: they join the same pending queue the
+// leader dashboard already reviews. The kiosk immediately resets for the next
+// person; approval later fires a web push to the member's own devices.
+
+/** 409 message when the person already has attendance or a request today. */
+async function checkinDuplicate(profileId: string, today: string): Promise<string | null> {
+  const attended = await db.query.attendanceTable.findFirst({
+    where: and(
+      eq(attendanceTable.profile_id, profileId),
+      eq(attendanceTable.session_date, today),
+    ),
+  });
+  if (attended) return "Already checked in for this session.";
+  const requested = await db.query.checkInRequestsTable.findFirst({
+    where: and(
+      eq(checkInRequestsTable.profile_id, profileId),
+      eq(checkInRequestsTable.session_date, today),
+    ),
+  });
+  if (requested) return "Already waiting for leader approval.";
+  return null;
+}
+
+// POST /kiosk/checkin — queue an existing member's check-in from the shared
+// kiosk phone. Leader-gated (the kiosk runs under the leader's session).
+router.post(
+  "/kiosk/checkin",
+  requireLeaderSession("leader"),
+  async (req, res) => {
+    try {
+      const profileId = ((req.body ?? {}) as Record<string, unknown>).profile_id;
+      if (typeof profileId !== "string" || !profileId) {
+        return res.status(400).json({ error: "profile_id is required" });
+      }
+      const target = await db.query.profilesTable.findFirst({
+        where: eq(profilesTable.id, profileId),
+      });
+      if (!target) return res.status(404).json({ error: "Profile not found" });
+
+      const today = todaySAST();
+      const dup = await checkinDuplicate(profileId, today);
+      if (dup) return res.status(409).json({ error: dup });
+
+      const [request] = await db
+        .insert(checkInRequestsTable)
+        .values({
+          profile_id: profileId,
+          session_date: today,
+          status: "pending",
+          type: "member",
+          check_in_method: "manual",
+        })
+        .returning();
+
+      return res.status(201).json({ status: "pending", request });
+    } catch (err) {
+      req.log.error(err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
+
+// POST /kiosk/register — leader registers a newcomer on the shared kiosk
+// phone. Creates a username+PIN visitor profile (login-capable on their own
+// phone later), queues a pending check-in for leader approval, and returns
+// the credentials once for the WhatsApp handoff.
 router.post(
   "/kiosk/register",
   requireLeaderSession("leader"),
@@ -39,8 +104,12 @@ router.post(
       }
       const v = validateDob(b.date_of_birth);
       if (!v.ok) return res.status(400).json({ error: v.error });
-      const phone =
-        typeof b.phone === "string" && b.phone.trim() ? b.phone.trim() : null;
+      // Phone is required at the kiosk: the login handoff and future check-in
+      // reminders go out over WhatsApp.
+      const phone = typeof b.phone === "string" && b.phone.trim() ? b.phone.trim() : null;
+      if (!phone) {
+        return res.status(400).json({ error: "A phone / WhatsApp number is required" });
+      }
       const parentName =
         typeof b.parent_name === "string" && b.parent_name.trim()
           ? b.parent_name.trim()
@@ -86,12 +155,15 @@ router.post(
         return res.status(500).json({ error: "Could not allocate a username" });
       }
 
-      const today = new Date().toISOString().split("T")[0] as string;
-      await db.insert(attendanceTable).values({
+      // Pending check-in (type "member": display data comes from the profiles
+      // join — the "visitor" request type is reserved for legacy visitors-table
+      // rows). Approval later records attendance + sends the push.
+      await db.insert(checkInRequestsTable).values({
         profile_id: inserted.id,
-        session_date: today,
+        session_date: todaySAST(),
+        status: "pending",
+        type: "member",
         check_in_method: "manual",
-        type: "visitor",
       });
       publishActivity({
         type: "registration",
@@ -160,7 +232,63 @@ router.post(
   },
 );
 
-// POST /kiosk/verify-pin — leader re-authenticates to exit kiosk mode.
+// ── Shared kiosk PIN ──────────────────────────────────────────────────────────
+// One PIN for every leader/super-admin, used only to exit kiosk mode. Stored in
+// the single-row kiosk_settings table (seeded at boot); managed from the
+// dashboard session tab.
+
+async function getKioskSettings() {
+  const [row] = await db.select().from(kioskSettingsTable).limit(1);
+  return row ?? null;
+}
+
+// GET /kiosk/pin — reveal the shared kiosk PIN (leader). Seeds one if missing.
+router.get("/kiosk/pin", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    let row = await getKioskSettings();
+    if (!row) {
+      const pin = generatePin();
+      const pinHash = await bcrypt.hash(pin, 12);
+      [row] = await db
+        .insert(kioskSettingsTable)
+        .values({ pin_hash: pinHash, pin_plain: pin })
+        .returning();
+    }
+    return res.json({ pin: row.pin_plain });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// PUT /kiosk/pin — change the shared kiosk PIN (leader).
+router.put("/kiosk/pin", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    const check = validatePin((req.body ?? {}).pin);
+    if (!check.ok) return res.status(400).json({ error: check.error });
+    const pinHash = await bcrypt.hash(check.value, 12);
+
+    const existing = await getKioskSettings();
+    if (existing) {
+      await db
+        .update(kioskSettingsTable)
+        .set({ pin_hash: pinHash, pin_plain: check.value, updated_at: new Date() })
+        .where(eq(kioskSettingsTable.id, existing.id));
+    } else {
+      await db
+        .insert(kioskSettingsTable)
+        .values({ pin_hash: pinHash, pin_plain: check.value });
+    }
+    return res.json({ success: true, pin: check.value });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /kiosk/verify-pin — check the shared kiosk PIN to exit kiosk mode.
+// Fails OPEN when no PIN row exists yet: being locked inside the kiosk is
+// worse than a soft lock being briefly absent (boot seeding makes this rare).
 router.post(
   "/kiosk/verify-pin",
   requireLeaderSession("leader"),
@@ -168,15 +296,9 @@ router.post(
     try {
       const body = (req.body ?? {}) as Record<string, unknown>;
       const pin = typeof body.pin === "string" ? body.pin : "";
-      const profile = await db.query.profilesTable.findFirst({
-        where: eq(profilesTable.id, req.leaderId!),
-      });
-      if (!profile?.pin_hash) return res.json({ valid: false, no_pin: true });
-      // Legacy short hashes are plaintext (same fallback as /leaders/verify-pin).
-      const valid =
-        profile.pin_hash.length < 20
-          ? pin === profile.pin_hash
-          : await bcrypt.compare(pin, profile.pin_hash);
+      const row = await getKioskSettings();
+      if (!row) return res.json({ valid: true, no_pin: true });
+      const valid = await bcrypt.compare(pin, row.pin_hash);
       return res.json({ valid });
     } catch (err) {
       req.log.error(err);

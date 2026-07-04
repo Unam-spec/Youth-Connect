@@ -49,7 +49,7 @@ interface KioskCredentials {
   full_name: string;
   username: string;
   pin: string;
-  phone: string | null;
+  phone: string;
 }
 
 // Screens that may auto-reset to home when nobody is interacting. The
@@ -57,7 +57,9 @@ interface KioskCredentials {
 // worse than an idle screen.
 const IDLE_RESET_SCREENS: Screen[] = ["search", "confirm", "success", "already"];
 const IDLE_MS = 45_000;
-const SUCCESS_RESET_MS = 4_000;
+// Success keeps the WhatsApp-reminder button reachable; "already" is a dead end.
+const SUCCESS_RESET_MS = 30_000;
+const ALREADY_RESET_MS = 6_000;
 // Mirrors CONSENT_AGE in the backend membership consent gate: under-13s need
 // parent details before a leader can later promote them to member.
 const CONSENT_AGE = 13;
@@ -76,7 +78,11 @@ const registerSchema = z.object({
       const a = computeAge(v);
       return a !== null && a >= MIN_AGE && a <= MAX_AGE;
     }, `Age must be between ${MIN_AGE} and ${MAX_AGE}`),
-  phone: z.string().optional(),
+  // Required: the login handoff and check-in reminders go out on WhatsApp.
+  phone: z
+    .string()
+    .min(8, "A phone / WhatsApp number is required")
+    .max(20, "Phone number is too long"),
   parent_name: z.string().optional(),
   parent_phone: z.string().optional(),
 });
@@ -90,6 +96,7 @@ export default function Kiosk() {
   const [isSearching, setIsSearching] = useState(false);
   const [selected, setSelected] = useState<SearchResult | null>(null);
   const [checkingIn, setCheckingIn] = useState(false);
+  const [alreadyMessage, setAlreadyMessage] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<KioskCredentials | null>(null);
   const [membershipBusy, setMembershipBusy] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
@@ -108,7 +115,10 @@ export default function Kiosk() {
   // Idle auto-reset for the tap-through screens.
   useEffect(() => {
     if (!IDLE_RESET_SCREENS.includes(screen)) return;
-    const ms = screen === "success" || screen === "already" ? SUCCESS_RESET_MS : IDLE_MS;
+    const ms =
+      screen === "success" ? SUCCESS_RESET_MS
+      : screen === "already" ? ALREADY_RESET_MS
+      : IDLE_MS;
     const t = setTimeout(resetToHome, ms);
     return () => clearTimeout(t);
     // searchQuery in deps: typing keeps the search screen alive.
@@ -135,13 +145,17 @@ export default function Kiosk() {
     if (!selected) return;
     setCheckingIn(true);
     try {
-      const res = await apiFetch("/api/attendance", {
+      // Joins the pending queue on the leader dashboard — kiosk check-ins are
+      // approved there, and approval sends the member a push notification.
+      const res = await apiFetch("/api/kiosk/checkin", {
         method: "POST",
-        body: JSON.stringify({ profile_id: selected.id, check_in_method: "manual" }),
+        body: JSON.stringify({ profile_id: selected.id }),
       });
       if (res.status === 201) {
         setScreen("success");
       } else if (res.status === 409) {
+        const data = await res.json().catch(() => ({}));
+        setAlreadyMessage(typeof data.error === "string" ? data.error : null);
         setScreen("already");
       } else if (res.status === 401) {
         setLocation("/leader-login");
@@ -161,13 +175,12 @@ export default function Kiosk() {
       <header className="flex items-center justify-between px-4 py-3 border-b border-border">
         <span className="font-semibold tracking-tight">JG Youth · Check-in</span>
         <Button
-          variant="ghost"
+          variant="outline"
           size="sm"
           className="text-muted-foreground"
           onClick={() => setExitOpen(true)}
-          aria-label="Exit kiosk mode"
         >
-          <Lock className="w-4 h-4" />
+          <Lock className="w-4 h-4 mr-1.5" /> Exit Kiosk
         </Button>
       </header>
 
@@ -256,9 +269,31 @@ export default function Kiosk() {
               <CheckCircle2 className="w-12 h-12 text-primary" />
             </div>
             <h2 className="text-2xl font-semibold">
-              You're in{selected ? `, ${selected.full_name.split(" ")[0]}` : ""}! 🎉
+              You're in the queue{selected ? `, ${selected.full_name.split(" ")[0]}` : ""}! 🎉
             </h2>
-            <p className="text-muted-foreground">Pass the phone to the next person.</p>
+            <p className="text-muted-foreground">
+              A leader will approve your check-in in a moment — you'll get a
+              notification on your phone when it's confirmed.
+            </p>
+            <div className="w-full space-y-3 mt-2">
+              {selected?.phone && (
+                <Button
+                  variant="outline"
+                  className="w-full h-12"
+                  onClick={() =>
+                    openWhatsApp(
+                      selected.phone!,
+                      `Hi ${selected.full_name.split(" ")[0]}! You're in the JG Youth check-in queue 🙌 Next time, check in from YOUR own phone at ${window.location.origin} — and turn on notifications there so you know the moment check-in opens.`,
+                    )
+                  }
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" /> WhatsApp them a reminder
+                </Button>
+              )}
+              <Button className="w-full h-14 text-lg rounded-2xl" onClick={resetToHome}>
+                Next person
+              </Button>
+            </div>
           </div>
         )}
 
@@ -267,9 +302,10 @@ export default function Kiosk() {
             <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center">
               <CheckCircle2 className="w-12 h-12 text-muted-foreground" />
             </div>
-            <h2 className="text-2xl font-semibold">Already checked in ✅</h2>
+            <h2 className="text-2xl font-semibold">All sorted ✅</h2>
             <p className="text-muted-foreground">
-              {selected?.full_name.split(" ")[0] ?? "You"} checked in earlier tonight.
+              {alreadyMessage ??
+                `${selected?.full_name.split(" ")[0] ?? "You"} already checked in tonight.`}
             </p>
           </div>
         )}
@@ -290,7 +326,10 @@ export default function Kiosk() {
             <div className="space-y-1">
               <PartyPopper className="w-10 h-10 text-primary mx-auto" />
               <h2 className="text-2xl font-semibold">Welcome, {credentials.full_name.split(" ")[0]}!</h2>
-              <p className="text-muted-foreground">You're checked in. Here's your login — keep it safe:</p>
+              <p className="text-muted-foreground">
+                You're registered — a leader will approve your check-in shortly.
+                Here's your login, keep it safe:
+              </p>
             </div>
             <div className="rounded-2xl border border-primary/25 bg-primary/5 p-6 space-y-3">
               <div>
@@ -306,21 +345,18 @@ export default function Kiosk() {
                 check in, see events, and get notifications.
               </p>
             </div>
-            {credentials.phone && (
-              <Button
-                variant="outline"
-                className="h-12"
-                onClick={() =>
-                  openWhatsApp(
-                    credentials.phone!,
-                    `Welcome to JG Youth! 🎉 Your login — username: ${credentials.username}, PIN: ${credentials.pin}. Sign in on your phone here: ${window.location.origin}/pin-login`,
-                  )
-                }
-              >
-                <MessageCircle className="w-4 h-4 mr-2" /> Send my login via WhatsApp
-              </Button>
-            )}
-            <Button className="h-14 text-lg rounded-2xl" onClick={() => setScreen("membership")}>
+            <Button
+              className="h-14 text-lg rounded-2xl"
+              onClick={() =>
+                openWhatsApp(
+                  credentials.phone,
+                  `Welcome to JG Youth! 🎉 Your login — username: ${credentials.username}, PIN: ${credentials.pin}. Sign in on your own phone here: ${window.location.origin}/pin-login and turn on notifications so you know the moment check-in opens.`,
+                )
+              }
+            >
+              <MessageCircle className="w-5 h-5 mr-2" /> Send my login via WhatsApp
+            </Button>
+            <Button variant="ghost" className="h-12" onClick={() => setScreen("membership")}>
               Done
             </Button>
           </div>
@@ -468,7 +504,7 @@ function KioskRegisterForm({
           full_name: data.full_name,
           username: data.username,
           pin: data.pin,
-          phone: values.phone || null,
+          phone: values.phone,
         });
         return;
       }
@@ -566,7 +602,7 @@ function KioskRegisterForm({
           )} />
           <FormField control={form.control} name="phone" render={({ field }) => (
             <FormItem>
-              <FormLabel>Phone / WhatsApp (optional)</FormLabel>
+              <FormLabel>Phone / WhatsApp number</FormLabel>
               <FormControl><PhoneInput className="h-12" {...field} value={field.value ?? ""} /></FormControl>
               <FormMessage />
             </FormItem>
@@ -605,7 +641,6 @@ function KioskRegisterForm({
 function KioskExitDialog({
   open, onOpenChange, onExit,
 }: { open: boolean; onOpenChange: (v: boolean) => void; onExit: () => void }) {
-  const [hasPin, setHasPin] = useState<boolean | null>(null);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -614,13 +649,7 @@ function KioskExitDialog({
     if (!open) {
       setPin("");
       setError(null);
-      return;
     }
-    setHasPin(null);
-    apiFetch("/api/profiles/me/pin")
-      .then((r) => (r.ok ? r.json() : { hasPIN: false }))
-      .then((d) => setHasPin(!!d.hasPIN))
-      .catch(() => setHasPin(false));
   }, [open]);
 
   async function verifyAndExit() {
@@ -632,10 +661,12 @@ function KioskExitDialog({
         body: JSON.stringify({ pin }),
       });
       const data = await res.json().catch(() => ({}));
+      // no_pin: the shared PIN row is missing — fail open so the leader is
+      // never trapped inside the kiosk.
       if (data.valid || data.no_pin) {
         onExit();
       } else {
-        setError("Wrong PIN — try again.");
+        setError("Wrong kiosk PIN — try again.");
       }
     } catch {
       setError("Could not verify. Check the connection.");
@@ -649,40 +680,31 @@ function KioskExitDialog({
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <KeyRound className="w-4 h-4" /> Exit kiosk mode
+            <KeyRound className="w-4 h-4" /> Exit Kiosk
           </DialogTitle>
           <DialogDescription>
-            {hasPin === null
-              ? "Checking…"
-              : hasPin
-                ? "Enter your leader PIN to go back to the dashboard."
-                : "Go back to the dashboard?"}
+            Enter the kiosk PIN to go back to the dashboard. Every leader uses
+            the same kiosk PIN — find or change it in the dashboard's Session tab.
           </DialogDescription>
         </DialogHeader>
-        {hasPin && (
-          <Input
-            type="password"
-            inputMode="numeric"
-            maxLength={6}
-            value={pin}
-            onChange={(e) => setPin(e.target.value)}
-            className="h-12 text-center text-lg tracking-[0.5em] font-mono"
-            placeholder="••••"
-            autoFocus
-          />
-        )}
+        <Input
+          type="password"
+          inputMode="numeric"
+          maxLength={6}
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          className="h-12 text-center text-lg tracking-[0.5em] font-mono"
+          placeholder="••••"
+          autoFocus
+        />
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex gap-2 justify-end">
           <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
             Cancel
           </Button>
-          {hasPin === false ? (
-            <Button onClick={onExit}>Exit</Button>
-          ) : (
-            <Button onClick={verifyAndExit} disabled={busy || pin.length < 4}>
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Exit"}
-            </Button>
-          )}
+          <Button onClick={verifyAndExit} disabled={busy || pin.length < 4}>
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : "Exit Kiosk"}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

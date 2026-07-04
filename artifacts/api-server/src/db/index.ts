@@ -1,5 +1,7 @@
 import { Pool } from "pg";
+import bcrypt from "bcrypt";
 import { logger } from "../lib/logger";
+import { generatePin } from "../lib/kioskAccount";
 
 // ── Startup schema sync ────────────────────────────────────────────────────────
 // Instead of relying on Drizzle's migrator (which requires a correct _journal.json),
@@ -281,6 +283,16 @@ CREATE TABLE IF NOT EXISTS "push_send_log" (
 
 -- 24h cap for leader "Notify members" event pushes.
 ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "last_notified_at" timestamp with time zone;
+
+-- Shared kiosk PIN (2026-07): single row, one PIN for every leader/super-admin
+-- to exit kiosk mode. Mirrors lib/db/drizzle/0017_add_kiosk_settings.sql.
+-- Seeded with a random PIN in code after patches run (needs bcrypt).
+CREATE TABLE IF NOT EXISTS "kiosk_settings" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "pin_hash" text NOT NULL,
+  "pin_plain" text NOT NULL,
+  "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+);
 `;
 
 export async function runMigrations() {
@@ -294,6 +306,20 @@ export async function runMigrations() {
   try {
     logger.info("Running schema sync patches...");
     await client.query(SCHEMA_PATCHES);
+
+    // Seed the shared kiosk PIN once (random non-trivial 4 digits). Never
+    // overwrites: leaders manage it from the dashboard afterwards.
+    const kioskRow = await client.query(`SELECT 1 FROM kiosk_settings LIMIT 1`);
+    if (kioskRow.rowCount === 0) {
+      const pin = generatePin();
+      const pinHash = await bcrypt.hash(pin, 12);
+      await client.query(
+        `INSERT INTO kiosk_settings (pin_hash, pin_plain) VALUES ($1, $2)`,
+        [pinHash, pin],
+      );
+      logger.info("Seeded shared kiosk PIN (view it in the dashboard session tab).");
+    }
+
     logger.info("Schema sync complete.");
   } catch (err: any) {
     // Log but do NOT crash the server — some patches may fail if the table

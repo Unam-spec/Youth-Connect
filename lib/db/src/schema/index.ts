@@ -504,3 +504,16 @@ export const pushSendLogTable = pgTable(
   }),
 );
 
+// Single-row shared kiosk PIN: every leader/super-admin uses this one PIN to
+// exit kiosk mode (easier to manage than per-leader PINs on a shared phone).
+// pin_plain is kept so the dashboard can display it — same deliberate product
+// decision as profiles.pin_plain.
+export const kioskSettingsTable = pgTable("kiosk_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  pin_hash: text("pin_hash").notNull(),
+  pin_plain: text("pin_plain").notNull(),
+  updated_at: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+

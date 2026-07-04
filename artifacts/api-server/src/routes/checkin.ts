@@ -15,6 +15,8 @@ import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { getSchedule, isCheckinOpenNow, type CheckinWindow } from "../lib/checkinSchedule";
 import { resolveAccount } from "../lib/resolveAccount";
 import { publishActivity } from "../lib/activityStream";
+import { sendPushToProfiles } from "../lib/pushSender";
+import { checkinApprovedPayload } from "../lib/pushLogic";
 
 const router = Router();
 
@@ -377,6 +379,14 @@ router.patch("/checkin/requests/:id/approve", requireLeaderSession("leader"), as
           profile_name: checkedInProfile.full_name,
           metadata: { method, role: checkedInProfile.role },
         });
+        // Approval push to the member's own devices (kiosk or self check-in
+        // alike). Fire-and-forget: approval must never fail on push errors.
+        void sendPushToProfiles(
+          [checkedInProfile.id],
+          checkinApprovedPayload(checkedInProfile.full_name),
+        ).catch((err) =>
+          req.log.warn({ err }, "[checkin] approval push failed"),
+        );
       }
     }
 

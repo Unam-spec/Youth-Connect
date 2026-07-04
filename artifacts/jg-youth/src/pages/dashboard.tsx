@@ -99,6 +99,7 @@ import { LeaderManagementPanel } from "@/components/panels/LeaderManagementPanel
 import { PinManagementPanel } from "@/components/panels/PinManagementPanel";
 import { AdminSlotsPanel } from "@/components/panels/AdminSlotsPanel";
 import { CheckInSchedulePanel } from "@/components/panels/CheckInSchedulePanel";
+import { KioskPinPanel } from "@/components/panels/KioskPinPanel";
 import { DeleteConfirmPanel } from "@/components/panels/DeleteConfirmPanel";
 import { DialogManager } from "@/components/panels/DialogManager";
 import { KpiCard } from "@/components/panels/shared";
@@ -1231,6 +1232,7 @@ export default function Dashboard() {
               handleRejectCheckIn={handleRejectCheckIn}
             />
             <CheckInSchedulePanel />
+            <KioskPinPanel />
           </TabsContent>
 
           <TabsContent value="members" className="mt-0 space-y-6">
