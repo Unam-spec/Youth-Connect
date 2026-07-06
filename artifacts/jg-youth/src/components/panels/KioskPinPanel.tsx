@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Eye, EyeOff, KeyRound, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PinInput } from "@/components/ui/pin-input";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
 import { DashCard, SectionTitle } from "./shared";
@@ -106,14 +106,12 @@ export function KioskPinPanel() {
         </Button>
       </div>
       <div className="flex gap-2 max-w-xs">
-        <Input
-          type="text"
-          inputMode="numeric"
+        <PinInput
           maxLength={6}
           placeholder="New PIN"
           value={newPin}
-          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ""))}
-          className="h-9 font-mono tracking-widest"
+          onChange={setNewPin}
+          className="h-9"
         />
         <Button
           size="sm"

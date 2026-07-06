@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PinInput } from "@/components/ui/pin-input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { QRCodeSVG } from "qrcode.react";
@@ -291,16 +292,13 @@ export function DialogManager(props: DialogManagerProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Input
+            <PinInput
               id="leader-pin-input"
-              type="password"
-              placeholder="Enter 4-digit PIN"
               maxLength={4}
+              placeholder="••••"
               value={props.leaderPinInput}
-              onChange={(e) =>
-                props.setLeaderPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))
-              }
-              className="text-center text-2xl tracking-widest"
+              onChange={props.setLeaderPinInput}
+              className="h-12 text-2xl"
               autoFocus
             />
           </div>
@@ -336,16 +334,13 @@ export function DialogManager(props: DialogManagerProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <Input
+            <PinInput
               id="pin-input"
-              type="password"
-              placeholder="Enter 4-digit PIN"
               maxLength={4}
+              placeholder="••••"
               value={props.pin}
-              onChange={(e) =>
-                props.setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
-              }
-              className="text-center text-2xl tracking-widest"
+              onChange={props.setPin}
+              className="h-12 text-2xl"
             />
           </div>
           <DialogFooter>

@@ -8,6 +8,7 @@ import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { PinInput } from "@/components/ui/pin-input";
 import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form";
@@ -145,14 +146,14 @@ export default function PinSignup() {
                 <FormField control={form.control} name="pin" render={({ field }) => (
                   <FormItem>
                     <FormLabel>PIN (4-6 digits)</FormLabel>
-                    <FormControl><Input className="h-12 text-center text-lg tracking-[0.5em] font-mono" type="password" inputMode="numeric" maxLength={6} placeholder="••••" {...field} /></FormControl>
+                    <FormControl><PinInput maxLength={6} className="h-12 text-lg" placeholder="••••" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="confirm_pin" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Confirm PIN</FormLabel>
-                    <FormControl><Input className="h-12 text-center text-lg tracking-[0.5em] font-mono" type="password" inputMode="numeric" maxLength={6} placeholder="••••" {...field} /></FormControl>
+                    <FormControl><PinInput maxLength={6} className="h-12 text-lg" placeholder="••••" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

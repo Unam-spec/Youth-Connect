@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useTransition } from "react";
-import { KeyRound, ArrowUpCircle } from "lucide-react";
+import { useEffect, useMemo, useState, useCallback, useTransition } from "react";
+import { KeyRound, ArrowUpCircle, Eye, EyeOff, Search, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,9 +7,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { DashCard, SectionTitle, SkeletonRows, EmptyState } from "./shared";
+import { DashCard, SkeletonRows, EmptyState } from "./shared";
 import { apiFetch } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface PinAccount {
   id: string;
@@ -22,10 +23,21 @@ interface PinAccount {
   parent_name: string | null;
 }
 
+type RoleFilter = "all" | "visitor" | "member";
+
+// Rows shown before the "Show all" expander — keeps the panel short once
+// kiosk registrations pile up.
+const COLLAPSED_ROWS = 8;
+
 export function PinAccountsPanel() {
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<PinAccount[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
+  const [showAll, setShowAll] = useState(false);
 
   const [promoteFor, setPromoteFor] = useState<PinAccount | null>(null);
   const [parentName, setParentName] = useState("");
@@ -49,6 +61,37 @@ export function PinAccountsPanel() {
   }, [apiFetch]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const isMember = (a: PinAccount) => a.role === "member";
+  const memberCount = accounts.filter(isMember).length;
+  const visitorCount = accounts.length - memberCount;
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return accounts
+      .filter((a) => {
+        if (roleFilter === "member" && !isMember(a)) return false;
+        if (roleFilter === "visitor" && isMember(a)) return false;
+        if (!q) return true;
+        return (
+          a.full_name.toLowerCase().includes(q) ||
+          (a.username ?? "").toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) => a.full_name.localeCompare(b.full_name));
+  }, [accounts, search, roleFilter]);
+
+  const visible = showAll ? filtered : filtered.slice(0, COLLAPSED_ROWS);
+  const hiddenCount = filtered.length - visible.length;
+
+  function toggleReveal(id: string) {
+    setRevealedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   function openPromote(a: PinAccount) {
     setPromoteFor(a);
@@ -124,46 +167,146 @@ export function PinAccountsPanel() {
     });
   }
 
+  const filterChips: { key: RoleFilter; label: string; count: number }[] = [
+    { key: "all", label: "All", count: accounts.length },
+    { key: "visitor", label: "Visitors", count: visitorCount },
+    { key: "member", label: "Members", count: memberCount },
+  ];
+
   return (
     <DashCard>
-      <SectionTitle title="PIN Accounts" icon={<KeyRound className="h-4 w-4 text-primary" />} />
+      <div className="flex items-center gap-2 mb-4">
+        <KeyRound className="h-4 w-4 text-primary" />
+        <h3 className="font-[family-name:var(--app-font-heading)] text-base font-semibold tracking-tight text-foreground">
+          PIN Accounts
+        </h3>
+        {!loading && accounts.length > 0 && (
+          <span className="text-xs font-medium tabular-nums rounded-full bg-primary/10 text-primary px-2 py-0.5">
+            {filtered.length === accounts.length ? accounts.length : `${filtered.length} of ${accounts.length}`}
+          </span>
+        )}
+      </div>
       <p className="text-xs text-muted-foreground mb-4">
-        Username + PIN accounts. Promote a visitor to member, or reset a forgotten PIN.
+        Kiosk and self-service username + PIN accounts. PINs stay hidden until you reveal them.
       </p>
+
       {loading ? (
         <SkeletonRows count={3} />
       ) : accounts.length > 0 ? (
-        <div className="space-y-3">
-          {accounts.map((a) => (
-            <div key={a.id} className="flex items-center justify-between p-4 border border-border rounded-xl bg-card">
-              <div>
-                <p className="font-semibold text-sm">{a.full_name}</p>
-                <p className="text-xs text-muted-foreground">
-                  @{a.username} • PIN {a.pin_plain ?? "—"} • {a.role === "member" ? "Member" : "Visitor"}
-                  {a.age != null ? ` • age ${a.age}` : ""}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {a.role === "visitor" && (
-                  <Button variant="outline" size="sm" className="h-8 text-xs px-3" onClick={() => openPromote(a)}>
-                    <ArrowUpCircle className="w-3.5 h-3.5 mr-1" /> Promote
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 text-xs px-3"
-                  onClick={() => resetPin(a)}
-                  disabled={resettingId === a.id}
-                >
-                  {resettingId === a.id ? "Resetting…" : "Reset PIN"}
-                </Button>
-              </div>
+        <>
+          <div className="flex flex-col sm:flex-row gap-2 mb-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name or username"
+                className="h-9 pl-9 text-sm"
+              />
             </div>
-          ))}
-        </div>
+            <div className="flex gap-1.5">
+              {filterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => setRoleFilter(chip.key)}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                    roleFilter === chip.key
+                      ? "border-primary/30 bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  {chip.label} {chip.count}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filtered.length > 0 ? (
+            <div className="rounded-xl border border-border/60 divide-y divide-border/40 overflow-hidden">
+              {visible.map((a) => {
+                const revealed = revealedIds.has(a.id);
+                return (
+                  <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 hover:bg-muted/20 transition-colors">
+                    <div className="h-8 w-8 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
+                      {a.full_name?.charAt(0)?.toUpperCase() ?? "?"}
+                    </div>
+                    <div className="min-w-[8rem] flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm leading-tight">{a.full_name}</p>
+                        <span
+                          className={cn(
+                            "rounded-full border px-2 py-px text-[11px]",
+                            isMember(a)
+                              ? "border-primary/25 bg-primary/10 text-primary"
+                              : "border-border bg-muted/40 text-muted-foreground",
+                          )}
+                        >
+                          {isMember(a) ? "Member" : "Visitor"}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        @{a.username ?? "—"}
+                        {a.age != null ? ` · age ${a.age}` : ""}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleReveal(a.id)}
+                      aria-label={revealed ? `Hide PIN for ${a.full_name}` : `Reveal PIN for ${a.full_name}`}
+                      className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 font-mono text-xs tracking-[0.2em] tabular-nums text-foreground hover:border-primary/40 transition-colors"
+                    >
+                      {revealed ? (a.pin_plain ?? "—") : "•".repeat(Math.max(a.pin_plain?.length ?? 4, 4))}
+                      {revealed ? <EyeOff className="h-3.5 w-3.5 shrink-0" /> : <Eye className="h-3.5 w-3.5 shrink-0" />}
+                    </button>
+                    {!isMember(a) && (
+                      <Button variant="outline" size="sm" className="h-7 text-xs px-2.5" onClick={() => openPromote(a)}>
+                        <ArrowUpCircle className="w-3.5 h-3.5 mr-1" /> Promote
+                      </Button>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => resetPin(a)}
+                      disabled={resettingId === a.id}
+                      title="Reset PIN"
+                      aria-label={`Reset PIN for ${a.full_name}`}
+                    >
+                      <RotateCcw className={cn("h-3.5 w-3.5", resettingId === a.id && "animate-spin")} />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState text={`No accounts match "${search.trim()}".`} />
+          )}
+
+          {hiddenCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2 w-full h-8 text-xs text-muted-foreground"
+              onClick={() => setShowAll(true)}
+            >
+              Show all {filtered.length}
+            </Button>
+          )}
+          {showAll && filtered.length > COLLAPSED_ROWS && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2 w-full h-8 text-xs text-muted-foreground"
+              onClick={() => setShowAll(false)}
+            >
+              Show fewer
+            </Button>
+          )}
+        </>
       ) : (
-        <EmptyState text="No PIN accounts yet." />
+        <EmptyState text="No PIN accounts yet. Kiosk registrations will show up here." />
       )}
 
       {/* Promote dialog */}
