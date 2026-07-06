@@ -1111,6 +1111,7 @@ export default function Dashboard() {
                     {isGeneratingQr ? "Generating…" : "Session QR"}
                   </Button>
                   <Button
+                    id="tour-kiosk-button"
                     onClick={() => (window.location.href = "/kiosk")}
                     size="sm"
                     variant="outline"

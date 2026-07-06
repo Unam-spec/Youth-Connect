@@ -20,7 +20,7 @@ const PAD = 8;
 const CARD_WIDTH = 300;
 
 /**
- * Lightweight 3-step spotlight tour. Dims the page, highlights the current
+ * Lightweight spotlight tour. Dims the page, highlights the current
  * target element, and shows a tooltip card with Back/Next/Finish. Pure React +
  * a portal — no external tour library.
  */
