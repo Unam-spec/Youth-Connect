@@ -22,5 +22,15 @@ export default defineConfig({
   server: {
     port: 3000,
     host: "0.0.0.0",
+    // Mirror the production vercel.json rewrite so `npm run dev` talks to the
+    // real backend. Without this, relative /api/* requests fall through to
+    // Vite's SPA fallback, which answers with index.html and crashes the
+    // dashboard panels on the unexpected HTML payload.
+    proxy: {
+      "/api": {
+        target: "https://youth-connect-y1zi.onrender.com",
+        changeOrigin: true,
+      },
+    },
   },
 });
