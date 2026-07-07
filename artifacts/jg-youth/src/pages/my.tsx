@@ -44,6 +44,7 @@ import { useAuth } from "@clerk/react";
 import { Settings2 } from "lucide-react";
 import { FeedbackModal } from "@/components/member/FeedbackModal";
 import { PreferencesModal } from "@/components/member/PreferencesModal";
+import { PrefsNudgeDialog } from "@/components/member/PrefsNudgeDialog";
 import { StreakWidget } from "@/components/member/StreakWidget";
 import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
 import { OnboardingTour, type TourStep } from "@/components/member/OnboardingTour";
@@ -1460,6 +1461,7 @@ export default function MyDashboard() {
         whatsappOptIn={!!(profile as any)?.whatsapp_opt_in}
       />
       <OnboardingTour steps={tourSteps} open={tourOpen} onClose={closeTour} />
+      <PrefsNudgeDialog />
     </Layout>
   );
 }

@@ -20,6 +20,7 @@ import { computeAge, todaySAST } from "@/lib/age";
 import { CheckCircle, Clock, LogOut, Loader2, Cake, CalendarDays, MapPin } from "lucide-react";
 import { useLocation } from "wouter";
 import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
+import { PrefsNudgeDialog } from "@/components/member/PrefsNudgeDialog";
 
 interface Me { id: string; full_name: string; username: string | null; role: string; age: number | null; date_of_birth: string | null; }
 interface EventRow { id: string; title: string; date: string; time: string | null; location: string | null; }
@@ -307,6 +308,7 @@ export default function AccountHome() {
           <LogOut className="w-4 h-4 mr-2" /> Log out
         </Button>
       </div>
+      <PrefsNudgeDialog />
     </Layout>
   );
 }

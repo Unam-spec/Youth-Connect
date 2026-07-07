@@ -299,6 +299,7 @@ router.get("/auth/me", async (req, res) => {
       // Live age from date_of_birth wins over the stored snapshot.
       age: computeAge(profile.date_of_birth) ?? profile.age,
       date_of_birth: profile.date_of_birth,
+      whatsapp_opt_in: profile.whatsapp_opt_in,
     });
   } catch (err) {
     req.log.error(err);

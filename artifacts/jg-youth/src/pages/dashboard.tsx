@@ -102,6 +102,7 @@ import { CheckInSchedulePanel } from "@/components/panels/CheckInSchedulePanel";
 import { KioskPinPanel } from "@/components/panels/KioskPinPanel";
 import { DeleteConfirmPanel } from "@/components/panels/DeleteConfirmPanel";
 import { DialogManager } from "@/components/panels/DialogManager";
+import { PrefsNudgeDialog } from "@/components/member/PrefsNudgeDialog";
 import { KpiCard } from "@/components/panels/shared";
 import { Activity, Download, Settings, MonitorSmartphone } from "lucide-react";
 
@@ -1364,6 +1365,7 @@ export default function Dashboard() {
         setPin={setPin}
         handleSavePin={handleSavePin}
       />
+      <PrefsNudgeDialog />
     </DashboardLayout>
   );
 }
