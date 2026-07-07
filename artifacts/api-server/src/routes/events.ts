@@ -12,6 +12,7 @@ import { CreateEventBody, UpdateEventBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { eventNotifyAllowed, eventPushPayload } from "../lib/pushLogic";
 import { sendPushToProfiles } from "../lib/pushSender";
+import { APP_BASE_URL } from "../lib/appUrl";
 
 const router = Router();
 
@@ -138,7 +139,10 @@ router.post("/events", requireLeaderSession("leader"), async (req: Request, res:
                   <tr><td style="padding: 8px 12px; color: #A0AEC0;">Location:</td><td style="padding: 8px 12px;">${event.location}</td></tr>
                 </table>
                 ${event.description ? `<p style="margin-top: 16px; color: #CBD5E0;">${event.description}</p>` : ""}
-                <p style="margin-top: 24px;">Please log in to your dashboard to RSVP.</p>
+                <div style="text-align: center; margin: 24px 0;">
+                  <a href="${APP_BASE_URL}/my" style="background-color: #2A9D8F; color: #E6E8EB; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">Open the app to RSVP</a>
+                </div>
+                <p style="font-size: 12px; color: #718096;">Or copy this link: <a href="${APP_BASE_URL}/my" style="color: #2A9D8F;">${APP_BASE_URL}/my</a></p>
                 <p style="margin-top: 16px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation Youth Team</p>
               </div>
             `,
@@ -173,6 +177,10 @@ router.post("/events", requireLeaderSession("leader"), async (req: Request, res:
                     <tr><td style="padding: 8px 12px; color: #A0AEC0;">Location:</td><td style="padding: 8px 12px;">${event.location}</td></tr>
                   </table>
                   <p>We look forward to seeing you there!</p>
+                  <div style="text-align: center; margin: 24px 0;">
+                    <a href="${APP_BASE_URL}/my" style="background-color: #2A9D8F; color: #E6E8EB; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; display: inline-block;">Open the app for details</a>
+                  </div>
+                  <p style="font-size: 12px; color: #718096;">Or copy this link: <a href="${APP_BASE_URL}/my" style="color: #2A9D8F;">${APP_BASE_URL}/my</a></p>
                   <p style="margin-top: 24px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation Youth Team</p>
                 </div>
               `,

@@ -10,6 +10,7 @@ import {
 } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { deleteProfileCascade } from "../lib/deleteProfileCascade";
+import { APP_BASE_URL } from "../lib/appUrl";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -298,6 +299,7 @@ router.post("/leaders/:id/reset-pin", requireLeaderSession("super_admin"), async
           <span style="font-size: 32px; font-weight: bold; letter-spacing: 0.25em; color: #3DBFB0;">${rawPin}</span>
         </div>
         <p style="font-size: 14px; color: #A0AEC0;">Please log in using this PIN and update it immediately to a personal PIN under your settings.</p>
+        <p style="font-size: 14px;">Log in here: <a href="${APP_BASE_URL}/leader-login" style="color: #2A9D8F;">${APP_BASE_URL}/leader-login</a></p>
       </div>
     `;
 

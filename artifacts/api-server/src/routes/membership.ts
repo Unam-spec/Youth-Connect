@@ -157,6 +157,7 @@ router.post("/membership-requests/:id/reject", requireLeaderSession("leader"), a
           <p>Hi <strong>${member.full_name}</strong>,</p>
           <p>Thank you for your interest in joining Jeremiah Generation Youth. After review, your membership request was not approved at this time.</p>
           <p>Please reach out to a leader if you have any questions.</p>
+          <p style="font-size: 14px;">You're still welcome at all our events — see what's on: <a href="${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/my" style="color: #2A9D8F;">${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/my</a></p>
           <p style="margin-top: 24px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation Youth Team</p>
         </div>
       `;

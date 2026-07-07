@@ -5,6 +5,7 @@ import { db, rsvpsTable, eventsTable, profilesTable, pendingEmailsTable } from "
 import { UpsertRsvpBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { publishActivity } from "../lib/activityStream";
+import { APP_BASE_URL } from "../lib/appUrl";
 
 const router = Router();
 
@@ -177,6 +178,7 @@ router.post("/rsvps/:eventId", async (req, res) => {
               <p style="margin: 4px 0;"><strong>Location:</strong> ${event.location}</p>
             </div>
             <p>See you there!</p>
+            <p style="font-size: 14px;">Manage your RSVP in the app: <a href="${APP_BASE_URL}/my" style="color: #2A9D8F;">${APP_BASE_URL}/my</a></p>
             <p style="margin-top: 24px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation AFM Team</p>
           </div>
         `;

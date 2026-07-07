@@ -620,7 +620,7 @@ export default function FollowUpHub() {
                                 toast.error("No phone number for this member");
                                 return;
                               }
-                              const msg = `Hi ${member.full_name.split(" ")[0]},\n\nWe have an upcoming event: *${selectedEvent.title}* on ${new Date(selectedEvent.date).toLocaleDateString()} at ${selectedEvent.time}!\n\nPlease check the JG Youth Connect app to RSVP.\n\n— JG Youth Team`;
+                              const msg = `Hi ${member.full_name.split(" ")[0]},\n\nWe have an upcoming event: *${selectedEvent.title}* on ${new Date(selectedEvent.date).toLocaleDateString()} at ${selectedEvent.time}!\n\nRSVP on the JG Youth Connect app: ${window.location.origin}/my\n\n— JG Youth Team`;
                               openWhatsApp(member.phone, msg);
                             }}
                           >

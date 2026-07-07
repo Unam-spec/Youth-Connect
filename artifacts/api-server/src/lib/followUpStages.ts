@@ -7,6 +7,7 @@
  * `template_type` so the message tone can differ per role.
  */
 import type { ProfileRole } from "./directoryListParams";
+import { APP_BASE_URL } from "./appUrl";
 
 export function isStaffRole(role: ProfileRole): boolean {
   return role === "leader" || role === "super_admin";
@@ -46,7 +47,7 @@ export const FOLLOW_UP_TEMPLATE_TYPES = [
 ];
 
 /** The public app URL, used as the [Link] placeholder value in templates. */
-export const APP_URL = "https://jgyouth.vercel.app/sign-in";
+export const APP_URL = `${APP_BASE_URL}/sign-in`;
 
 /**
  * Replace template placeholders. Templates are documented with the

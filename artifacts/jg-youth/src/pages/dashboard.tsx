@@ -816,7 +816,7 @@ export default function Dashboard() {
       toast({ title: `PIN set for ${settingPinFor.full_name}` });
 
       if (settingPinFor.phone) {
-        const message = `Hi ${settingPinFor.full_name.split(" ")[0]}, your leader PIN for JG Youth Connect has been set to: ${leaderPinInput}. Please use this PIN to log in to the Leader Dashboard.`;
+        const message = `Hi ${settingPinFor.full_name.split(" ")[0]}, your leader PIN for JG Youth Connect has been set to: ${leaderPinInput}. Log in to the Leader Dashboard here: ${window.location.origin}/leader-login`;
         // Normalises SA "0…" numbers to "27…" and falls back to the current tab
         // if the pre-opened window was blocked (common on mobile).
         openWhatsApp(settingPinFor.phone, message, waWindow);

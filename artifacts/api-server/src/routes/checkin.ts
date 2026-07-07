@@ -17,6 +17,7 @@ import { resolveAccount } from "../lib/resolveAccount";
 import { publishActivity } from "../lib/activityStream";
 import { sendPushToProfiles } from "../lib/pushSender";
 import { checkinApprovedPayload } from "../lib/pushLogic";
+import { APP_BASE_URL } from "../lib/appUrl";
 
 const router = Router();
 
@@ -411,6 +412,7 @@ router.patch("/checkin/requests/:id/approve", requireLeaderSession("leader"), as
             <p>Hi <strong>${profile.full_name}</strong>,</p>
             <p>You have been successfully checked in for the youth session on <strong>${sessionDate}</strong>.</p>
             <p>See you in there!</p>
+            <p style="font-size: 14px;">See what's coming up in the app: <a href="${APP_BASE_URL}/my" style="color: #2A9D8F;">${APP_BASE_URL}/my</a></p>
             <p style="margin-top: 24px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation Youth Team</p>
           </div>
         `;
