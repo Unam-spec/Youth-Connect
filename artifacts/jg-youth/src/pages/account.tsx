@@ -17,12 +17,14 @@ import { useToast } from "@/hooks/use-toast";
 import { getPinSession, clearPinSession } from "@/lib/pinSession";
 import { apiFetch } from "@/lib/api";
 import { computeAge, todaySAST } from "@/lib/age";
-import { CheckCircle, Clock, LogOut, Loader2, Cake, CalendarDays, MapPin } from "lucide-react";
+import { CheckCircle, Clock, LogOut, Loader2, Cake, CalendarDays, MapPin, GraduationCap } from "lucide-react";
 import { useLocation } from "wouter";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
 import { PrefsNudgeDialog } from "@/components/member/PrefsNudgeDialog";
+import { StreakWidget } from "@/components/member/StreakWidget";
 
-interface Me { id: string; full_name: string; username: string | null; role: string; age: number | null; date_of_birth: string | null; }
+interface Me { id: string; full_name: string; username: string | null; role: string; age: number | null; date_of_birth: string | null; school?: string | null; phone?: string | null; avatar_url?: string | null; }
 interface EventRow { id: string; title: string; date: string; time: string | null; location: string | null; }
 interface ScheduleWindow { day_of_week: number; start_time: string; end_time: string; enabled: boolean; }
 interface Schedule { restrict_to_schedule: boolean; windows: ScheduleWindow[]; }
@@ -44,6 +46,12 @@ export default function AccountHome() {
   const [checkingIn, setCheckingIn] = useState(false);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [events, setEvents] = useState<EventRow[]>([]);
+  // Member-only extras (visitors never load these).
+  const [sessionDates, setSessionDates] = useState<string[]>([]);
+  const [myRsvps, setMyRsvps] = useState<Record<string, string>>({});
+  const [savingRsvp, setSavingRsvp] = useState<string | null>(null);
+  const [detailsDraft, setDetailsDraft] = useState<{ school: string; phone: string }>({ school: "", phone: "" });
+  const [savingDetails, setSavingDetails] = useState(false);
 
   useEffect(() => {
     const session = getPinSession();
@@ -75,6 +83,68 @@ export default function AccountHome() {
       .then((rows: EventRow[]) => setEvents(Array.isArray(rows) ? rows.slice(0, 4) : []))
       .catch(() => {});
   }, [setLocation]);
+
+  // Once we know the caller is a member, load the richer member data that the
+  // basic visitor view never needs: attendance (for the streak) and RSVPs.
+  useEffect(() => {
+    if (me?.role !== "member") return;
+    setDetailsDraft({ school: me.school ?? "", phone: me.phone ?? "" });
+    apiFetch("/api/attendance/my")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: { session_date: string }[]) =>
+        setSessionDates(Array.isArray(rows) ? rows.map((r) => r.session_date).filter(Boolean) : []),
+      )
+      .catch(() => {});
+    apiFetch("/api/rsvps/my")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: { event_id: string; status: string }[]) => {
+        const map: Record<string, string> = {};
+        if (Array.isArray(rows)) for (const r of rows) map[r.event_id] = r.status;
+        setMyRsvps(map);
+      })
+      .catch(() => {});
+  }, [me?.role, me?.id]);
+
+  async function handleRsvp(eventId: string, status: "going" | "not_going") {
+    setSavingRsvp(eventId);
+    try {
+      const res = await apiFetch(`/api/rsvps/${eventId}`, {
+        method: "POST",
+        body: JSON.stringify({ status }),
+      });
+      if (res.ok) {
+        setMyRsvps((m) => ({ ...m, [eventId]: status }));
+        toast({ title: status === "going" ? "You're going 🎉" : "RSVP updated" });
+      } else {
+        toast({ title: "Could not RSVP", description: "Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingRsvp(null);
+    }
+  }
+
+  async function saveDetails() {
+    setSavingDetails(true);
+    try {
+      const res = await apiFetch("/api/profiles/me", {
+        method: "PATCH",
+        body: JSON.stringify({ school: detailsDraft.school, phone: detailsDraft.phone }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setMe((m) => (m ? { ...m, school: detailsDraft.school, phone: detailsDraft.phone } : m));
+        toast({ title: "Details saved" });
+      } else {
+        toast({ title: "Could not save details", description: data.error ?? "Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Network error", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setSavingDetails(false);
+    }
+  }
 
   const openWindows = (schedule?.windows ?? []).filter(
     (w) => w.enabled && w.start_time && w.end_time,
@@ -182,6 +252,8 @@ export default function AccountHome() {
 
         <NotificationSetupCard />
 
+        {me?.role === "member" && <StreakWidget sessionDates={sessionDates} />}
+
         <Card className="border border-border bg-card rounded-2xl">
           <CardHeader>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -225,6 +297,28 @@ export default function AccountHome() {
                         </span>
                       ) : null}
                     </p>
+                    {me?.role === "member" && (
+                      <div className="mt-2 flex gap-2">
+                        <Button
+                          size="sm"
+                          variant={myRsvps[e.id] === "going" ? "default" : "outline"}
+                          className="h-8 flex-1"
+                          disabled={savingRsvp === e.id}
+                          onClick={() => handleRsvp(e.id, "going")}
+                        >
+                          {savingRsvp === e.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "I'm going"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={myRsvps[e.id] === "not_going" ? "secondary" : "outline"}
+                          className="h-8 flex-1"
+                          disabled={savingRsvp === e.id}
+                          onClick={() => handleRsvp(e.id, "not_going")}
+                        >
+                          Can't make it
+                        </Button>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -272,6 +366,42 @@ export default function AccountHome() {
             </div>
           </CardContent>
         </Card>
+
+        {me?.role === "member" && (
+          <Card className="border border-border bg-card rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-primary" /> Your details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">School</label>
+                <Input
+                  className="h-11"
+                  placeholder="Your school"
+                  value={detailsDraft.school}
+                  onChange={(e) => setDetailsDraft((d) => ({ ...d, school: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Phone</label>
+                <PhoneInput
+                  value={detailsDraft.phone}
+                  onChange={(v) => setDetailsDraft((d) => ({ ...d, phone: v }))}
+                />
+              </div>
+              <Button
+                variant="outline"
+                className="w-full h-11"
+                onClick={saveDetails}
+                disabled={savingDetails}
+              >
+                {savingDetails ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save details"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border border-border bg-card rounded-2xl">
           <CardHeader>

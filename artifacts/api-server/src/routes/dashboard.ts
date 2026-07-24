@@ -14,6 +14,7 @@ import {
 } from "@workspace/db";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { getCache, setCache } from "../lib/redis";
+import { sastWeekRange } from "../lib/weekRange";
 
 const router = Router();
 
@@ -534,9 +535,13 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
 // ── Data Export (multi-sheet Excel) ───────────────────────────────────────────
 router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res) => {
   try {
-    const { dateString: today } = getSastParts();
+    const { dateString: today, dayOfWeek } = getSastParts();
+    // Scope the per-week sheets to the current SAST week (Mon–Sun). Weekly
+    // Trends stays multi-week (it IS the trend) and Absentees stays cumulative
+    // (it answers "who is at risk right now", which spans weeks by nature).
+    const { weekStart, weekEndExclusive, weekEndInclusive } = sastWeekRange(today, dayOfWeek);
 
-    // ── 1. Full Attendance ──────────────────────────────────────────────
+    // ── 1. Full Attendance (this week only) ─────────────────────────────
     const fullAttendance = await db
       .select({
         full_name: profilesTable.full_name,
@@ -548,6 +553,10 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       })
       .from(attendanceTable)
       .leftJoin(profilesTable, eq(attendanceTable.profile_id, profilesTable.id))
+      .where(
+        sql`${attendanceTable.session_date}::date >= ${weekStart}::date
+            AND ${attendanceTable.session_date}::date < ${weekEndExclusive}::date`,
+      )
       .orderBy(desc(attendanceTable.session_date));
 
     // ── 2. At-Risk / Absentees ──────────────────────────────────────────
@@ -581,7 +590,7 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       // Most weeks absent first (never-attended count from registration).
       .orderBy(sql`COALESCE(max(${attendanceTable.session_date}::date), ${profilesTable.created_at}::date) ASC`);
 
-    // ── 3. Visitor Tracking ─────────────────────────────────────────────
+    // ── 3. Visitor Tracking (new visitors this week) ────────────────────
     const visitors = await db
       .select({
         full_name: profilesTable.full_name,
@@ -596,7 +605,13 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
         )`,
       })
       .from(profilesTable)
-      .where(eq(profilesTable.role, "visitor"))
+      .where(
+        and(
+          eq(profilesTable.role, "visitor"),
+          sql`(${profilesTable.created_at} AT TIME ZONE 'Africa/Johannesburg')::date >= ${weekStart}::date
+              AND (${profilesTable.created_at} AT TIME ZONE 'Africa/Johannesburg')::date < ${weekEndExclusive}::date`,
+        ),
+      )
       .orderBy(desc(profilesTable.created_at));
 
     // ── 4. Weekly Trends ────────────────────────────────────────────────
@@ -612,7 +627,7 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       .groupBy(sql`date_trunc('week', ${attendanceTable.session_date}::date)`)
       .orderBy(sql`date_trunc('week', ${attendanceTable.session_date}::date) DESC`);
 
-    // ── 5. Feedback ─────────────────────────────────────────────────────
+    // ── 5. Feedback (this week only) ────────────────────────────────────
     const feedback = await db
       .select({
         content: feedbacksTable.content,
@@ -622,6 +637,10 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       })
       .from(feedbacksTable)
       .leftJoin(profilesTable, eq(feedbacksTable.user_id, profilesTable.id))
+      .where(
+        sql`(${feedbacksTable.created_at} AT TIME ZONE 'Africa/Johannesburg')::date >= ${weekStart}::date
+            AND (${feedbacksTable.created_at} AT TIME ZONE 'Africa/Johannesburg')::date < ${weekEndExclusive}::date`,
+      )
       .orderBy(desc(feedbacksTable.created_at));
 
     // ── Build Excel workbook ────────────────────────────────────────────
@@ -635,7 +654,33 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       alignment: { horizontal: "center" },
     };
 
-    // Sheet 1: Full Attendance
+    // Sheet 1: This Week — a summary that makes the reporting window explicit
+    // so the file is unmistakably a single-week report, not an all-time dump.
+    const memberRoles = new Set(["member", "leader", "super_admin"]);
+    const weekMemberCheckins = fullAttendance.filter((r) => memberRoles.has(String(r.role))).length;
+    const weekVisitorCheckins = fullAttendance.length - weekMemberCheckins;
+
+    const summarySheet = workbook.addWorksheet("This Week");
+    summarySheet.columns = [
+      { header: "Metric", key: "metric", width: 34 },
+      { header: "Value", key: "value", width: 28 },
+    ];
+    summarySheet.getRow(1).eachCell((cell) => { cell.style = headerStyle; });
+    const summaryRows: Array<[string, string | number]> = [
+      ["Report", "JG Youth — Weekly Report"],
+      ["Week (Mon–Sun)", `${weekStart} to ${weekEndInclusive}`],
+      ["Generated", today],
+      ["Total check-ins this week", fullAttendance.length],
+      ["  • Members", weekMemberCheckins],
+      ["  • Visitors", weekVisitorCheckins],
+      ["New visitors this week", visitors.length],
+      ["Feedback submitted this week", feedback.length],
+    ];
+    for (const [metric, value] of summaryRows) {
+      summarySheet.addRow({ metric, value });
+    }
+
+    // Sheet 2: Full Attendance
     const attendSheet = workbook.addWorksheet("Full Attendance");
     attendSheet.columns = [
       { header: "Name", key: "full_name", width: 25 },
@@ -731,8 +776,8 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       });
     }
 
-    // Stream response
-    const filename = `JG-Youth-Report-${today}.xlsx`;
+    // Stream response — name the file by the week it covers, not "today".
+    const filename = `JG-Youth-Report-Week-of-${weekStart}.xlsx`;
     res.setHeader(
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

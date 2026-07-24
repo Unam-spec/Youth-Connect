@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { db, rsvpsTable, eventsTable, profilesTable, pendingEmailsTable } from "@workspace/db";
 import { UpsertRsvpBody } from "@workspace/api-zod";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { resolveAccount } from "../lib/resolveAccount";
 import { publishActivity } from "../lib/activityStream";
 import { APP_BASE_URL } from "../lib/appUrl";
 
@@ -46,12 +47,9 @@ router.get("/rsvps/event/:eventId", async (req, res) => {
 // GET /rsvps/my — member fetches their own RSVPs with full event details
 router.get("/rsvps/my", async (req, res) => {
   try {
-    const auth = getAuth(req);
-    if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
-    const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    // Accept either a Clerk member or a username+PIN account.
+    const profile = await resolveAccount(req);
+    if (!profile) return res.status(401).json({ error: "Unauthorized" });
     const myRsvps = await db
       .select({
         id: rsvpsTable.id,
@@ -115,14 +113,11 @@ router.get("/rsvps", requireLeaderSession("leader"), async (req, res) => {
 
 router.post("/rsvps/:eventId", async (req, res) => {
   try {
-    const auth = getAuth(req);
-    if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
     const parsed = UpsertRsvpBody.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-    const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    // Accept either a Clerk member or a username+PIN account.
+    const profile = await resolveAccount(req);
+    if (!profile) return res.status(401).json({ error: "Unauthorized" });
 
     const event = await db.query.eventsTable.findFirst({
       where: eq(eventsTable.id, req.params.eventId),

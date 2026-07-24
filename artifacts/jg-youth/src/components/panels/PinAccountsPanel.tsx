@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, useCallback, useTransition } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { getListProfilesQueryKey } from "@workspace/api-client-react";
 import { KeyRound, ArrowUpCircle, Eye, EyeOff, Search, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +33,7 @@ const COLLAPSED_ROWS = 8;
 
 export function PinAccountsPanel() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [accounts, setAccounts] = useState<PinAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -137,6 +140,11 @@ export function PinAccountsPanel() {
               ),
             );
           }
+          // The promoted account is now a full member (role: "member"), so it
+          // belongs in the Member Directory alongside normal members. That list
+          // is a separate query — invalidate it so the new member shows up there
+          // immediately instead of only after a full page reload.
+          queryClient.invalidateQueries({ queryKey: getListProfilesQueryKey() });
         } else {
           toast({ title: "Could not promote", description: data.error ?? "Please try again.", variant: "destructive" });
         }

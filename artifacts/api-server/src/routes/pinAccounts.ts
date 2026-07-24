@@ -300,6 +300,11 @@ router.get("/auth/me", async (req, res) => {
       age: computeAge(profile.date_of_birth) ?? profile.age,
       date_of_birth: profile.date_of_birth,
       whatsapp_opt_in: profile.whatsapp_opt_in,
+      // Member-facing fields so a promoted PIN member can view/edit their own
+      // details on /account without a Clerk-only profile fetch.
+      school: profile.school,
+      phone: profile.phone,
+      avatar_url: profile.avatar_url,
     });
   } catch (err) {
     req.log.error(err);

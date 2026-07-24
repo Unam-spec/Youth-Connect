@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-zod";
 import { publishActivity } from "../lib/activityStream";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
+import { resolveAccount } from "../lib/resolveAccount";
 
 const router = Router();
 
@@ -148,13 +149,9 @@ router.get("/attendance/today", async (req, res) => {
 // GET /attendance/my - the authenticated member's own attendance history
 router.get("/attendance/my", async (req, res) => {
   try {
-    const auth = getAuth(req);
-    if (!auth?.userId) return res.status(401).json({ error: "Unauthorized" });
-
-    const profile = await db.query.profilesTable.findFirst({
-      where: eq(profilesTable.clerk_id, auth.userId),
-    });
-    if (!profile) return res.status(404).json({ error: "Profile not found" });
+    // Accept either a Clerk member or a username+PIN account (visitor/member).
+    const profile = await resolveAccount(req);
+    if (!profile) return res.status(401).json({ error: "Unauthorized" });
 
     const rows = await db
       .select({

@@ -604,8 +604,12 @@ export default function Dashboard() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
+      // Prefer the server-provided name (scoped to the reporting week); fall
+      // back to a date-stamped name if the header is unavailable.
+      const disposition = res.headers.get("Content-Disposition") ?? "";
+      const match = disposition.match(/filename="?([^"]+)"?/i);
       const today = new Date().toISOString().split("T")[0];
-      a.download = `JG-Youth-Report-${today}.xlsx`;
+      a.download = match?.[1] ?? `JG-Youth-Report-${today}.xlsx`;
       document.body.appendChild(a);
       a.click();
       a.remove();

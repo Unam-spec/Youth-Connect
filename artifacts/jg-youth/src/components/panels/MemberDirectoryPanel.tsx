@@ -335,17 +335,24 @@ export function MemberDirectoryPanel({
                         </DropdownMenuItem>
                       )}
 
-                      <DropdownMenuSeparator />
-                      
-                      <DropdownMenuItem 
-                        className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
-                        onClick={() => {
-                          setDeleteMemberId(profile.id);
-                          setDeleteMemberName(profile.full_name || "Unknown");
-                        }}
-                      >
-                        Remove Member
-                      </DropdownMenuItem>
+                      {/* Deleting a profile is destructive and irreversible, so
+                          it is restricted to super admins — matching the backend,
+                          which gates DELETE /profiles/:id to super_admin. */}
+                      {sessionRole === 'super_admin' && (
+                        <>
+                          <DropdownMenuSeparator />
+
+                          <DropdownMenuItem
+                            className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                            onClick={() => {
+                              setDeleteMemberId(profile.id);
+                              setDeleteMemberName(profile.full_name || "Unknown");
+                            }}
+                          >
+                            Remove Member
+                          </DropdownMenuItem>
+                        </>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 )}
