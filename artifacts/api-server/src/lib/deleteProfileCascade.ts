@@ -7,6 +7,8 @@ import {
   checkInRequestsTable,
   leaderPermissionsTable,
   eventsTable,
+  feedbacksTable,
+  followUpQueueTable,
 } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
@@ -35,6 +37,16 @@ export async function deleteProfileCascade(profileId: string): Promise<void> {
       .set({ reviewed_by: null })
       .where(eq(membershipRequestsTable.reviewed_by, profileId));
     await tx.delete(leaderPermissionsTable).where(eq(leaderPermissionsTable.profile_id, profileId));
+    // Follow-up queue: drop this member's own entries, then null the audit
+    // column on any entries they reviewed for others.
+    await tx.delete(followUpQueueTable).where(eq(followUpQueueTable.profile_id, profileId));
+    await tx
+      .update(followUpQueueTable)
+      .set({ reviewed_by: null })
+      .where(eq(followUpQueueTable.reviewed_by, profileId));
+    // Feedback authorship is a nullable link; null it so the feedback content is
+    // preserved (it simply becomes anonymous) rather than lost with the member.
+    await tx.update(feedbacksTable).set({ user_id: null }).where(eq(feedbacksTable.user_id, profileId));
     await tx.update(eventsTable).set({ created_by: null }).where(eq(eventsTable.created_by, profileId));
     await tx.delete(profilesTable).where(eq(profilesTable.id, profileId));
   });

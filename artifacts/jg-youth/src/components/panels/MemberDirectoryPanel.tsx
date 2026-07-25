@@ -43,7 +43,7 @@ export function MemberDirectoryPanel({
   const [search, setSearch] = useState("");
   // Debounce so each keystroke doesn't fire a profiles request (300ms idle).
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [group, setGroup] = useState<"members" | "leaders">("members");
+  const [group, setGroup] = useState<"members" | "visitors" | "leaders">("members");
   const [sort, setSort] = useState<"name" | "newest" | "oldest">("name");
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const apiFetch = useApiFetch();
@@ -141,6 +141,7 @@ export function MemberDirectoryPanel({
         <div className="inline-flex rounded-xl border border-border bg-card p-1">
           {([
             { key: "members", label: "Members" },
+            { key: "visitors", label: "Visitors" },
             { key: "leaders", label: "Leaders" },
           ] as const).map((t) => (
             <button

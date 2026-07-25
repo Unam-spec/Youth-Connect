@@ -8,9 +8,13 @@ describe("resolveDirectoryListParams", () => {
       "super_admin",
     ]);
   });
-  it("maps group=members to member + visitor", () => {
+  it("maps group=members to member only", () => {
     expect(resolveDirectoryListParams({ group: "members" }).roles).toEqual([
       "member",
+    ]);
+  });
+  it("maps group=visitors to visitor only", () => {
+    expect(resolveDirectoryListParams({ group: "visitors" }).roles).toEqual([
       "visitor",
     ]);
   });

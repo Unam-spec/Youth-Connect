@@ -25,7 +25,8 @@ export function resolveDirectoryListParams(
   const group = typeof q.group === "string" ? q.group : "";
   let roles: ProfileRole[] | undefined;
   if (group === "leaders") roles = ["leader", "super_admin"];
-  else if (group === "members") roles = ["member", "visitor"];
+  else if (group === "members") roles = ["member"];
+  else if (group === "visitors") roles = ["visitor"];
   else {
     const role = typeof q.role === "string" ? q.role : "";
     roles = (ALL_ROLES as string[]).includes(role) ? [role as ProfileRole] : undefined;

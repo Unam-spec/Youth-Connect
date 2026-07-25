@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useCallback, useTransition } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { getListProfilesQueryKey } from "@workspace/api-client-react";
-import { KeyRound, ArrowUpCircle, Eye, EyeOff, Search, RotateCcw } from "lucide-react";
+import { KeyRound, ArrowUpCircle, Eye, EyeOff, Search, RotateCcw, MoreVertical, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,8 +9,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DashCard, SkeletonRows, EmptyState } from "./shared";
 import { apiFetch } from "@/lib/api";
+import { getLeaderSession } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +60,12 @@ export function PinAccountsPanel() {
   const [resettingId, setResettingId] = useState<string | null>(null);
 
   const [resetResult, setResetResult] = useState<{ name: string; pin: string } | null>(null);
+
+  const [deleteFor, setDeleteFor] = useState<PinAccount | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  // Deleting a profile is super-admin-only on the backend; only show the action
+  // to super admins so the menu item matches what the API will allow.
+  const isSuperAdmin = getLeaderSession()?.role === "super_admin";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -175,6 +189,30 @@ export function PinAccountsPanel() {
     });
   }
 
+  async function confirmDelete() {
+    if (!deleteFor) return;
+    const target = deleteFor;
+    setIsDeleting(true);
+    try {
+      const res = await apiFetch(`/api/profiles/${target.id}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setAccounts((prev) => prev.filter((p) => p.id !== target.id));
+        setDeleteFor(null);
+        // The account is gone from the shared profiles table too — refresh the
+        // Member Directory so it disappears there as well.
+        queryClient.invalidateQueries({ queryKey: getListProfilesQueryKey() });
+        toast({ title: "Account deleted" });
+      } else {
+        toast({ title: "Could not delete", description: data.error ?? "Please try again.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Could not delete", description: "Please try again.", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const filterChips: { key: RoleFilter; label: string; count: number }[] = [
     { key: "all", label: "All", count: accounts.length },
     { key: "visitor", label: "Visitors", count: visitorCount },
@@ -273,17 +311,36 @@ export function PinAccountsPanel() {
                         <ArrowUpCircle className="w-3.5 h-3.5 mr-1" /> Promote
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                      onClick={() => resetPin(a)}
-                      disabled={resettingId === a.id}
-                      title="Reset PIN"
-                      aria-label={`Reset PIN for ${a.full_name}`}
-                    >
-                      <RotateCcw className={cn("h-3.5 w-3.5", resettingId === a.id && "animate-spin")} />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                          aria-label={`Actions for ${a.full_name}`}
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-44">
+                        <DropdownMenuItem onClick={() => resetPin(a)} disabled={resettingId === a.id}>
+                          <RotateCcw className={cn("mr-2 h-3.5 w-3.5", resettingId === a.id && "animate-spin")} />
+                          Reset PIN
+                        </DropdownMenuItem>
+                        {isSuperAdmin && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-950/50"
+                              onClick={() => setDeleteFor(a)}
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5" />
+                              Delete account
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 );
               })}
@@ -366,6 +423,29 @@ export function PinAccountsPanel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete-account confirmation (super admins only) */}
+      <AlertDialog open={deleteFor != null} onOpenChange={(o) => !o && setDeleteFor(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {deleteFor?.full_name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the account and all its check-ins, RSVPs and
+              requests. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700 text-white border-0"
+              onClick={(e) => { e.preventDefault(); confirmDelete(); }}
+              disabled={isDeleting}
+            >
+              {isDeleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashCard>
   );
 }
