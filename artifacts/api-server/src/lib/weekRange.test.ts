@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sastWeekRange } from "./weekRange";
+import { sastWeekRange, resolveReportWeek } from "./weekRange";
 
 describe("sastWeekRange", () => {
   it("Friday maps to the Monday-start week containing it", () => {
@@ -44,5 +44,38 @@ describe("sastWeekRange", () => {
       weekEndExclusive: "2027-01-04",
       weekEndInclusive: "2027-01-03",
     });
+  });
+});
+
+describe("resolveReportWeek", () => {
+  // "Today" in these tests: Monday 2026-09-28 (dayOfWeek 1).
+  const today = "2026-09-28";
+  const dow = 1;
+
+  it("defaults to the current week when no week is requested", () => {
+    expect(resolveReportWeek(undefined, today, dow)).toEqual({
+      weekStart: "2026-09-28",
+      weekEndExclusive: "2026-10-05",
+      weekEndInclusive: "2026-10-04",
+    });
+  });
+
+  it("returns a past week for any date inside it (e.g. the Friday session)", () => {
+    // Friday 2026-09-25 → week of Monday 2026-09-21.
+    expect(resolveReportWeek("2026-09-25", today, dow)).toEqual({
+      weekStart: "2026-09-21",
+      weekEndExclusive: "2026-09-28",
+      weekEndInclusive: "2026-09-27",
+    });
+  });
+
+  it("rejects malformed dates", () => {
+    expect(resolveReportWeek("25-09-2026", today, dow)).toBeNull();
+    expect(resolveReportWeek("2026-02-30", today, dow)).toBeNull();
+    expect(resolveReportWeek("nope", today, dow)).toBeNull();
+  });
+
+  it("rejects weeks in the future", () => {
+    expect(resolveReportWeek("2026-10-05", today, dow)).toBeNull();
   });
 });

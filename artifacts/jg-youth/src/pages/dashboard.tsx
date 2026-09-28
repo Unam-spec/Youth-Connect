@@ -103,6 +103,7 @@ import { KioskPinPanel } from "@/components/panels/KioskPinPanel";
 import { DeleteConfirmPanel } from "@/components/panels/DeleteConfirmPanel";
 import { DialogManager } from "@/components/panels/DialogManager";
 import { PrefsNudgeDialog } from "@/components/member/PrefsNudgeDialog";
+import { ReportHistoryDialog } from "@/components/panels/ReportHistoryDialog";
 import { KpiCard } from "@/components/panels/shared";
 import { Activity, Download, Settings, MonitorSmartphone } from "lucide-react";
 
@@ -334,7 +335,7 @@ export default function Dashboard() {
     null,
   );
   const [kpisUpdatedAt, setKpisUpdatedAt] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -589,40 +590,6 @@ export default function Dashboard() {
       });
     } finally {
       setIsGeneratingQr(false);
-    }
-  };
-
-  const handleExportReport = async () => {
-    setIsExporting(true);
-    toast({ title: "Generating report…" });
-    try {
-      const res = await apiFetch("/api/dashboard/export");
-      if (!res.ok) {
-        throw new Error("Export failed");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      // Prefer the server-provided name (scoped to the reporting week); fall
-      // back to a date-stamped name if the header is unavailable.
-      const disposition = res.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="?([^"]+)"?/i);
-      const today = new Date().toISOString().split("T")[0];
-      a.download = match?.[1] ?? `JG-Youth-Report-${today}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      toast({ title: "Report downloaded" });
-    } catch {
-      toast({
-        title: "Export failed",
-        description: "Could not generate the report. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -1097,13 +1064,12 @@ export default function Dashboard() {
                 session.role === "super_admin") && (
                 <>
                   <Button
-                    onClick={handleExportReport}
-                    disabled={isExporting}
+                    onClick={() => setReportsOpen(true)}
                     size="sm"
                     variant="outline"
                   >
-                    <Download className={`h-4 w-4 mr-2${isExporting ? " animate-bounce" : ""}`} />
-                    {isExporting ? "Exporting…" : "Export Report"}
+                    <Download className="h-4 w-4 mr-2" />
+                    Weekly Reports
                   </Button>
                   <Button
                     id="btn-generate-qr"
@@ -1369,6 +1335,7 @@ export default function Dashboard() {
         setPin={setPin}
         handleSavePin={handleSavePin}
       />
+      <ReportHistoryDialog open={reportsOpen} onOpenChange={setReportsOpen} />
       <PrefsNudgeDialog />
     </DashboardLayout>
   );

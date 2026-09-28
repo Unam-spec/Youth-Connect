@@ -48,3 +48,32 @@ export function sastWeekRange(dateString: string, dayOfWeek: number): SastWeekRa
     weekEndInclusive: toISO(weekEndInclusiveMs),
   };
 }
+
+/**
+ * Picks the week a report should cover.
+ *
+ * - No `requested` date → the current SAST week (the original behaviour).
+ * - A "YYYY-MM-DD" date → the Monday-start week containing it, so past weeks
+ *   stay downloadable forever (the report is rebuilt from stored data).
+ *
+ * Returns null for a malformed/impossible date or a week that hasn't started.
+ */
+export function resolveReportWeek(
+  requested: string | undefined,
+  todayString: string,
+  todayDayOfWeek: number,
+): SastWeekRange | null {
+  const current = sastWeekRange(todayString, todayDayOfWeek);
+  if (!requested) return current;
+
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(requested);
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const ms = Date.UTC(y, mo - 1, d);
+  // Reject roll-overs like 2026-02-30 → 2026-03-02.
+  if (toISO(ms) !== requested) return null;
+
+  const range = sastWeekRange(requested, new Date(ms).getUTCDay());
+  if (range.weekStart > current.weekStart) return null;
+  return range;
+}

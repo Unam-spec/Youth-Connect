@@ -14,7 +14,7 @@ import {
 } from "@workspace/db";
 import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { getCache, setCache } from "../lib/redis";
-import { sastWeekRange } from "../lib/weekRange";
+import { resolveReportWeek } from "../lib/weekRange";
 
 const router = Router();
 
@@ -532,14 +532,78 @@ router.get("/dashboard/analytics-data", requireLeaderSession("leader"), async (r
   }
 });
 
+// ── Report history: every week that has attendance, newest first ─────────────
+// Powers the "Weekly Reports" list so past weeks stay downloadable. Reports are
+// rebuilt from stored data on demand, so nothing ever expires.
+router.get("/dashboard/report-weeks", requireLeaderSession("leader"), async (req, res) => {
+  try {
+    const { dateString: today, dayOfWeek } = getSastParts();
+    const current = resolveReportWeek(undefined, today, dayOfWeek)!;
+
+    const rows = await db
+      .select({
+        week_start: sql<string>`to_char(date_trunc('week', ${attendanceTable.session_date}::date), 'YYYY-MM-DD')`,
+        total: count(),
+        members: sql<number>`count(*) filter (where ${profilesTable.role} IN ('member', 'leader', 'super_admin'))`,
+        visitors: sql<number>`count(*) filter (where ${profilesTable.role} = 'visitor')`,
+        session_dates: sql<string[]>`array_agg(DISTINCT to_char(${attendanceTable.session_date}::date, 'YYYY-MM-DD'))`,
+      })
+      .from(attendanceTable)
+      .leftJoin(profilesTable, eq(attendanceTable.profile_id, profilesTable.id))
+      .groupBy(sql`date_trunc('week', ${attendanceTable.session_date}::date)`)
+      .orderBy(sql`date_trunc('week', ${attendanceTable.session_date}::date) DESC`);
+
+    const weeks = rows.map((r) => {
+      const range = resolveReportWeek(r.week_start, today, dayOfWeek);
+      return {
+        week_start: r.week_start,
+        week_end: range?.weekEndInclusive ?? r.week_start,
+        total_checkins: Number(r.total),
+        members: Number(r.members),
+        visitors: Number(r.visitors),
+        session_dates: [...(r.session_dates ?? [])].sort(),
+        is_current: r.week_start === current.weekStart,
+      };
+    });
+
+    // Always offer the current week, even before anyone has checked in.
+    if (!weeks.some((w) => w.is_current)) {
+      weeks.unshift({
+        week_start: current.weekStart,
+        week_end: current.weekEndInclusive,
+        total_checkins: 0,
+        members: 0,
+        visitors: 0,
+        session_dates: [],
+        is_current: true,
+      });
+    }
+
+    return res.json({ weeks });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // ── Data Export (multi-sheet Excel) ───────────────────────────────────────────
+// `?week=YYYY-MM-DD` (any date in the week) exports that past week; without it
+// the current SAST week is exported.
 router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res) => {
   try {
     const { dateString: today, dayOfWeek } = getSastParts();
-    // Scope the per-week sheets to the current SAST week (Mon–Sun). Weekly
-    // Trends stays multi-week (it IS the trend) and Absentees stays cumulative
-    // (it answers "who is at risk right now", which spans weeks by nature).
-    const { weekStart, weekEndExclusive, weekEndInclusive } = sastWeekRange(today, dayOfWeek);
+    const requestedWeek = typeof req.query.week === "string" ? req.query.week : undefined;
+    const range = resolveReportWeek(requestedWeek, today, dayOfWeek);
+    if (!range) {
+      return res.status(400).json({ error: "Invalid week. Use YYYY-MM-DD for a week that has started." });
+    }
+    // Per-week sheets are scoped to the chosen Mon–Sun week. Weekly Trends
+    // covers every week up to and including it, and Absentees is computed "as
+    // of" the end of that week, so an old report reads the same as it did then.
+    const { weekStart, weekEndExclusive, weekEndInclusive } = range;
+    const isCurrentWeek = resolveReportWeek(undefined, today, dayOfWeek)!.weekStart === weekStart;
+    // For the in-progress week "as of" is today; for past weeks, its Sunday.
+    const asOf = isCurrentWeek ? today : weekEndInclusive;
 
     // ── 1. Full Attendance (this week only) ─────────────────────────────
     const fullAttendance = await db
@@ -559,7 +623,7 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       )
       .orderBy(desc(attendanceTable.session_date));
 
-    // ── 2. At-Risk / Absentees ──────────────────────────────────────────
+    // ── 2. At-Risk / Absentees (as of the end of the chosen week) ───────
     const absentees = await db
       .select({
         full_name: profilesTable.full_name,
@@ -569,13 +633,24 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
         last_checkin: sql<string>`max(${attendanceTable.session_date})`,
         // Same never-attended fallback as the at-risk analytics query above.
         weeks_absent: sql<number>`
-          GREATEST(1, (current_date - COALESCE(max(${attendanceTable.session_date}::date), ${profilesTable.created_at}::date)) / 7)
+          GREATEST(1, (${asOf}::date - COALESCE(max(${attendanceTable.session_date}::date), ${profilesTable.created_at}::date)) / 7)
         `,
         total_checkins: sql<number>`count(${attendanceTable.id})`,
       })
       .from(profilesTable)
-      .leftJoin(attendanceTable, eq(profilesTable.id, attendanceTable.profile_id))
-      .where(inArray(profilesTable.role, ["member", "leader", "super_admin"]))
+      .leftJoin(
+        attendanceTable,
+        and(
+          eq(profilesTable.id, attendanceTable.profile_id),
+          sql`${attendanceTable.session_date}::date < ${weekEndExclusive}::date`,
+        ),
+      )
+      .where(
+        and(
+          inArray(profilesTable.role, ["member", "leader", "super_admin"]),
+          sql`(${profilesTable.created_at} AT TIME ZONE 'Africa/Johannesburg')::date < ${weekEndExclusive}::date`,
+        ),
+      )
       .groupBy(
         profilesTable.id,
         profilesTable.full_name,
@@ -585,7 +660,7 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       )
       .having(
         sql`max(${attendanceTable.session_date}) IS NULL
-            OR max(${attendanceTable.session_date}::date) < (current_date - interval '2 weeks')`,
+            OR max(${attendanceTable.session_date}::date) < (${asOf}::date - interval '2 weeks')`,
       )
       // Most weeks absent first (never-attended count from registration).
       .orderBy(sql`COALESCE(max(${attendanceTable.session_date}::date), ${profilesTable.created_at}::date) ASC`);
@@ -614,7 +689,7 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       )
       .orderBy(desc(profilesTable.created_at));
 
-    // ── 4. Weekly Trends ────────────────────────────────────────────────
+    // ── 4. Weekly Trends (every week up to the chosen one) ──────────────
     const weeklyTrends = await db
       .select({
         week: sql<string>`to_char(date_trunc('week', ${attendanceTable.session_date}::date), 'YYYY-MM-DD')`,
@@ -624,6 +699,7 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
       })
       .from(attendanceTable)
       .leftJoin(profilesTable, eq(attendanceTable.profile_id, profilesTable.id))
+      .where(sql`${attendanceTable.session_date}::date < ${weekEndExclusive}::date`)
       .groupBy(sql`date_trunc('week', ${attendanceTable.session_date}::date)`)
       .orderBy(sql`date_trunc('week', ${attendanceTable.session_date}::date) DESC`);
 
@@ -660,7 +736,7 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
     const weekMemberCheckins = fullAttendance.filter((r) => memberRoles.has(String(r.role))).length;
     const weekVisitorCheckins = fullAttendance.length - weekMemberCheckins;
 
-    const summarySheet = workbook.addWorksheet("This Week");
+    const summarySheet = workbook.addWorksheet(isCurrentWeek ? "This Week" : "Week Summary");
     summarySheet.columns = [
       { header: "Metric", key: "metric", width: 34 },
       { header: "Value", key: "value", width: 28 },
@@ -668,13 +744,13 @@ router.get("/dashboard/export", requireLeaderSession("leader"), async (req, res)
     summarySheet.getRow(1).eachCell((cell) => { cell.style = headerStyle; });
     const summaryRows: Array<[string, string | number]> = [
       ["Report", "JG Youth — Weekly Report"],
-      ["Week (Mon–Sun)", `${weekStart} to ${weekEndInclusive}`],
+      ["Week (Mon–Sun)", `${weekStart} to ${weekEndInclusive}${isCurrentWeek ? " (in progress)" : ""}`],
       ["Generated", today],
-      ["Total check-ins this week", fullAttendance.length],
+      ["Total check-ins", fullAttendance.length],
       ["  • Members", weekMemberCheckins],
       ["  • Visitors", weekVisitorCheckins],
-      ["New visitors this week", visitors.length],
-      ["Feedback submitted this week", feedback.length],
+      ["New visitors", visitors.length],
+      ["Feedback submitted", feedback.length],
     ];
     for (const [metric, value] of summaryRows) {
       summarySheet.addRow({ metric, value });
