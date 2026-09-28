@@ -3,7 +3,9 @@
  * so they can be unit tested. The job that uses them lives in
  * jobs/autoMessenger.ts.
  *
- *  - Re-engagement: every Tuesday 17:00 SAST, to people who've missed enough
+ *  - Leader nudge: Friday 14:00 SAST, a push to leaders to post the weekly
+ *    announcement to the JG YOUTH WhatsApp group (one tap from the dashboard).
+ *  - Re-engagement: every Friday 15:00 SAST (before check-in opens), to people who've missed enough
  *    weeks to hit a follow-up stage (stageForRole). Each stage is sent once
  *    per absence, so nobody gets the same nudge twice.
  *
@@ -17,8 +19,9 @@ import type { PushPayload } from "./pushLogic";
 
 export const AUTO_MESSAGES_START = process.env.AUTO_MESSAGES_START ?? "2026-10-02";
 
-export const REENGAGE_DAY_OF_WEEK = 2; // Tuesday
-export const REENGAGE_TIME = "17:00";
+export const OUTREACH_DAY_OF_WEEK = 5; // Friday — session day
+export const LEADER_GROUP_POST_TIME = "14:00";
+export const REENGAGE_TIME = "15:00";
 /** How long after the target time a missed send may still go out (restarts, deploys). */
 export const SEND_GRACE_MIN = 60;
 
@@ -73,18 +76,27 @@ export function reengagementMessage(
   const staff = isStaffRole(role);
   const body = staff
     ? stage >= 4
-      ? `Hi ${first}, it's been a while — the team really misses you. Can we count on you this Friday?`
-      : `Hi ${first}, we missed you on the team! Hope to see you this Friday.`
+      ? `Hi ${first}, it's been a while — the team really misses you. Can we count on you tonight?`
+      : `Hi ${first}, we missed you on the team! Hope to see you tonight.`
     : stage >= 6
-      ? `Hi ${first}, it's been a while and we still save you a seat. Come through this Friday — no pressure, just good vibes.`
+      ? `Hi ${first}, it's been a while and we still save you a seat. Come through tonight — no pressure, just good vibes.`
       : stage >= 4
-        ? `Hi ${first}, we've really missed you at JG Youth! This Friday is a great one to come back to.`
-        : `Hi ${first}, we missed you at JG Youth! Hope to see you this Friday 🙌`;
+        ? `Hi ${first}, we've really missed you at JG Youth! Tonight is a great night to come back.`
+        : `Hi ${first}, we missed you at JG Youth! Hope to see you tonight 🙌`;
   return {
     push: { title: "We miss you at JG Youth", body, url: "/my" },
     subject: staff ? "The team misses you 💙" : "We miss you at JG Youth 💙",
-    paragraphs: [body, "Everything for this week — events and check-in — is in the app."],
+    paragraphs: [body, "Everything for tonight — events and check-in — is in the app."],
     cta: { label: "See what's on", path: "/my" },
+  };
+}
+
+/** Friday push to leaders: one tap opens the dashboard's "post to group" prompt. */
+export function leaderGroupPostPayload(): PushPayload {
+  return {
+    title: "Post tonight's message to the group 📣",
+    body: "Tap to send this week's announcement to the JG YOUTH WhatsApp group.",
+    url: "/dashboard?share=group",
   };
 }
 

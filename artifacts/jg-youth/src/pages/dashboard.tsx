@@ -339,6 +339,17 @@ export default function Dashboard() {
   );
   const [kpisUpdatedAt, setKpisUpdatedAt] = useState<string | null>(null);
   const [reportsOpen, setReportsOpen] = useState(false);
+  // Opened from the Friday leader push (/dashboard?share=group).
+  const [groupPostPrompt, setGroupPostPrompt] = useState(false);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("share") === "group") {
+      setGroupPostPrompt(true);
+      params.delete("share");
+      const qs = params.toString();
+      window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    }
+  }, []);
   const [eventForm, setEventForm] = useState({
     title: "",
     description: "",
@@ -607,7 +618,11 @@ export default function Dashboard() {
       /* fall back to a message without a time */
     }
     const text = buildGroupAnnouncement(windows, window.location.origin);
-    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    // After an await, mobile browsers often block new tabs; navigating the
+    // current tab hands off to the WhatsApp app instead.
+    const opened = window.open(url, "_blank");
+    if (!opened) window.location.href = url;
   };
 
   function handleCreateEvent() {
@@ -1357,6 +1372,27 @@ export default function Dashboard() {
         handleSavePin={handleSavePin}
       />
       <ReportHistoryDialog open={reportsOpen} onOpenChange={setReportsOpen} />
+      <AlertDialog open={groupPostPrompt} onOpenChange={setGroupPostPrompt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Post tonight's message to the group</AlertDialogTitle>
+            <AlertDialogDescription>
+              WhatsApp opens with this week's announcement ready — pick the JG
+              YOUTH group and press send.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Not now</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                void handleShareToGroup();
+              }}
+            >
+              Open WhatsApp
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <PrefsNudgeDialog />
     </DashboardLayout>
   );

@@ -2,7 +2,8 @@
  * Automated outreach job — push + email, no leader action needed.
  *
  * Runs every 60 s. Rules and message copy live in lib/autoMessages.ts:
- *   - Tuesday 17:00 re-engagement for people who've been away (once per stage)
+ *   - Friday 14:00 push nudging leaders to post the weekly group announcement
+ *   - Friday 15:00 re-engagement for people who've been away (once per stage)
  *
  * Check-in reminders are left to the existing "check-in is open" push.
  *
@@ -27,8 +28,10 @@ import {
   renderEmailHtml,
   sessionsMissedSince,
   unsubscribeToken,
-  REENGAGE_DAY_OF_WEEK,
+  OUTREACH_DAY_OF_WEEK,
+  LEADER_GROUP_POST_TIME,
   REENGAGE_TIME,
+  leaderGroupPostPayload,
   type OutboundMessage,
 } from "../lib/autoMessages";
 import { stageForRole } from "../lib/followUpStages";
@@ -157,8 +160,22 @@ async function tick(): Promise<void> {
   const now = sastNow();
   if (!automationActive(now.date)) return;
 
+  if (now.dayOfWeek !== OUTREACH_DAY_OF_WEEK) return;
+
+  // Nudge leaders to post the weekly announcement to the WhatsApp group.
+  if (dueNow(now.hhmm, LEADER_GROUP_POST_TIME)) {
+    if (await claimRun("auto_leader_group_post", now.date)) {
+      const leaders = await db
+        .select({ id: profilesTable.id })
+        .from(profilesTable)
+        .where(inArray(profilesTable.role, ["leader", "super_admin"]));
+      const devices = await sendPushToProfiles(leaders.map((l) => l.id), leaderGroupPostPayload());
+      logger.info({ devices }, "[autoMessenger] Leader group-post nudge sent");
+    }
+  }
+
   // Weekly re-engagement.
-  if (now.dayOfWeek === REENGAGE_DAY_OF_WEEK && dueNow(now.hhmm, REENGAGE_TIME)) {
+  if (dueNow(now.hhmm, REENGAGE_TIME)) {
     if (await claimRun("auto_reengage", now.date)) {
       const count = await sendReengagement(now.date);
       logger.info({ count }, "[autoMessenger] Re-engagement sent");

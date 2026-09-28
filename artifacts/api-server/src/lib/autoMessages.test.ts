@@ -4,6 +4,7 @@ import {
   sessionsMissedSince,
   dueNow,
   reengagementMessage,
+  leaderGroupPostPayload,
   renderEmailHtml,
   unsubscribeToken,
   verifyUnsubscribeToken,
@@ -44,6 +45,18 @@ describe("messages", () => {
     expect(reengagementMessage("member", 2, "Sipho").push.body).toContain("we missed you");
     expect(reengagementMessage("member", 8, "Sipho").push.body).toContain("save you a seat");
     expect(reengagementMessage("leader", 4, "Sipho").subject).toContain("team");
+  });
+});
+
+describe("leaderGroupPostPayload", () => {
+  it("opens the dashboard's group-post prompt", () => {
+    expect(leaderGroupPostPayload().url).toBe("/dashboard?share=group");
+  });
+});
+
+describe("re-engagement copy", () => {
+  it("talks about tonight, since it goes out on session day", () => {
+    expect(reengagementMessage("member", 2, "Sipho").push.body).toContain("tonight");
   });
 });
 
