@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@clerk/react";
 import { getLeaderSession } from "@/lib/auth";
+import { getPinSession } from "@/lib/pinSession";
+import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
 import { Link } from "wouter";
 import { Html5Qrcode } from "html5-qrcode";
 import { Layout } from "@/components/layout";
@@ -507,6 +509,13 @@ export default function CheckIn() {
               <Button variant="outline" className="mt-2 rounded-xl px-8">View my streak</Button>
             </Link>
           </motion.div>
+          {/* Best moment to win a notification opt-in; needs a signed-in account
+              because the subscription is saved against it. */}
+          {(isSignedIn || getPinSession() || getLeaderSession()) && (
+            <div className="mt-4">
+              <NotificationSetupCard context="checkin" />
+            </div>
+          )}
         </div>
       </Layout>
     );

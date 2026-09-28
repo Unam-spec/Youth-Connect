@@ -105,7 +105,8 @@ import { DialogManager } from "@/components/panels/DialogManager";
 import { PrefsNudgeDialog } from "@/components/member/PrefsNudgeDialog";
 import { ReportHistoryDialog } from "@/components/panels/ReportHistoryDialog";
 import { KpiCard } from "@/components/panels/shared";
-import { Activity, Download, Settings, MonitorSmartphone } from "lucide-react";
+import { Activity, Download, Settings, MonitorSmartphone, Share2 } from "lucide-react";
+import { buildGroupAnnouncement } from "@/lib/groupAnnouncement";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -595,6 +596,20 @@ export default function Dashboard() {
     }
   };
 
+  // One tap: WhatsApp opens with this week's announcement and asks which chat
+  // (e.g. the youth group) to send it to — reaches people without push/email.
+  const handleShareToGroup = async () => {
+    let windows: { day_of_week: number; start_time: string; enabled: boolean }[] = [];
+    try {
+      const res = await apiFetch("/api/checkin/schedule");
+      if (res.ok) windows = ((await res.json()) as { windows?: typeof windows }).windows ?? [];
+    } catch {
+      /* fall back to a message without a time */
+    }
+    const text = buildGroupAnnouncement(windows, window.location.origin);
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener");
+  };
+
   function handleCreateEvent() {
     if (
       !eventForm.title ||
@@ -1072,6 +1087,10 @@ export default function Dashboard() {
                   >
                     <Download className="h-4 w-4 mr-2" />
                     Weekly Reports
+                  </Button>
+                  <Button onClick={handleShareToGroup} size="sm" variant="outline">
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Share to group
                   </Button>
                   <Button
                     id="btn-generate-qr"

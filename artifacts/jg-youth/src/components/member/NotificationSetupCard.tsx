@@ -12,19 +12,33 @@ import {
 } from "@/lib/pushClient";
 
 const DISMISS_KEY = "jg_push_card_dismissed";
+// The post-check-in prompt asks again each session day until they say yes;
+// "Not now" only hides it for today.
+const CHECKIN_DISMISS_KEY = "jg_push_checkin_prompt_dismissed_on";
+const todayKey = () => new Date().toISOString().slice(0, 10);
 
 /**
  * Platform-aware "enable notifications" card. Hides itself when push can
  * never work here (old iOS, unsupported browsers) or after dismissal.
+ *
+ * context="checkin": shown right after a successful check-in — the moment
+ * people are most likely to say yes. Hidden once notifications are on.
  */
-export function NotificationSetupCard() {
+export function NotificationSetupCard({ context = "default" }: { context?: "default" | "checkin" } = {}) {
+  const afterCheckin = context === "checkin";
   const { toast } = useToast();
   const [state, setState] = useState<PushSetupState | "loading">("loading");
   const [busy, setBusy] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [dismissed, setDismissed] = useState(
-    () => localStorage.getItem(DISMISS_KEY) === "1",
-  );
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return afterCheckin
+        ? localStorage.getItem(CHECKIN_DISMISS_KEY) === todayKey()
+        : localStorage.getItem(DISMISS_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     getPushSetupState().then(setState).catch(() => setState("unsupported"));
@@ -33,7 +47,12 @@ export function NotificationSetupCard() {
   if (dismissed || state === "loading" || state === "unsupported") return null;
 
   const dismiss = () => {
-    localStorage.setItem(DISMISS_KEY, "1");
+    try {
+      if (afterCheckin) localStorage.setItem(CHECKIN_DISMISS_KEY, todayKey());
+      else localStorage.setItem(DISMISS_KEY, "1");
+    } catch {
+      /* storage unavailable — just hide for now */
+    }
     setDismissed(true);
   };
 
@@ -98,6 +117,7 @@ export function NotificationSetupCard() {
   };
 
   if (state === "subscribed") {
+    if (afterCheckin) return null;
     return (
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -175,10 +195,12 @@ export function NotificationSetupCard() {
         <div>
           <p className="flex items-center gap-2 font-medium text-foreground">
             <Bell className="h-4 w-4 text-primary" />
-            Never miss check-in
+            {afterCheckin ? "Want a reminder next Friday?" : "Never miss check-in"}
           </p>
           <p className="text-sm text-muted-foreground">
-            Get a notification when check-in opens and when new events drop.
+            {afterCheckin
+              ? "Turn on notifications and we'll tell you when youth is on and when check-in opens."
+              : "Get a notification when check-in opens and when new events drop."}
           </p>
         </div>
         <div className="flex items-center gap-2">
