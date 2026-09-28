@@ -3,9 +3,6 @@ import {
   automationActive,
   sessionsMissedSince,
   dueNow,
-  fridayReminderTime,
-  friendlyTime,
-  fridayReminderMessage,
   reengagementMessage,
   renderEmailHtml,
   unsubscribeToken,
@@ -42,27 +39,7 @@ describe("dueNow", () => {
   });
 });
 
-describe("fridayReminderTime / friendlyTime", () => {
-  it("is 3 hours before check-in opens", () => {
-    expect(fridayReminderTime("17:00")).toBe("14:00");
-    expect(fridayReminderTime("18:30:00")).toBe("15:30");
-    expect(fridayReminderTime("01:00")).toBe("22:00");
-  });
-  it("formats times for people", () => {
-    expect(friendlyTime("17:00")).toBe("5pm");
-    expect(friendlyTime("18:30")).toBe("6:30pm");
-    expect(friendlyTime("00:15")).toBe("12:15am");
-  });
-});
-
 describe("messages", () => {
-  it("friday reminder names the person and the check-in time", () => {
-    const m = fridayReminderMessage("Lerato Dube", "17:00");
-    expect(m.paragraphs[0]).toBe("Hi Lerato,");
-    expect(m.push.body).toContain("5pm");
-    expect(m.push.url).toBe("/checkin");
-  });
-
   it("re-engagement tone depends on role and how long they've been away", () => {
     expect(reengagementMessage("member", 2, "Sipho").push.body).toContain("we missed you");
     expect(reengagementMessage("member", 8, "Sipho").push.body).toContain("save you a seat");
@@ -83,10 +60,10 @@ describe("unsubscribe tokens", () => {
 describe("renderEmailHtml", () => {
   it("includes the app link, unsubscribe link and escapes content", () => {
     const html = renderEmailHtml(
-      { ...fridayReminderMessage("<b>X</b>", "17:00") },
+      reengagementMessage("member", 2, "<b>X</b>"),
       { appUrl: "https://jgyouth.site", unsubscribeUrl: "https://jgyouth.site/api/email/unsubscribe?p=1&t=2" },
     );
-    expect(html).toContain("https://jgyouth.site/checkin");
+    expect(html).toContain("https://jgyouth.site/my");
     expect(html).toContain("unsubscribe?p=1&t=2");
     expect(html).toContain("&lt;b&gt;X&lt;/b&gt;");
     expect(html).not.toContain("<b>X</b>");

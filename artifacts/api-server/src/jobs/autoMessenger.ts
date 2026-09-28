@@ -2,19 +2,19 @@
  * Automated outreach job — push + email, no leader action needed.
  *
  * Runs every 60 s. Rules and message copy live in lib/autoMessages.ts:
- *   - Session-day reminder, 3h before check-in opens, to recently active people
  *   - Tuesday 17:00 re-engagement for people who've been away (once per stage)
+ *
+ * Check-in reminders are left to the existing "check-in is open" push.
  *
  * Idempotent across restarts and multiple instances: each daily run is claimed
  * in push_send_log (unique kind+day), and each person's re-engagement stage in
  * auto_message_log (unique per absence). Does nothing before AUTO_MESSAGES_START.
  */
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import {
   db,
   profilesTable,
   attendanceTable,
-  checkinWindowsTable,
   pushSendLogTable,
   autoMessageLogTable,
   pendingEmailsTable,
@@ -23,8 +23,6 @@ import {
 import {
   automationActive,
   dueNow,
-  fridayReminderTime,
-  fridayReminderMessage,
   reengagementMessage,
   renderEmailHtml,
   sessionsMissedSince,
@@ -106,32 +104,6 @@ const recipientColumns = {
   role: profilesTable.role,
 };
 
-/** Session-day reminder to everyone active in the last 4 weeks. */
-export async function sendSessionReminder(checkinStart: string): Promise<number> {
-  const recipients = (await db
-    .select(recipientColumns)
-    .from(profilesTable)
-    .where(
-      and(
-        inArray(profilesTable.role, OUTREACH_ROLES),
-        sql`(
-          ${profilesTable.created_at} >= now() - interval '28 days'
-          OR EXISTS (
-            SELECT 1 FROM ${attendanceTable} a
-            WHERE a.profile_id = ${profilesTable.id}
-              AND a.session_date::date >= current_date - 28
-          )
-        )`,
-      ),
-    )) as Recipient[];
-
-  const emailOn = isEmailConfigured();
-  for (const r of recipients) {
-    await deliver(r, fridayReminderMessage(r.full_name, checkinStart), emailOn);
-  }
-  return recipients.length;
-}
-
 /** Re-engagement: one message per follow-up stage per absence (stage = sessions missed). */
 export async function sendReengagement(todaySast: string): Promise<number> {
   const [settings] = await db.select().from(whatsappAutomationSettingsTable).limit(1);
@@ -184,24 +156,6 @@ export async function sendReengagement(todaySast: string): Promise<number> {
 async function tick(): Promise<void> {
   const now = sastNow();
   if (!automationActive(now.date)) return;
-
-  // Session-day reminder.
-  const [window] = await db
-    .select()
-    .from(checkinWindowsTable)
-    .where(
-      and(
-        eq(checkinWindowsTable.day_of_week, now.dayOfWeek),
-        eq(checkinWindowsTable.enabled, true),
-      ),
-    )
-    .limit(1);
-  if (window && dueNow(now.hhmm, fridayReminderTime(window.start_time))) {
-    if (await claimRun("auto_session_reminder", now.date)) {
-      const count = await sendSessionReminder(window.start_time.slice(0, 5));
-      logger.info({ count }, "[autoMessenger] Session reminder sent");
-    }
-  }
 
   // Weekly re-engagement.
   if (now.dayOfWeek === REENGAGE_DAY_OF_WEEK && dueNow(now.hhmm, REENGAGE_TIME)) {

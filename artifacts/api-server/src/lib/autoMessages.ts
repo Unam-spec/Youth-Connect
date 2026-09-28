@@ -3,12 +3,11 @@
  * so they can be unit tested. The job that uses them lives in
  * jobs/autoMessenger.ts.
  *
- *  - Friday reminder: session day, FRIDAY_REMINDER_LEAD_MIN before check-in
- *    opens, to everyone active in the last 4 weeks.
  *  - Re-engagement: every Tuesday 17:00 SAST, to people who've missed enough
  *    weeks to hit a follow-up stage (stageForRole). Each stage is sent once
  *    per absence, so nobody gets the same nudge twice.
  *
+ * Check-in reminders are left to the existing "check-in is open" push.
  * Nothing is sent before AUTO_MESSAGES_START (a SAST date).
  */
 import crypto from "node:crypto";
@@ -18,7 +17,6 @@ import type { PushPayload } from "./pushLogic";
 
 export const AUTO_MESSAGES_START = process.env.AUTO_MESSAGES_START ?? "2026-10-05";
 
-export const FRIDAY_REMINDER_LEAD_MIN = 180; // 3h before check-in opens
 export const REENGAGE_DAY_OF_WEEK = 2; // Tuesday
 export const REENGAGE_TIME = "17:00";
 /** How long after the target time a missed send may still go out (restarts, deploys). */
@@ -48,31 +46,14 @@ export function toMinutes(hhmm: string): number {
   return h * 60 + m;
 }
 
-export function fromMinutes(total: number): string {
-  const t = ((total % 1440) + 1440) % 1440;
-  return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`;
-}
-
 /** Inside [target, target + grace) — so a send happens once, soon after its time. */
 export function dueNow(nowHHMM: string, targetHHMM: string, graceMin = SEND_GRACE_MIN): boolean {
   const diff = toMinutes(nowHHMM) - toMinutes(targetHHMM);
   return diff >= 0 && diff < graceMin;
 }
 
-export function fridayReminderTime(checkinStart: string): string {
-  return fromMinutes(toMinutes(checkinStart.slice(0, 5)) - FRIDAY_REMINDER_LEAD_MIN);
-}
-
 function firstNameOf(name: string | null | undefined): string {
   return (name ?? "").trim().split(/\s+/)[0] || "there";
-}
-
-/** "17:00" -> "5pm", "18:30" -> "6:30pm". */
-export function friendlyTime(hhmm: string): string {
-  const [h, m] = hhmm.slice(0, 5).split(":").map(Number);
-  const suffix = h >= 12 ? "pm" : "am";
-  const h12 = h % 12 === 0 ? 12 : h % 12;
-  return m === 0 ? `${h12}${suffix}` : `${h12}:${String(m).padStart(2, "0")}${suffix}`;
 }
 
 export interface OutboundMessage {
@@ -81,25 +62,6 @@ export interface OutboundMessage {
   /** Plain paragraphs; the email template wraps them. */
   paragraphs: string[];
   cta: { label: string; path: string };
-}
-
-export function fridayReminderMessage(fullName: string | null, checkinStart: string): OutboundMessage {
-  const first = firstNameOf(fullName);
-  const at = friendlyTime(checkinStart);
-  return {
-    push: {
-      title: "JG Youth is tonight 🙌",
-      body: `Check-in opens at ${at}. See you there!`,
-      url: "/checkin",
-    },
-    subject: "JG Youth is tonight 🙌",
-    paragraphs: [
-      `Hi ${first},`,
-      `Just a reminder that JG Youth is on tonight — check-in opens at ${at}.`,
-      "Bring a friend, and don't forget to check in when you arrive. See you there!",
-    ],
-    cta: { label: "Open the app", path: "/checkin" },
-  };
 }
 
 export function reengagementMessage(
