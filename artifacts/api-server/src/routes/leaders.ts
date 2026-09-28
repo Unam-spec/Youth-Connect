@@ -2,7 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
-import { db, leaderPermissionsTable, profilesTable, pendingEmailsTable } from "@workspace/db";
+import { db, leaderPermissionsTable, profilesTable, pendingEmailsTable, authSessionsTable } from "@workspace/db";
 import {
   AddLeaderBody,
   UpdateLeaderPermissionsBody,
@@ -12,6 +12,8 @@ import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { deleteProfileCascade } from "../lib/deleteProfileCascade";
 import { APP_BASE_URL } from "../lib/appUrl";
 import { logger } from "../lib/logger";
+import { validatePin } from "../lib/pin";
+import { buildLeaderInviteMessage } from "../lib/leaderInvite";
 import { createSession, revokeAllSessions, revokeSession, tokenFromHeader } from "../lib/sessions";
 import { clearCachedSessionsForProfile } from "../middlewares/requireLeaderSession";
 
@@ -237,16 +239,63 @@ router.post("/leaders/verify-pin", async (req, res) => {
 // GET /leaders/pins - Lists leaders without PIN information (protected: super_admin only)
 router.get("/leaders/pins", requireLeaderSession("super_admin"), async (req, res) => {
   try {
-    const { inArray } = await import("drizzle-orm");
+    const { inArray, sql } = await import("drizzle-orm");
     const leaders = await db
       .select({
         id: profilesTable.id,
         full_name: profilesTable.full_name,
         phone: profilesTable.phone,
+        role: profilesTable.role,
+        // Ever logged in: a session row, or the legacy single token.
+        has_logged_in: sql<boolean>`(
+          ${profilesTable.session_token} IS NOT NULL
+          OR EXISTS (SELECT 1 FROM ${authSessionsTable} s WHERE s.profile_id = ${profilesTable.id})
+        )`,
       })
       .from(profilesTable)
       .where(inArray(profilesTable.role, ["leader", "super_admin"]));
     return res.json(leaders);
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST /leaders/:id/invite - Give a leader a fresh PIN and return a ready-to-send
+// WhatsApp invite (link + login details). Super admin sends it from their own
+// WhatsApp. The leader's previous PIN stops working; existing logins stay.
+router.post("/leaders/:id/invite", requireLeaderSession("super_admin"), async (req, res) => {
+  try {
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, req.params.id as string),
+    });
+    if (!profile || (profile.role !== "leader" && profile.role !== "super_admin")) {
+      return res.status(404).json({ error: "Leader not found" });
+    }
+    if (!profile.phone || !profile.phone.trim()) {
+      return res.status(400).json({ error: "This leader has no phone number — add one first." });
+    }
+
+    let pin: string;
+    do {
+      pin = String(crypto.randomInt(1000, 10000));
+    } while (!validatePin(pin).ok);
+
+    await db
+      .update(profilesTable)
+      .set({ pin_hash: await bcrypt.hash(pin, 12) })
+      .where(eq(profilesTable.id, profile.id));
+
+    return res.json({
+      phone: profile.phone,
+      full_name: profile.full_name,
+      message: buildLeaderInviteMessage({
+        fullName: profile.full_name,
+        phone: profile.phone,
+        pin,
+        appUrl: APP_BASE_URL,
+      }),
+    });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });

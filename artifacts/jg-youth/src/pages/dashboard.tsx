@@ -166,6 +166,8 @@ interface LeaderPin {
   id: string;
   full_name: string;
   phone: string | null;
+  role?: string;
+  has_logged_in?: boolean;
 }
 
 export default function Dashboard() {
