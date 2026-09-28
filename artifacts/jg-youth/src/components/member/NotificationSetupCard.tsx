@@ -52,7 +52,10 @@ export function NotificationSetupCard() {
     } else {
       toast({
         title: "Could not enable notifications",
-        description: "Please try again in a moment.",
+        description:
+          result === "signed-out"
+            ? "Your login on this device has expired. Log out, log back in, then try again."
+            : "Please try again in a moment.",
         variant: "destructive",
       });
     }

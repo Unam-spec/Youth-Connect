@@ -1,3 +1,5 @@
+import { SESSION_TTL_MS } from "./auth";
+
 export interface PinSession {
   role: "visitor" | "member";
   profile_id: string;
@@ -7,7 +9,9 @@ export interface PinSession {
 }
 
 export function setPinSession(session: Omit<PinSession, "expires_at">): void {
-  const expires_at = Date.now() + 8 * 60 * 60 * 1000; // 8 hours
+  // Matches the server's 30-day session lifetime (the server enforces the
+  // real expiry; this just stops the app discarding a still-valid login).
+  const expires_at = Date.now() + SESSION_TTL_MS;
   localStorage.setItem("jg_pin_session", JSON.stringify({ ...session, expires_at }));
 }
 

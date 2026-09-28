@@ -281,6 +281,17 @@ CREATE TABLE IF NOT EXISTS "push_send_log" (
   CONSTRAINT "push_send_log_kind_sent_on_unique" UNIQUE ("kind", "sent_on")
 );
 
+-- Multi-device login sessions (2026-09). One row per signed-in device; 30-day
+-- expiry enforced server-side. Deleting a profile removes its sessions.
+CREATE TABLE IF NOT EXISTS "auth_sessions" (
+  "token" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "profile_id" uuid NOT NULL REFERENCES "profiles"("id") ON DELETE CASCADE,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "expires_at" timestamp with time zone NOT NULL,
+  "user_agent" text
+);
+CREATE INDEX IF NOT EXISTS "auth_sessions_profile_id_idx" ON "auth_sessions" ("profile_id");
+
 -- 24h cap for leader "Notify members" event pushes.
 ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "last_notified_at" timestamp with time zone;
 

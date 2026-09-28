@@ -10,18 +10,15 @@ import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { canGrantMembership, CONSENT_AGE } from "../lib/membershipConsent";
 import { computeAge } from "../lib/age";
 import { resolveSignupAge } from "../lib/signupAge";
+import { createSession, revokeAllSessions } from "../lib/sessions";
 
 const router = Router();
 
-const SESSION_MS = 8 * 60 * 60 * 1000; // 8 hours
-
-function sessionPayload(profileId: string, sessionToken: string) {
-  return {
-    success: true,
-    profile_id: profileId,
-    session_token: sessionToken,
-    expires_at: Date.now() + SESSION_MS,
-  };
+function sessionPayload(
+  profileId: string,
+  session: { session_token: string; expires_at: number },
+) {
+  return { success: true, profile_id: profileId, ...session };
 }
 
 // Looks up a profile by normalized username via the same lower(btrim()) predicate
@@ -54,7 +51,6 @@ router.post("/auth/pin-signup", async (req, res) => {
     if (existing) return res.status(409).json({ error: "That username is already taken." });
 
     const pinHash = await bcrypt.hash(pin.value, 12);
-    const sessionToken = crypto.randomUUID();
 
     let inserted;
     try {
@@ -76,7 +72,6 @@ router.post("/auth/pin-signup", async (req, res) => {
             typeof body.parent_name === "string" && body.parent_name.trim()
               ? body.parent_name.trim()
               : null,
-          session_token: sessionToken,
         })
         .returning();
     } catch (e) {
@@ -84,7 +79,8 @@ router.post("/auth/pin-signup", async (req, res) => {
       return res.status(409).json({ error: "That username is already taken." });
     }
 
-    return res.status(201).json(sessionPayload(inserted.id, sessionToken));
+    const session = await createSession(inserted.id, req.headers["user-agent"]);
+    return res.status(201).json(sessionPayload(inserted.id, session));
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -114,13 +110,8 @@ router.post("/auth/pin-login", async (req, res) => {
     const valid = await bcrypt.compare(pin, profile.pin_hash);
     if (!valid) return res.status(401).json({ error: "Invalid username or PIN" });
 
-    const sessionToken = crypto.randomUUID();
-    await db
-      .update(profilesTable)
-      .set({ session_token: sessionToken })
-      .where(eq(profilesTable.id, profile.id));
-
-    return res.json({ ...sessionPayload(profile.id, sessionToken), role: profile.role });
+    const session = await createSession(profile.id, req.headers["user-agent"]);
+    return res.json({ ...sessionPayload(profile.id, session), role: profile.role });
   } catch (err) {
     req.log.error(err);
     return res.status(500).json({ error: "Internal server error" });
@@ -227,6 +218,8 @@ router.post(
         .update(profilesTable)
         .set({ pin_hash: pinHash, pin_plain: newPin, session_token: null })
         .where(eq(profilesTable.id, target.id));
+      // A PIN reset logs the account out on every device.
+      await revokeAllSessions(target.id);
 
       return res.json({ success: true, pin: newPin });
     } catch (err) {

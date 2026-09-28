@@ -56,7 +56,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
 }
 
 export async function subscribeToPush(): Promise<
-  "subscribed" | "denied" | "error"
+  "subscribed" | "denied" | "signed-out" | "error"
 > {
   try {
     const permission = await Notification.requestPermission();
@@ -78,7 +78,9 @@ export async function subscribeToPush(): Promise<
     });
     if (!save.ok) {
       await sub.unsubscribe().catch(() => {});
-      return "error";
+      // 401 = this device's login has expired or was replaced; say so instead
+      // of a vague "try again" that can never succeed.
+      return save.status === 401 ? "signed-out" : "error";
     }
     return "subscribed";
   } catch (err) {

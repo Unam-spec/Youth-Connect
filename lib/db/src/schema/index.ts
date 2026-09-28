@@ -485,6 +485,23 @@ export const pushSubscriptionsTable = pgTable("push_subscriptions", {
     .defaultNow(),
 });
 
+// Login sessions (2026-09): one row per signed-in device, so a person can stay
+// logged in on phone + laptop at once. Replaces the single profiles.session_token
+// (still honoured for sessions issued before this table existed).
+export const authSessionsTable = pgTable("auth_sessions", {
+  token: uuid("token").primaryKey().defaultRandom(),
+  profile_id: uuid("profile_id")
+    .notNull()
+    .references(() => profilesTable.id, { onDelete: "cascade" }),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+  user_agent: text("user_agent"),
+});
+
+export type AuthSession = typeof authSessionsTable.$inferSelect;
+
 // Restart-safe dedupe for automated pushes: one row per (kind, day) fired.
 export const pushSendLogTable = pgTable(
   "push_send_log",

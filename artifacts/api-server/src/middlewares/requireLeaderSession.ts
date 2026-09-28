@@ -34,6 +34,13 @@ function setCachedProfile(cacheKey: string, profile: any): void {
   });
 }
 
+/** Drops cached sessions for a profile so a logout/revoke takes effect now. */
+export function clearCachedSessionsForProfile(profileId: string): void {
+  for (const [key, entry] of sessionCache) {
+    if (entry.profile?.id === profileId) sessionCache.delete(key);
+  }
+}
+
 export function requireLeaderSession(minRole: "leader" | "super_admin" = "leader"): any {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {

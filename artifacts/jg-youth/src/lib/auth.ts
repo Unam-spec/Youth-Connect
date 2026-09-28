@@ -1,3 +1,6 @@
+/** Sessions last 30 days (server-enforced in api-server lib/sessions.ts). */
+export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 export interface LeaderSession {
   role: "super_admin" | "leader";
   profile_id?: string;
@@ -14,7 +17,9 @@ export interface LeaderSession {
 }
 
 export function setLeaderSession(session: Omit<LeaderSession, "expires_at">) {
-  const expires_at = Date.now() + 8 * 60 * 60 * 1000; // 8 hours
+  // Matches the server's 30-day session lifetime (the server enforces the
+  // real expiry; this just stops the app discarding a still-valid login).
+  const expires_at = Date.now() + SESSION_TTL_MS;
   localStorage.setItem(
     "jg_leader_session",
     JSON.stringify({ ...session, expires_at }),

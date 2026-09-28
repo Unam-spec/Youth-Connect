@@ -12,6 +12,8 @@ import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { deleteProfileCascade } from "../lib/deleteProfileCascade";
 import { APP_BASE_URL } from "../lib/appUrl";
 import { logger } from "../lib/logger";
+import { createSession, revokeAllSessions, revokeSession, tokenFromHeader } from "../lib/sessions";
+import { clearCachedSessionsForProfile } from "../middlewares/requireLeaderSession";
 
 const router = Router();
 
@@ -110,6 +112,8 @@ router.post("/leaders/:profileId/demote", requireLeaderSession("super_admin"), a
       .where(eq(profilesTable.id, req.params.profileId as string))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
+    await revokeAllSessions(updated.id);
+    clearCachedSessionsForProfile(updated.id);
 
     await db.delete(leaderPermissionsTable)
       .where(eq(leaderPermissionsTable.profile_id, req.params.profileId as string));
@@ -130,6 +134,8 @@ router.post("/leaders/:profileId/demote-to-leader", requireLeaderSession("super_
       .where(eq(profilesTable.id, req.params.profileId as string))
       .returning();
     if (!updated) return res.status(404).json({ error: "Profile not found" });
+    await revokeAllSessions(updated.id);
+    clearCachedSessionsForProfile(updated.id);
 
     return res.json({ success: true, profile: updated });
   } catch (err) {
@@ -173,6 +179,8 @@ router.delete("/leaders/:profileId", requireLeaderSession("super_admin"), async 
     await db.update(profilesTable)
       .set({ role: "member", pin_hash: null, session_token: null })
       .where(eq(profilesTable.id, req.params.profileId as string));
+    await revokeAllSessions(req.params.profileId as string);
+    clearCachedSessionsForProfile(req.params.profileId as string);
     return res.status(204).send();
   } catch (err) {
     req.log.error(err);
@@ -202,13 +210,11 @@ router.post("/leaders/verify-pin", async (req, res) => {
     }
     if (!valid) return res.status(401).json({ error: "Invalid PIN" });
 
-    // Generate database-backed session_token
-    const sessionToken = crypto.randomUUID();
-    const expiresAt = Date.now() + 8 * 60 * 60 * 1000; // 8 hours
-
-    await db.update(profilesTable)
-      .set({ session_token: sessionToken })
-      .where(eq(profilesTable.id, profile.id));
+    // New per-device session (30 days); other devices stay logged in.
+    const { session_token: sessionToken, expires_at: expiresAt } = await createSession(
+      profile.id,
+      req.headers["user-agent"],
+    );
 
     return res.json({
       success: true,
@@ -324,20 +330,23 @@ router.post("/leaders/:id/reset-pin", requireLeaderSession("super_admin"), async
 // token isn't attached. Guarded by requireLeaderSession, which accepts the Clerk JWT.
 router.post("/leaders/session", requireLeaderSession("leader"), async (req, res) => {
   try {
-    const sessionToken = crypto.randomUUID();
-    const [profile] = await db
-      .update(profilesTable)
-      .set({ session_token: sessionToken })
-      .where(eq(profilesTable.id, req.leaderId!))
-      .returning();
+    const profile = await db.query.profilesTable.findFirst({
+      where: eq(profilesTable.id, req.leaderId!),
+    });
     if (!profile) return res.status(404).json({ error: "Profile not found" });
+    // A fresh session for this device only — minting one no longer logs the
+    // same person out on their other devices.
+    const { session_token: sessionToken, expires_at: expiresAt } = await createSession(
+      profile.id,
+      req.headers["user-agent"],
+    );
 
     const isSuperAdmin = profile.role === "super_admin";
     return res.json({
       profile_id: profile.id,
       full_name: profile.full_name,
       session_token: sessionToken,
-      expires_at: Date.now() + 8 * 60 * 60 * 1000, // 8 hours
+      expires_at: expiresAt,
       role: profile.role,
       can_create_events: isSuperAdmin ? true : profile.can_create_events,
       can_view_kpis: isSuperAdmin ? true : profile.can_view_kpis,
@@ -353,9 +362,12 @@ router.post("/leaders/session", requireLeaderSession("leader"), async (req, res)
 // POST /leaders/logout - Clear own session (protected: leader)
 router.post("/leaders/logout", requireLeaderSession("leader"), async (req, res) => {
   try {
-    await db.update(profilesTable)
-      .set({ session_token: null })
-      .where(eq(profilesTable.id, req.leaderId!));
+    // Log out this device only.
+    const token = tokenFromHeader(req.headers["x-leader-session"]);
+    if (token) {
+      await revokeSession(token);
+      clearCachedSessionsForProfile(req.leaderId!);
+    }
     return res.json({ success: true });
   } catch (err) {
     req.log.error(err);
@@ -370,9 +382,9 @@ router.post("/leaders/:id/revoke-session", requireLeaderSession("super_admin"), 
       return res.status(403).json({ error: "Cannot revoke your own session" });
     }
     
-    await db.update(profilesTable)
-      .set({ session_token: null })
-      .where(eq(profilesTable.id, req.params.id as string));
+    // Logs them out on every device.
+    await revokeAllSessions(req.params.id as string);
+    clearCachedSessionsForProfile(req.params.id as string);
     return res.json({ success: true });
   } catch (err) {
     req.log.error(err);
