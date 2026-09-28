@@ -7,6 +7,7 @@ import { apiFetch } from "@/lib/api";
 import {
   getPushSetupState,
   subscribeToPush,
+  lastPushError,
   unsubscribeFromPush,
   type PushSetupState,
 } from "@/lib/pushClient";
@@ -74,7 +75,7 @@ export function NotificationSetupCard({ context = "default" }: { context?: "defa
         description:
           result === "signed-out"
             ? "Your login on this device has expired. Log out, log back in, then try again."
-            : "Please try again in a moment.",
+            : `Please try again in a moment.${lastPushError ? ` (Details: ${lastPushError})` : ""}`,
         variant: "destructive",
       });
     }

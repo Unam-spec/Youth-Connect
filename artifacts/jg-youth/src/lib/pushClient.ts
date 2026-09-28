@@ -55,6 +55,9 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
   return output;
 }
 
+/** Why the last subscribeToPush() returned "error" — shown to the user so failures are diagnosable. */
+export let lastPushError = "";
+
 export async function subscribeToPush(): Promise<
   "subscribed" | "denied" | "signed-out" | "error"
 > {
@@ -62,15 +65,27 @@ export async function subscribeToPush(): Promise<
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return "denied";
 
+    lastPushError = "";
     const keyRes = await apiFetch("/api/push/public-key");
-    if (!keyRes.ok) return "error";
+    if (!keyRes.ok) {
+      lastPushError = `server key unavailable (${keyRes.status})`;
+      return "error";
+    }
     const { public_key } = (await keyRes.json()) as { public_key: string };
 
     const reg = await navigator.serviceWorker.ready;
-    const sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(public_key),
-    });
+    const key = urlBase64ToUint8Array(public_key);
+    let sub: PushSubscription;
+    try {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    } catch (err) {
+      // A subscription made with an older server key blocks a new one:
+      // drop it and retry once.
+      const existing = await reg.pushManager.getSubscription();
+      if (!existing) throw err;
+      await existing.unsubscribe().catch(() => {});
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    }
 
     const save = await apiFetch("/api/push/subscribe", {
       method: "POST",
@@ -80,11 +95,16 @@ export async function subscribeToPush(): Promise<
       await sub.unsubscribe().catch(() => {});
       // 401 = this device's login has expired or was replaced; say so instead
       // of a vague "try again" that can never succeed.
-      return save.status === 401 ? "signed-out" : "error";
+      if (save.status === 401) return "signed-out";
+      lastPushError = `server rejected the subscription (${save.status})`;
+      return "error";
     }
     return "subscribed";
   } catch (err) {
     console.error("subscribeToPush failed:", err);
+    // e.g. "AbortError: Registration failed - push service error" when the
+    // browser's push service is off (Brave, some privacy settings).
+    lastPushError = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
     return "error";
   }
 }
