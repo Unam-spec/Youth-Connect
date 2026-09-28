@@ -15,7 +15,7 @@ import type { ProfileRole } from "./directoryListParams";
 import { isStaffRole } from "./followUpStages";
 import type { PushPayload } from "./pushLogic";
 
-export const AUTO_MESSAGES_START = process.env.AUTO_MESSAGES_START ?? "2026-10-05";
+export const AUTO_MESSAGES_START = process.env.AUTO_MESSAGES_START ?? "2026-10-02";
 
 export const REENGAGE_DAY_OF_WEEK = 2; // Tuesday
 export const REENGAGE_TIME = "17:00";
