@@ -1,18 +1,24 @@
 /**
- * Email transport via Gmail SMTP (nodemailer).
+ * Email transport.
  *
- * Chosen because it needs no domain and no provider vetting — it uses an
- * existing Gmail account with an App Password.
+ * Preferred: Resend (https://resend.com) sending from the app's own domain,
+ * e.g. hello@jgyouth.site — better deliverability, no daily Gmail cap.
+ * Fallback: Gmail SMTP with an App Password, used only when Resend isn't set.
  *
- * Required env vars:
+ * Resend env vars:
+ *   RESEND_API_KEY      — API key from resend.com (the domain must be verified there)
+ *   EMAIL_FROM          — optional, default "Jeremiah Generation Youth <hello@jgyouth.site>"
+ * Gmail env vars (fallback):
  *   GMAIL_USER          — the Gmail address that sends the mail
  *   GMAIL_APP_PASSWORD  — a 16-character Google App Password (NOT the account password;
  *                         requires 2-Step Verification enabled on the account)
- * Optional:
  *   EMAIL_FROM_NAME     — display name on the From header (default below)
  */
 import nodemailer, { type Transporter } from "nodemailer";
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY ?? "";
+const EMAIL_FROM =
+  process.env.EMAIL_FROM ?? "Jeremiah Generation Youth <hello@jgyouth.site>";
 const GMAIL_USER = process.env.GMAIL_USER ?? "";
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD ?? "";
 const FROM_NAME = process.env.EMAIL_FROM_NAME ?? "Jeremiah Generation Youth";
@@ -38,17 +44,48 @@ function getTransporter(): Transporter {
   return transporter;
 }
 
+/** True when some email provider is configured (used to skip queuing mail that can't send). */
+export function isEmailConfigured(): boolean {
+  return Boolean(RESEND_API_KEY || (GMAIL_USER && GMAIL_APP_PASSWORD));
+}
+
+async function sendViaResend(payload: EmailPayload): Promise<void> {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: EMAIL_FROM,
+      to: [payload.to],
+      subject: payload.subject,
+      text: payload.text,
+      ...(payload.html ? { html: payload.html } : {}),
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Resend API error (${res.status}): ${body.slice(0, 300)}`);
+  }
+}
+
 /**
- * Send a transactional email via Gmail SMTP.
- * Throws when credentials are missing or the SMTP send fails, so the caller
+ * Send a transactional email (Resend if configured, else Gmail SMTP).
+ * Throws when no provider is configured or the send fails, so the caller
  * (the email queue) records the failure instead of marking mail as sent.
  */
 export async function sendEmail(payload: EmailPayload): Promise<void> {
+  if (RESEND_API_KEY) {
+    await sendViaResend(payload);
+    return;
+  }
+
   if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
     // Throw (rather than silently return) so the queue does NOT mark this email
     // as sent. Missing credentials mean nothing was delivered — keep it visible.
     throw new Error(
-      "GMAIL_USER / GMAIL_APP_PASSWORD not configured — email cannot be sent",
+      "No email provider configured (set RESEND_API_KEY, or GMAIL_USER + GMAIL_APP_PASSWORD) — email cannot be sent",
     );
   }
 

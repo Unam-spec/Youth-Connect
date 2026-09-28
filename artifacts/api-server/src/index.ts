@@ -5,6 +5,7 @@ import { runMigrations } from "./db";
 import { startEmailProcessor, stopEmailProcessor } from "./jobs/emailProcessor";
 import { startFollowUpGenerator, stopFollowUpGenerator } from "./jobs/followUpGenerator";
 import { startEmailWorker, stopQueue } from "./lib/queue";
+import { startAutoMessenger, stopAutoMessenger } from "./jobs/autoMessenger";
 
 let usingBullMQ = false;
 
@@ -16,6 +17,7 @@ process.on("SIGTERM", async () => {
     stopEmailProcessor();
   }
   stopFollowUpGenerator();
+  stopAutoMessenger();
 });
 
 const rawPort = process.env["PORT"];
@@ -41,6 +43,7 @@ async function startServer() {
   }
 
   startFollowUpGenerator();
+  startAutoMessenger();
 
   app.listen(port, (err) => {
     if (err) {

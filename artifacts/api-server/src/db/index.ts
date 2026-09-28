@@ -292,6 +292,19 @@ CREATE TABLE IF NOT EXISTS "auth_sessions" (
 );
 CREATE INDEX IF NOT EXISTS "auth_sessions_profile_id_idx" ON "auth_sessions" ("profile_id");
 
+-- Automated push + email outreach (2026-09): email opt-out flag and a per-person
+-- send log so each re-engagement stage goes out once per absence.
+ALTER TABLE "profiles" ADD COLUMN IF NOT EXISTS "email_opt_out" boolean NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS "auto_message_log" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "profile_id" uuid NOT NULL REFERENCES "profiles"("id") ON DELETE CASCADE,
+  "kind" text NOT NULL,
+  "stage" integer NOT NULL DEFAULT 0,
+  "anchor" date NOT NULL,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "auto_message_log_once" UNIQUE ("profile_id", "kind", "stage", "anchor")
+);
+
 -- 24h cap for leader "Notify members" event pushes.
 ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "last_notified_at" timestamp with time zone;
 

@@ -18,6 +18,7 @@ import whatsappRouter from "./whatsapp";
 import birthdaysRouter from "./birthdays";
 import pushRouter from "./push";
 import kioskRouter from "./kiosk";
+import emailPrefsRouter from "./emailPrefs";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(whatsappTemplatesRouter);
 router.use(whatsappRouter);
 router.use(pushRouter);
 router.use(kioskRouter);
+router.use(emailPrefsRouter);
 
 export default router;

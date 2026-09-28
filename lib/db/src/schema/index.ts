@@ -84,6 +84,8 @@ export const profilesTable = pgTable("profiles", {
   parent_phone: text("parent_phone"),
   parent_name: text("parent_name"),
   whatsapp_opt_in: boolean("whatsapp_opt_in").notNull().default(false),
+  // Set from the unsubscribe link in automated emails (2026-09).
+  email_opt_out: boolean("email_opt_out").notNull().default(false),
   avatar_url: text("avatar_url"),
   link_token: text("link_token"),
   link_token_expires_at: timestamp("link_token_expires_at", { withTimezone: true }),
@@ -501,6 +503,28 @@ export const authSessionsTable = pgTable("auth_sessions", {
 });
 
 export type AuthSession = typeof authSessionsTable.$inferSelect;
+
+// Automated outreach log (2026-09): one row per person per message, so a
+// re-engagement stage is sent once per absence (anchor = last attendance, or
+// sign-up date for people who never attended).
+export const autoMessageLogTable = pgTable(
+  "auto_message_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    profile_id: uuid("profile_id")
+      .notNull()
+      .references(() => profilesTable.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    stage: integer("stage").notNull().default(0),
+    anchor: date("anchor").notNull(),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    oncePerAnchor: unique("auto_message_log_once").on(t.profile_id, t.kind, t.stage, t.anchor),
+  }),
+);
 
 // Restart-safe dedupe for automated pushes: one row per (kind, day) fired.
 export const pushSendLogTable = pgTable(
