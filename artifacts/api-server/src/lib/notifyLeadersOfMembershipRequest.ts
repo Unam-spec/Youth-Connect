@@ -1,5 +1,6 @@
 import { db, profilesTable, pendingEmailsTable } from "@workspace/db";
 import { inArray } from "drizzle-orm";
+import { APP_BASE_URL } from "./appUrl";
 
 /**
  * Queues a notification email to every leader and super_admin (who has an email
@@ -19,7 +20,7 @@ export async function notifyLeadersOfMembershipRequest(
     );
 
   const dashboardUrl =
-    (process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app") +
+    APP_BASE_URL +
     "/dashboard";
 
   const rows = recipients

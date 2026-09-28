@@ -7,6 +7,7 @@ import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembershipRequest";
 import { publishActivity } from "../lib/activityStream";
 import { resolveAccount } from "../lib/resolveAccount";
+import { APP_BASE_URL } from "../lib/appUrl";
 
 const router = Router();
 
@@ -104,7 +105,7 @@ router.post("/membership-requests/:id/approve", requireLeaderSession("leader"), 
     });
     if (member?.email) {
       const hasClerkAccount = !!member.clerk_id;
-      const signUpUrl = `${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/sign-up`;
+      const signUpUrl = `${APP_BASE_URL}/sign-up`;
       const ctaHtml = hasClerkAccount
         ? `<p>Log in to see upcoming events, RSVP, and check in on Fridays.</p>`
         : `<p><a href="${signUpUrl}" style="background:#2A9D8F;color:#fff;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;margin-top:8px">Create Your Login</a></p><p style="font-size:12px;color:#888;margin-top:4px">Or copy this link: ${signUpUrl}</p>`;
@@ -157,7 +158,7 @@ router.post("/membership-requests/:id/reject", requireLeaderSession("leader"), a
           <p>Hi <strong>${member.full_name}</strong>,</p>
           <p>Thank you for your interest in joining Jeremiah Generation Youth. After review, your membership request was not approved at this time.</p>
           <p>Please reach out to a leader if you have any questions.</p>
-          <p style="font-size: 14px;">You're still welcome at all our events — see what's on: <a href="${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/my" style="color: #2A9D8F;">${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/my</a></p>
+          <p style="font-size: 14px;">You're still welcome at all our events — see what's on: <a href="${APP_BASE_URL}/my" style="color: #2A9D8F;">${APP_BASE_URL}/my</a></p>
           <p style="margin-top: 24px; font-weight: bold; color: #2A9D8F;">Jeremiah Generation Youth Team</p>
         </div>
       `;
@@ -206,7 +207,7 @@ router.post("/membership-requests/invite", requireLeaderSession("leader"), async
       .returning();
 
     if (profile.email) {
-      const signUpUrl = `${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/sign-up`;
+      const signUpUrl = `${APP_BASE_URL}/sign-up`;
       const emailBody = `
         <div style="font-family: 'Inter', sans-serif; background-color: #0B0F14; color: #E6E8EB; padding: 24px; border-radius: 8px;">
           <h2 style="color: #2A9D8F; font-family: 'Sora', sans-serif;">You're Invited!</h2>

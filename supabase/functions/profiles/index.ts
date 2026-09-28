@@ -138,7 +138,7 @@ async function notifyLeadersOfMembershipRequest(
     .where(inArray(profilesTable.role, ["leader", "super_admin"]));
 
   const dashboardUrl =
-    (Deno.env.get("FRONTEND_URL") ?? "https://youth-connect-tau.vercel.app") +
+    (Deno.env.get("FRONTEND_URL") ?? "https://jgyouth.site") +
     "/dashboard";
 
   const rows = recipients
@@ -764,7 +764,7 @@ app.post("/profiles/:id/promote", requireRole("leader"), async (c) => {
     if (updated.email) {
       const hasClerkAccount = !!updated.clerk_id;
       const signUpUrl = `${
-        Deno.env.get("FRONTEND_URL") ?? "https://youth-connect-tau.vercel.app"
+        Deno.env.get("FRONTEND_URL") ?? "https://jgyouth.site"
       }/sign-up`;
       const ctaHtml = hasClerkAccount
         ? `<p>Log in to see upcoming events, RSVP, and check in on Fridays.</p>`

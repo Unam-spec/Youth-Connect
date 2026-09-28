@@ -29,6 +29,7 @@ import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembersh
 import { mergeProfiles } from "../lib/mergeProfiles";
 import { validateDob, computeAge } from "../lib/age";
 import { resolveDirectoryListParams } from "../lib/directoryListParams";
+import { APP_BASE_URL } from "../lib/appUrl";
 
 const router = Router();
 
@@ -508,7 +509,7 @@ router.post("/profiles/:id/promote", requireLeaderSession("leader"), async (req:
     
     if (updated.email) {
       const hasClerkAccount = !!updated.clerk_id;
-      const signUpUrl = `${process.env.FRONTEND_URL ?? "https://youth-connect-tau.vercel.app"}/sign-up`;
+      const signUpUrl = `${APP_BASE_URL}/sign-up`;
       const ctaText = hasClerkAccount
         ? "Log in to see upcoming events, RSVP, and check in on Fridays."
         : `Create your login account to access all member features: ${signUpUrl}`;
