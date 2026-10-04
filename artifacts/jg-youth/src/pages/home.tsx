@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useUser } from "@clerk/react";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
@@ -9,6 +10,7 @@ import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, KeyRound, Mus
 import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
 import { isEventVisibleTo } from "@/lib/eventVisibility";
+import { isFreshLaunch, resumePath } from "@/lib/lastArea";
 
 function PublicHome() {
   const [, setLocation] = useLocation();
@@ -217,6 +219,8 @@ function PublicHome() {
 
 export default function Home() {
   const { user, isLoaded } = useUser();
+  // Opening the app picks up where you left off (if still signed in there).
+  const [freshLaunch] = useState(isFreshLaunch);
 
   if (!isLoaded) {
     return (
@@ -226,6 +230,11 @@ export default function Home() {
         </div>
       </Layout>
     );
+  }
+
+  if (freshLaunch) {
+    const resume = resumePath(Boolean(user));
+    if (resume) return <Redirect to={resume} />;
   }
 
   if (user) {

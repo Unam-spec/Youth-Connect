@@ -101,8 +101,11 @@ export default function MyDashboard() {
   };
 
   useEffect(() => {
+    // Not signed in by email: go to the landing page (which reopens a PIN,
+    // leader or worship login if there is one) rather than a login screen.
+    // The installed app opens here, so this used to mean "login every time".
     if (isLoaded && !isSignedIn) {
-      setLocation("/sign-in", { replace: true });
+      setLocation("/", { replace: true });
     }
   }, [isLoaded, isSignedIn, setLocation]);
 

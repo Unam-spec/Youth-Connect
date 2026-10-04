@@ -15,6 +15,7 @@ import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 import { CommandPalette } from "@/components/command-palette";
 import { capturePageview, identifyUser, resetPostHog } from "@/lib/posthog";
+import { useRememberArea } from "@/lib/lastArea";
 
 import Home from "@/pages/home";
 import Register from "@/pages/register";
@@ -185,6 +186,7 @@ function AnalyticsTracker() {
   useEffect(() => {
     capturePageview(location);
   }, [location]);
+  useRememberArea(location);
 
   useEffect(() => {
     if (!isLoaded) return;

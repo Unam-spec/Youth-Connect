@@ -2,7 +2,7 @@
   "name": "Jeremiah Generation Youth",
   "short_name": "JG Youth",
   "description": "Register, check in, and connect with the JG Youth community.",
-  "start_url": "/my",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2A9D8F",
