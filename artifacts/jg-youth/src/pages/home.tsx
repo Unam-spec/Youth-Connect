@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useUser } from "@clerk/react";
+import { useSearch } from "wouter";
 import { useLocation } from "wouter";
 import { Layout } from "@/components/layout";
 import { Button } from "@/components/ui/button";
@@ -221,6 +222,9 @@ export default function Home() {
   const { user, isLoaded } = useUser();
   // Opening the app picks up where you left off (if still signed in there).
   const [freshLaunch] = useState(isFreshLaunch);
+  // "/?stay=1" (e.g. Worship's back button): show the landing page even when
+  // signed in, instead of sending them on to their dashboard.
+  const stay = new URLSearchParams(useSearch()).has("stay");
 
   if (!isLoaded) {
     return (
@@ -232,12 +236,12 @@ export default function Home() {
     );
   }
 
-  if (freshLaunch) {
+  if (freshLaunch && !stay) {
     const resume = resumePath(Boolean(user));
     if (resume) return <Redirect to={resume} />;
   }
 
-  if (user) {
+  if (user && !stay) {
     return <Redirect to="/my" />;
   }
 

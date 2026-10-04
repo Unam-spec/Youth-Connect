@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { Bell, BellRing, CalendarDays, ListMusic, LogOut, Music, Settings, Sparkles, User, UserPlus, Users } from "lucide-react";
+import { Bell, BellRing, CalendarDays, ChevronLeft, ListMusic, LogOut, Music, Settings, Sparkles, User, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -56,7 +56,16 @@ export function WorshipFrame({ children, right }: { children: ReactNode; right?:
       <div className="pointer-events-none fixed inset-x-0 top-0 h-72 bg-gradient-to-b from-primary/20 to-transparent" />
       <div className="relative mx-auto max-w-3xl px-4 pb-16">
         <header className="flex h-16 items-center justify-between gap-3">
-          <Link href="/worship" className="flex items-center gap-2.5">
+          <div className="flex min-w-0 items-center gap-1">
+          {/* Back to the JG Youth landing page; stays signed in to worship. */}
+          <Link
+            href="/?stay=1"
+            aria-label="Back to JG Youth"
+            className="-ml-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Link>
+          <Link href="/worship" className="flex min-w-0 items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20">
               <Music className="h-5 w-5 text-primary" />
             </span>
@@ -64,6 +73,7 @@ export function WorshipFrame({ children, right }: { children: ReactNode; right?:
               Worship Team
             </span>
           </Link>
+          </div>
           {right}
         </header>
         {children}

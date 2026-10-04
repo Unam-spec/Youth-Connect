@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, BellRing, Clock, KeyRound, Loader2, Lock, MessageCircle } from "lucide-react";
+import { BellRing, Clock, KeyRound, Loader2, Lock, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -218,18 +218,12 @@ function JoinForm() {
   );
 }
 
-const backLink = (
-  <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-    <ArrowLeft className="h-3.5 w-3.5" />
-    JG Youth
-  </Link>
-);
 
 function SignedOut() {
   // The invite link (/worship?join=1) opens straight on "Request to join".
   const startOnJoin = new URLSearchParams(useSearch()).has("join");
   return (
-    <WorshipFrame right={backLink}>
+    <WorshipFrame>
       <div className="mx-auto max-w-sm pt-8">
         <div className="mb-6 space-y-2 text-center">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
@@ -268,7 +262,7 @@ function Waiting({ account }: { account: WorshipAccount }) {
     onError: (err: Error) => toast.error(err.message),
   });
   return (
-    <WorshipFrame right={backLink}>
+    <WorshipFrame>
       <div className="mx-auto max-w-sm pt-12 text-center">
         <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/15">
           <Clock className="h-7 w-7 text-primary" />
@@ -324,7 +318,7 @@ export function WorshipGate({ children }: { children: (account: WorshipAccount) 
   }
   if (isError) {
     return (
-      <WorshipFrame right={backLink}>
+      <WorshipFrame>
         <div className="pt-24 text-center">
           <p className="text-sm text-muted-foreground">Couldn't reach the worship team. Check your connection.</p>
           <Button className="mt-4" variant="outline" onClick={() => refetch()}>
