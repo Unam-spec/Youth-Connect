@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import {
   ArrowLeft,
+  Bell,
   Lock,
   Music,
   UserCircle,
@@ -16,9 +17,10 @@ import { Badge } from "@/components/ui/badge";
 // personal song lists, keys and lyrics) is being built on the
 // `feature/worship-team` branch; see docs/worship-team.md for the plan.
 //
-// Deliberately standalone: no JG Youth header/footer or dashboard links. The
-// only way in is the discreet "Worship Team" link in the site footer, and once
-// built the page will be restricted to worship team members.
+// Deliberately standalone: worship team is its own membership, separate from
+// JG Youth (some worship members aren't JG Youth members), so there's no JG
+// Youth header/footer or dashboard links. The only way in is the discreet
+// "Worship Team" link in the site footer.
 const PLANNED_FEATURES = [
   {
     icon: UserCircle,
@@ -44,6 +46,11 @@ const PLANNED_FEATURES = [
     icon: Users,
     title: "View the team",
     description: "Open anyone's profile to see their songs and keys. Only they can edit it.",
+  },
+  {
+    icon: Bell,
+    title: "Team notifications",
+    description: "Get notified when a teammate adds a new song. Only the worship team receives these.",
   },
   {
     icon: CalendarDays,
@@ -116,6 +123,8 @@ export default function Worship() {
         </section>
 
         <p className="pb-4 text-center text-xs text-white/40">
+          The worship team has its own membership, so you don't need to be a JG Youth member to join.
+          <br />
           Worship team sign-in is coming soon.
         </p>
       </div>
