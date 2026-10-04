@@ -49,6 +49,9 @@ import {
  */
 const router = Router();
 const loginLimiter = new LoginLimiter();
+// 15-minute lockout after 5 wrong PINs. Paused for now at the head leader's
+// request; set back to true to turn it on again.
+const LOGIN_LOCKOUT_ENABLED = false;
 
 // Serializes "first account becomes head leader" so two sign-ups can't both
 // claim it.
@@ -140,7 +143,7 @@ router.post("/worship/auth/login", async (req, res) => {
     const phone = normalizeWorshipPhone(b.phone);
     const pin = typeof b.pin === "string" ? b.pin : "";
     if (!phone || !pin) return res.status(400).json({ error: "Phone number and PIN are required." });
-    if (loginLimiter.isBlocked(phone)) {
+    if (LOGIN_LOCKOUT_ENABLED && loginLimiter.isBlocked(phone)) {
       return res.status(429).json({ error: "Too many tries. Wait 15 minutes and try again." });
     }
     if (pin.length > 8) return res.status(401).json({ error: "Wrong phone number or PIN." });
