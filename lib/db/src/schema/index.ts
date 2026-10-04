@@ -581,6 +581,8 @@ export const worshipAccountsTable = pgTable("worship_accounts", {
     .notNull()
     .defaultNow(),
   approved_at: timestamp("approved_at", { withTimezone: true }),
+  // Set when they finish (or skip) the welcome sequence, so it shows once.
+  onboarded_at: timestamp("onboarded_at", { withTimezone: true }),
 });
 
 export type WorshipAccount = typeof worshipAccountsTable.$inferSelect;

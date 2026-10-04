@@ -24,6 +24,7 @@ export interface WorshipAccount {
   created_at: string;
   phone?: string;
   notifications_muted?: boolean;
+  onboarded_at?: string | null;
   song_count?: number;
 }
 

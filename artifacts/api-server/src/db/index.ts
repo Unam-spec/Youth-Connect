@@ -384,6 +384,9 @@ CREATE TABLE IF NOT EXISTS "worship_push_subscriptions" (
   "created_at" timestamp with time zone NOT NULL DEFAULT now()
 );
 
+-- Worship onboarding (2026-10): when someone finished the welcome sequence.
+ALTER TABLE "worship_accounts" ADD COLUMN IF NOT EXISTS "onboarded_at" timestamp with time zone;
+
 -- Sunday setlists (2026-10).
 CREATE TABLE IF NOT EXISTS "worship_setlists" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),

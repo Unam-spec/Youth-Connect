@@ -68,7 +68,12 @@ function fail(req: Request, res: Response, err: unknown) {
 }
 
 function ownAccount(a: WorshipAccount) {
-  return { ...publicAccount(a), phone: a.phone, notifications_muted: a.notifications_muted };
+  return {
+    ...publicAccount(a),
+    phone: a.phone,
+    notifications_muted: a.notifications_muted,
+    onboarded_at: a.onboarded_at,
+  };
 }
 
 // ── Joining & signing in ──────────────────────────────────────────────────────
@@ -217,6 +222,20 @@ router.patch("/worship/me", requireWorship(), async (req, res) => {
     const [updated] = await db
       .update(worshipAccountsTable)
       .set(set)
+      .where(eq(worshipAccountsTable.id, me(req).id))
+      .returning();
+    return res.json({ account: ownAccount(updated) });
+  } catch (err) {
+    return fail(req, res, err);
+  }
+});
+
+// POST /worship/me/onboarded — they finished (or skipped) the welcome sequence.
+router.post("/worship/me/onboarded", requireWorship(), async (req, res) => {
+  try {
+    const [updated] = await db
+      .update(worshipAccountsTable)
+      .set({ onboarded_at: new Date() })
       .where(eq(worshipAccountsTable.id, me(req).id))
       .returning();
     return res.json({ account: ownAccount(updated) });

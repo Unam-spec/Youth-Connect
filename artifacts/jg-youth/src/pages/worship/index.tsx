@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Check, Crown, KeyRound, MoreVertical, Send, UserMinus, UserPlus, X } from "lucide-react";
 import { InviteDialog } from "@/components/worship/InviteDialog";
+import { GettingStarted } from "@/components/worship/GettingStarted";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -194,6 +195,9 @@ function TeamPage({ me }: { me: WorshipAccount }) {
   return (
     <div>
       {canApprove(me) && <JoinRequests />}
+      {data && (
+        <GettingStarted me={me} songCount={data.members.find((m) => m.id === me.id)?.song_count ?? 0} />
+      )}
       <button
         type="button"
         onClick={() => setInviteOpen(true)}

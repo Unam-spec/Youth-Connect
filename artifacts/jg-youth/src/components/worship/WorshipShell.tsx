@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { Bell, BellRing, CalendarDays, ListMusic, LogOut, Music, Settings, User, UserPlus, Users } from "lucide-react";
+import { Bell, BellRing, CalendarDays, ListMusic, LogOut, Music, Settings, Sparkles, User, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -27,6 +27,7 @@ import {
 } from "@/lib/worship";
 import { enableWorshipPush } from "@/lib/worshipPush";
 import { InviteDialog } from "./InviteDialog";
+import { WorshipOnboarding } from "./WorshipOnboarding";
 import { ProfileDialog } from "./ProfileDialog";
 
 /** Applies the worship colour theme to <html> while mounted (dialogs portal to body). */
@@ -164,6 +165,8 @@ export function WorshipShell({
   const [location, setLocation] = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  // First time in: the welcome sequence opens by itself.
+  const [welcomeOpen, setWelcomeOpen] = useState(!account.onboarded_at);
 
   const nav = [
     { href: "/worship", label: "Team", icon: Users, active: location === "/worship" },
@@ -217,6 +220,9 @@ export function WorshipShell({
               <DropdownMenuItem onSelect={() => setInviteOpen(true)}>
                 <UserPlus className="mr-2 h-4 w-4" /> Invite someone
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setWelcomeOpen(true)}>
+                <Sparkles className="mr-2 h-4 w-4" /> Replay welcome
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
                   signOutOfWorship(queryClient);
@@ -250,6 +256,7 @@ export function WorshipShell({
       {children}
       <ProfileDialog account={account} open={profileOpen} onOpenChange={setProfileOpen} />
       <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+      <WorshipOnboarding account={account} open={welcomeOpen} onOpenChange={setWelcomeOpen} />
     </WorshipFrame>
   );
 }

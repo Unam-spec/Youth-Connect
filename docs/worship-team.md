@@ -19,6 +19,12 @@ Some worship team members are not JG Youth members, so the worship area is a **s
 - **Separate look and entry point.** `/worship` has its own design and no JG Youth header, footer or dashboard links. The only way in is a discreet **"Worship Team"** link in the landing page footer, next to "Leader Portal".
 - **Checked on the server.** Every `/api/worship/*` route requires a worship session. A JG Youth login or leader PIN session does not work there, and the reverse is also true.
 
+## Onboarding
+
+The first time someone gets in (the head leader on sign-up, everyone else once accepted), a 7-step welcome opens: what their role means (head leader / leader / member wording), set up their profile (instruments, vocal range, saved straight away), add a first song or pick from the library, how keys and stage mode work, Sunday setlists (leaders get a shortcut to post one), turn on notifications, and invite someone. Skip or finish both mark it done on the server (`onboarded_at`, `POST /api/worship/me/onboarded`), so it shows once per person on any device. **Replay welcome** in the account menu reopens it.
+
+Afterwards a **Getting started** checklist on the team page ticks itself off from real data (role picked, first song added, notifications on) and disappears when done or dismissed.
+
 ## Roles: head leader, leaders, members
 
 Shaped like the JG Youth leader system (Super Admin → Leaders → Members). Everyone sees the same pages; leaders just have one extra responsibility.
