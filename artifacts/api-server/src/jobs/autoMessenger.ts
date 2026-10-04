@@ -4,6 +4,8 @@
  * Runs every 60 s. Rules and message copy live in lib/autoMessages.ts:
  *   - Friday 14:00 push nudging leaders to post the weekly group announcement
  *   - Friday 15:00 re-engagement for people who've been away (once per stage)
+ *   - Every day 08:00 birthday pushes: a wish to the birthday person and an
+ *     announcement to everyone else
  *
  * Check-in reminders are left to the existing "check-in is open" push.
  *
@@ -35,6 +37,12 @@ import {
   type OutboundMessage,
 } from "../lib/autoMessages";
 import { stageForRole } from "../lib/followUpStages";
+import {
+  BIRTHDAY_PUSH_TIME,
+  birthdayAnnouncementPayload,
+  birthdayWishPayload,
+  selectBirthdays,
+} from "../lib/birthdays";
 import type { ProfileRole } from "../lib/directoryListParams";
 import { sendPushToProfiles } from "../lib/pushSender";
 import { isEmailConfigured } from "../lib/email";
@@ -156,9 +164,44 @@ export async function sendReengagement(todaySast: string): Promise<number> {
   return sent;
 }
 
+/**
+ * Today's birthdays: wish each birthday person, and tell everyone else (all
+ * roles) whose birthday it is. Returns the number of devices reached.
+ */
+export async function sendBirthdayPushes(todaySast: string): Promise<number> {
+  const people = await db
+    .select({
+      id: profilesTable.id,
+      full_name: profilesTable.full_name,
+      avatar_url: profilesTable.avatar_url,
+      date_of_birth: profilesTable.date_of_birth,
+    })
+    .from(profilesTable)
+    .where(inArray(profilesTable.role, OUTREACH_ROLES));
+  const { today } = selectBirthdays(people, todaySast);
+  if (today.length === 0) return 0;
+
+  let devices = 0;
+  for (const celebrant of today) {
+    devices += await sendPushToProfiles([celebrant.id], birthdayWishPayload(celebrant));
+  }
+  const celebrantIds = new Set(today.map((c) => c.id));
+  const everyoneElse = people.filter((p) => !celebrantIds.has(p.id)).map((p) => p.id);
+  devices += await sendPushToProfiles(everyoneElse, birthdayAnnouncementPayload(today));
+  return devices;
+}
+
 async function tick(): Promise<void> {
   const now = sastNow();
   if (!automationActive(now.date)) return;
+
+  // Birthdays go out every day of the week.
+  if (dueNow(now.hhmm, BIRTHDAY_PUSH_TIME)) {
+    if (await claimRun("auto_birthdays", now.date)) {
+      const devices = await sendBirthdayPushes(now.date);
+      logger.info({ devices }, "[autoMessenger] Birthday pushes sent");
+    }
+  }
 
   if (now.dayOfWeek !== OUTREACH_DAY_OF_WEEK) return;
 

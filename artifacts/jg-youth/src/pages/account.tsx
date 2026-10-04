@@ -21,6 +21,7 @@ import { CheckCircle, Clock, LogOut, Loader2, Cake, CalendarDays, MapPin, Gradua
 import { useLocation } from "wouter";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
+import { BirthdayBanner } from "@/components/member/BirthdayBanner";
 import { PrefsNudgeDialog } from "@/components/member/PrefsNudgeDialog";
 import { StreakWidget } from "@/components/member/StreakWidget";
 
@@ -250,6 +251,7 @@ export default function AccountHome() {
           </CardContent>
         </Card>
 
+        <BirthdayBanner />
         <NotificationSetupCard />
 
         {me?.role === "member" && <StreakWidget sessionDates={sessionDates} />}

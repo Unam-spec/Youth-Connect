@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { Cake } from "lucide-react";
 import { useApiFetch } from "@/lib/api";
 import { DashCard, SectionTitle, EmptyState } from "./shared";
@@ -25,7 +26,7 @@ function Avatar({ entry }: { entry: BirthdayEntry }) {
         url.startsWith("gradient:") ? (
           <div className="h-full w-full" style={{ background: url.replace("gradient:", "") }} />
         ) : (
-          <img src={url} alt={entry.full_name} className="h-full w-full object-cover" />
+          <ZoomableImage src={url} alt={entry.full_name} className="h-full w-full object-cover" />
         )
       ) : (
         initials

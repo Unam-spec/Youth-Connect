@@ -1,4 +1,5 @@
 import { UserPlus, Star, GraduationCap, Users } from "lucide-react";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { useListMembershipRequests, getListMembershipRequestsQueryKey } from "@workspace/api-client-react";
 import { DashCard, SectionTitle, SkeletonRows, EmptyState, PendingCheckIn, CheckInCard } from "./shared";
 import { Button } from "@/components/ui/button";
@@ -105,7 +106,7 @@ export function RequestsPanel({
                 <div className="space-y-3 flex-1">
                   <div className="flex items-start gap-3">
                     {req.avatar_url ? (
-                      <img
+                      <ZoomableImage
                         src={req.avatar_url}
                         alt={req.name}
                         className="h-10 w-10 rounded-full object-cover shrink-0 border border-amber-500/30"

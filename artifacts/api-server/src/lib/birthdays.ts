@@ -56,3 +56,46 @@ export function selectBirthdays(
   const strip = ({ _d, ...rest }: Ranked): BirthdayEntry => rest;
   return { today: todayList.map(strip), this_week: weekList.map(strip) };
 }
+
+// ── Birthday notifications (2026-10) ──────────────────────────────────────────
+
+/** When the daily birthday push goes out (SAST). */
+export const BIRTHDAY_PUSH_TIME = "08:00";
+
+function firstName(fullName: string): string {
+  return fullName.trim().split(/\s+/)[0] || fullName;
+}
+
+/** "Thabo", "Thabo and Lerato", "Thabo, Lerato and Sipho". */
+export function joinNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/** Push to everyone else: whose birthday it is today. */
+export function birthdayAnnouncementPayload(celebrants: { full_name: string }[]): {
+  title: string;
+  body: string;
+  url: string;
+} {
+  const names = joinNames(celebrants.map((c) => c.full_name.trim()));
+  const whose = celebrants.length === 1 ? `${names}'s birthday` : `${names}'s birthdays`;
+  return {
+    title: "JG Youth 🎂",
+    body: `It's ${whose} today! Wish ${celebrants.length === 1 ? "them" : "them all"} a happy birthday 🎉`,
+    url: "/my",
+  };
+}
+
+/** Push to the birthday person themselves. */
+export function birthdayWishPayload(celebrant: { full_name: string }): {
+  title: string;
+  body: string;
+  url: string;
+} {
+  return {
+    title: "JG Youth 🎉",
+    body: `Happy birthday, ${firstName(celebrant.full_name)}! From all of us at JG Youth 🎂`,
+    url: "/my",
+  };
+}

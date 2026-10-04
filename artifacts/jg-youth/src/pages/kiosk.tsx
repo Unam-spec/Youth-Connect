@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { Redirect, useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -247,7 +248,7 @@ export default function Kiosk() {
 
         {screen === "confirm" && selected && (
           <div className="flex-1 flex flex-col justify-center items-center gap-6 text-center">
-            <Avatar url={selected.avatar_url} name={selected.full_name} size="w-28 h-28" textSize="text-4xl" />
+            <Avatar url={selected.avatar_url} name={selected.full_name} size="w-28 h-28" textSize="text-4xl" zoomable />
             <div>
               <h2 className="text-2xl font-semibold">{selected.full_name}</h2>
               <p className="text-muted-foreground mt-1">Is this you?</p>
@@ -416,10 +417,11 @@ function BackRow({ onBack, title }: { onBack: () => void; title: string }) {
 }
 
 function Avatar({
-  url, name, size, textSize = "text-lg",
-}: { url: string | null; name: string; size: string; textSize?: string }) {
+  url, name, size, textSize = "text-lg", zoomable = false,
+}: { url: string | null; name: string; size: string; textSize?: string; zoomable?: boolean }) {
   if (url) {
-    return <img src={url} alt={name} className={`${size} rounded-full object-cover border border-border shrink-0`} />;
+    const cls = `${size} rounded-full object-cover border border-border shrink-0`;
+    return zoomable ? <ZoomableImage src={url} alt={name} className={cls} /> : <img src={url} alt={name} className={cls} />;
   }
   return (
     <div className={`${size} rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0`}>

@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -180,7 +181,7 @@ export function CheckInCard({
     >
       <div className="flex items-start gap-3">
         {req.avatar_url ? (
-          <img
+          <ZoomableImage
             src={req.avatar_url}
             alt={req.name}
             className="h-9 w-9 rounded-full object-cover shrink-0 border border-border"

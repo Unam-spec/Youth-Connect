@@ -46,6 +46,7 @@ import { FeedbackModal } from "@/components/member/FeedbackModal";
 import { PreferencesModal } from "@/components/member/PreferencesModal";
 import { PrefsNudgeDialog } from "@/components/member/PrefsNudgeDialog";
 import { StreakWidget } from "@/components/member/StreakWidget";
+import { BirthdayBanner } from "@/components/member/BirthdayBanner";
 import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
 import { OnboardingTour, type TourStep } from "@/components/member/OnboardingTour";
 
@@ -824,6 +825,9 @@ export default function MyDashboard() {
           </section>
         )}
 
+        {/* Today's birthdays */}
+        <BirthdayBanner hideOwnWish />
+
         {/* Enable push notifications (platform-aware; hides where unsupported) */}
         <NotificationSetupCard />
 
@@ -1441,7 +1445,7 @@ export default function MyDashboard() {
       <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
         <DialogContent className="max-w-2xl bg-transparent border-0 shadow-none p-0 flex flex-col items-center justify-center">
           {lightboxImage && (
-            <img src={lightboxImage} alt="Profile" className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" />
+            <img src={lightboxImage} alt="Profile" className="aspect-square w-[85vw] max-w-md rounded-2xl bg-black/40 object-contain shadow-2xl" />
           )}
           <Button onClick={() => { setLightboxImage(null); setShowAvatarDialog(true); }} className="mt-4">
             <Camera className="w-4 h-4 mr-2" /> Change Photo

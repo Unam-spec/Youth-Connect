@@ -1,4 +1,5 @@
 import { Star, ShieldAlert } from "lucide-react";
+import { ZoomableImage } from "@/components/ui/zoomable-image";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useListProfiles, getListProfilesQueryKey } from "@workspace/api-client-react";
@@ -61,7 +62,7 @@ export function AdminSlotsPanel({
                             style={{ background: admin.avatar_url.replace("gradient:", "") }}
                           />
                         ) : (
-                          <img
+                          <ZoomableImage
                             src={admin.avatar_url}
                             alt={admin.full_name}
                             className="h-full w-full object-cover"

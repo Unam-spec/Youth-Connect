@@ -379,7 +379,7 @@ export function MemberDirectoryPanel({
       <Dialog open={!!lightboxImage} onOpenChange={(open) => !open && setLightboxImage(null)}>
         <DialogContent className="max-w-2xl bg-transparent border-0 shadow-none p-0 flex items-center justify-center">
           {lightboxImage && (
-            <img src={lightboxImage} alt="Profile" className="max-h-[85vh] max-w-full rounded-xl object-contain shadow-2xl" />
+            <img src={lightboxImage} alt="Profile" className="aspect-square w-[85vw] max-w-md rounded-2xl bg-black/40 object-contain shadow-2xl" />
           )}
         </DialogContent>
       </Dialog>

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { selectBirthdays } from "./birthdays";
+import {
+  selectBirthdays,
+  joinNames,
+  birthdayAnnouncementPayload,
+  birthdayWishPayload,
+} from "./birthdays";
 
 const p = (id: string, full_name: string, dob: string | null) => ({
   id,
@@ -35,5 +40,26 @@ describe("selectBirthdays", () => {
     const out = selectBirthdays(rows, today);
     expect(out.today.map((x) => x.full_name)).toEqual(["Alice", "Fin"]);
     expect(out.this_week.map((x) => x.full_name)).toEqual(["Bob", "Cara"]);
+  });
+});
+
+describe("birthday notifications", () => {
+  it("joins names naturally", () => {
+    expect(joinNames(["Thabo"])).toBe("Thabo");
+    expect(joinNames(["Thabo", "Lerato"])).toBe("Thabo and Lerato");
+    expect(joinNames(["Thabo", "Lerato", "Sipho"])).toBe("Thabo, Lerato and Sipho");
+  });
+  it("announces one or several birthdays to everyone", () => {
+    expect(birthdayAnnouncementPayload([{ full_name: "Thabo Mokoena" }]).body).toBe(
+      "It's Thabo Mokoena's birthday today! Wish them a happy birthday 🎉",
+    );
+    expect(birthdayAnnouncementPayload([{ full_name: "Thabo" }, { full_name: "Lerato" }]).body).toBe(
+      "It's Thabo and Lerato's birthdays today! Wish them all a happy birthday 🎉",
+    );
+  });
+  it("wishes the birthday person by first name", () => {
+    expect(birthdayWishPayload({ full_name: "Thabo Mokoena" }).body).toBe(
+      "Happy birthday, Thabo! From all of us at JG Youth 🎂",
+    );
   });
 });
