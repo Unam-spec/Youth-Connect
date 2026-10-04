@@ -101,6 +101,24 @@ export async function notifyAccepted(
   });
 }
 
+/** The head leader hears that someone forgot their PIN (tap → reset it). */
+export async function notifyPinResetRequest(requester: { id: string; full_name: string }): Promise<void> {
+  const owners = await db
+    .select({
+      id: worshipAccountsTable.id,
+      notifications_muted: worshipAccountsTable.notifications_muted,
+    })
+    .from(worshipAccountsTable)
+    .where(and(eq(worshipAccountsTable.status, "approved"), eq(worshipAccountsTable.role, "owner")));
+  await notify(owners, {
+    actorId: requester.id,
+    type: "pin_reset_request",
+    title: "Worship Team",
+    message: `${requester.full_name} forgot their PIN. Tap to give them a new one 🔑`,
+    url: `/worship?reset=${requester.id}`,
+  });
+}
+
 /** Everyone else on the team hears that a setlist was posted. */
 export async function notifySetlistPosted(
   actor: { id: string; full_name: string },

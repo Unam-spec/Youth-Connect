@@ -39,6 +39,7 @@ import {
   inBackground,
   notifyAccepted,
   notifyJoinRequest,
+  notifyPinResetRequest,
   notifySetlistPosted,
   notifySongAdded,
 } from "../lib/worshipNotify";
@@ -158,6 +159,49 @@ router.post("/worship/auth/login", async (req, res) => {
     loginLimiter.reset(phone);
     const session = await createWorshipSession(account.id, req.headers["user-agent"]);
     return res.json({ ...session, account: ownAccount(account) });
+  } catch (err) {
+    return fail(req, res, err);
+  }
+});
+
+// One forgot-PIN request per number every 10 minutes, so the head leader
+// isn't spammed.
+const forgotPinRequests = new Map<string, number>();
+const FORGOT_PIN_EVERY_MS = 10 * 60 * 1000;
+
+/** wa.me link: digits only, no "+". */
+function waLink(phone: string, text: string): string {
+  return `https://wa.me/${phone.replace(/\D/g, "")}?text=${encodeURIComponent(text)}`;
+}
+
+// POST /worship/auth/forgot-pin — public. Tells the head leader (push + bell)
+// that this person needs a new PIN, and gives a team member a ready-made
+// WhatsApp message to the head leader's number. Unknown numbers get the same
+// "sent" reply and no number, so this can't be used to find who's on the team.
+router.post("/worship/auth/forgot-pin", async (req, res) => {
+  try {
+    const phone = normalizeWorshipPhone(body(req).phone);
+    if (!phone) return res.status(400).json({ error: "Please enter a valid phone number." });
+    const generic = { ok: true, whatsapp_url: null as string | null, is_head_leader: false };
+
+    const account = await db.query.worshipAccountsTable.findFirst({
+      where: eq(worshipAccountsTable.phone, phone),
+    });
+    if (!account) return res.json(generic);
+    if (account.role === "owner") return res.json({ ...generic, is_head_leader: true });
+
+    const owner = await db.query.worshipAccountsTable.findFirst({
+      where: and(eq(worshipAccountsTable.role, "owner"), eq(worshipAccountsTable.status, "approved")),
+    });
+    const last = forgotPinRequests.get(phone) ?? 0;
+    if (Date.now() - last > FORGOT_PIN_EVERY_MS) {
+      forgotPinRequests.set(phone, Date.now());
+      inBackground("forgot pin notify", notifyPinResetRequest(account));
+    }
+    const text =
+      `Hi${owner ? ` ${owner.full_name.split(" ")[0]}` : ""}, it's ${account.full_name} (${account.phone}) ` +
+      `from the worship team 🙏 I forgot my PIN for the Worship Team app. Please could you reset it for me?`;
+    return res.json({ ...generic, whatsapp_url: owner ? waLink(owner.phone, text) : null });
   } catch (err) {
     return fail(req, res, err);
   }
@@ -424,7 +468,8 @@ router.post("/worship/members/:id/reset-pin", requireWorship({ owner: true }), a
       .set({ pin_hash: await bcrypt.hash(pin, 12) })
       .where(eq(worshipAccountsTable.id, target.id));
     await revokeAllWorshipSessions(target.id);
-    return res.json({ pin });
+    // Phone + name so the head leader can WhatsApp the new PIN straight to them.
+    return res.json({ pin, phone: target.phone, full_name: target.full_name });
   } catch (err) {
     return fail(req, res, err);
   }

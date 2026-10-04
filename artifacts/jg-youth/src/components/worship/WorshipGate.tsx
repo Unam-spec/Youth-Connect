@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, BellRing, Clock, Loader2, Lock } from "lucide-react";
+import { ArrowLeft, BellRing, Clock, KeyRound, Loader2, Lock, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,10 +31,95 @@ function pinInput(set: (v: string) => void) {
   return (e: React.ChangeEvent<HTMLInputElement>) => set(e.target.value.replace(/\D/g, "").slice(0, 6));
 }
 
+type ForgotResult = { ok: boolean; whatsapp_url: string | null; is_head_leader: boolean };
+
+/** "Forgot PIN?": notifies the head leader and offers a WhatsApp message to them. */
+function ForgotPinForm({ initialPhone, onBack }: { initialPhone: string; onBack: () => void }) {
+  const [phone, setPhone] = useState(initialPhone);
+  const [result, setResult] = useState<ForgotResult | null>(null);
+  const send = useMutation({
+    mutationFn: () => worshipPost<ForgotResult>("/auth/forgot-pin", { phone }),
+    onSuccess: setResult,
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  if (result?.is_head_leader) {
+    return (
+      <div className="space-y-4 text-center">
+        <p className="text-sm">
+          You're the head leader, so there's no one above you to reset it. Ask the JG Youth app admin for a new PIN.
+        </p>
+        <Button variant="outline" className="w-full" onClick={onBack}>
+          Back to sign in
+        </Button>
+      </div>
+    );
+  }
+
+  if (result) {
+    const url = result.whatsapp_url;
+    return (
+      <div className="space-y-4 text-center">
+        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/15">
+          <KeyRound className="h-6 w-6 text-primary" />
+        </span>
+        <p className="font-semibold">Request sent 🙏</p>
+        <p className="text-sm text-muted-foreground">
+          If this number is on the team, the head leader has been notified and will send you a new PIN.
+          {url && " You can also message them directly:"}
+        </p>
+        {url && (
+          <Button
+            className="w-full"
+            onClick={() => {
+              const opened = window.open(url, "_blank");
+              if (!opened) window.location.href = url;
+            }}
+          >
+            <MessageCircle className="mr-2 h-4 w-4" /> Message the head leader on WhatsApp
+          </Button>
+        )}
+        <Button variant="ghost" className="w-full" onClick={onBack}>
+          Back to sign in
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        send.mutate();
+      }}
+    >
+      <div className="space-y-1">
+        <p className="font-semibold">Forgot your PIN?</p>
+        <p className="text-sm text-muted-foreground">
+          Enter your number and we'll ask the head leader to send you a new one.
+        </p>
+      </div>
+      <div className="space-y-1.5">
+        <Label htmlFor="wf-phone">Phone number</Label>
+        <PhoneInput id="wf-phone" value={phone} onChange={setPhone} />
+      </div>
+      <Button type="submit" className="w-full" disabled={send.isPending || !hasPhoneNumber(phone)}>
+        {send.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Request a new PIN
+      </Button>
+      <Button type="button" variant="ghost" className="w-full" onClick={onBack}>
+        Back to sign in
+      </Button>
+    </form>
+  );
+}
+
 function SignInForm() {
   const queryClient = useQueryClient();
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
+  const [forgot, setForgot] = useState(false);
   const login = useMutation({
     mutationFn: () => worshipPost<AuthResponse>("/auth/login", { phone, pin }),
     onSuccess: (r) => {
@@ -43,6 +128,7 @@ function SignInForm() {
     },
     onError: (err: Error) => toast.error(err.message),
   });
+  if (forgot) return <ForgotPinForm initialPhone={phone} onBack={() => setForgot(false)} />;
   return (
     <form
       className="space-y-4"
@@ -63,7 +149,13 @@ function SignInForm() {
         {login.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Sign in
       </Button>
-      <p className="text-center text-xs text-muted-foreground">Forgot your PIN? Ask a worship leader to reset it.</p>
+      <button
+        type="button"
+        onClick={() => setForgot(true)}
+        className="block w-full text-center text-sm font-medium text-primary hover:underline"
+      >
+        Forgot PIN?
+      </button>
     </form>
   );
 }

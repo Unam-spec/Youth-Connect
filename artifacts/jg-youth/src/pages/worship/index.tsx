@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Link } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Crown, KeyRound, MoreVertical, Send, UserMinus, UserPlus, X } from "lucide-react";
+import { Check, Crown, KeyRound, MessageCircle, MoreVertical, Send, UserMinus, UserPlus, X } from "lucide-react";
+import { openWhatsApp } from "@/lib/whatsapp";
 import { InviteDialog } from "@/components/worship/InviteDialog";
 import { GettingStarted } from "@/components/worship/GettingStarted";
 import { Button } from "@/components/ui/button";
@@ -98,11 +99,78 @@ function JoinRequests() {
   );
 }
 
+/**
+ * Head leader gives someone a new PIN: confirm → new PIN shown once → send it
+ * straight to them on WhatsApp. Used by the ⋮ menu and by tapping a
+ * "forgot their PIN" notification.
+ */
+function ResetPinFlow({
+  member,
+  open,
+  onOpenChange,
+}: {
+  member: WorshipAccount;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}) {
+  const [result, setResult] = useState<{ pin: string; phone: string } | null>(null);
+  const reset = useMutation({
+    mutationFn: () => worshipPost<{ pin: string; phone: string }>(`/members/${member.id}/reset-pin`),
+    onSuccess: setResult,
+    onError: (err: Error) => toast.error(err.message),
+  });
+  const first = member.full_name.split(" ")[0];
+  const close = (o: boolean) => {
+    if (!o) setResult(null);
+    onOpenChange(o);
+  };
+  const message = result
+    ? `Hi ${first}, your new Worship Team PIN is *${result.pin}* 🔑\n\nSign in with your phone number and this PIN at ${window.location.origin}/worship. You can change it under Edit profile.`
+    : "";
+
+  return (
+    <AlertDialog open={open} onOpenChange={close}>
+      <AlertDialogContent>
+        {!result ? (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Give {member.full_name} a new PIN?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Their old PIN stops working and they're signed out on every device.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <Button onClick={() => reset.mutate()} disabled={reset.isPending}>
+                <KeyRound className="mr-2 h-4 w-4" /> Make a new PIN
+              </Button>
+            </AlertDialogFooter>
+          </>
+        ) : (
+          <>
+            <AlertDialogHeader>
+              <AlertDialogTitle>New PIN for {member.full_name}</AlertDialogTitle>
+              <AlertDialogDescription>Send it to them. They can change it after signing in.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <p className="py-2 text-center font-mono text-4xl font-bold tracking-[0.3em]">{result.pin}</p>
+            <div className="flex flex-col gap-2">
+              <Button onClick={() => openWhatsApp(result.phone, message)}>
+                <MessageCircle className="mr-2 h-4 w-4" /> Send to {first} on WhatsApp
+              </Button>
+              <AlertDialogCancel className="mt-0">Done</AlertDialogCancel>
+            </div>
+          </>
+        )}
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 /** Head leader only: promote/demote, reset PIN, remove. */
 function LeaderMenu({ member }: { member: WorshipAccount }) {
   const queryClient = useQueryClient();
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [newPin, setNewPin] = useState<string | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
   const isLeader = member.role === "leader";
   const done = () => queryClient.invalidateQueries({ queryKey: ["worship"] });
 
@@ -122,11 +190,6 @@ function LeaderMenu({ member }: { member: WorshipAccount }) {
     },
     onError: (err: Error) => toast.error(err.message),
   });
-  const resetPin = useMutation({
-    mutationFn: () => worshipPost<{ pin: string }>(`/members/${member.id}/reset-pin`),
-    onSuccess: (r) => setNewPin(r.pin),
-    onError: (err: Error) => toast.error(err.message),
-  });
 
   return (
     <>
@@ -141,7 +204,7 @@ function LeaderMenu({ member }: { member: WorshipAccount }) {
             <Crown className="mr-2 h-4 w-4" />
             {isLeader ? "Make member" : "Make leader"}
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => resetPin.mutate()}>
+          <DropdownMenuItem onSelect={() => setResetOpen(true)}>
             <KeyRound className="mr-2 h-4 w-4" /> Reset PIN
           </DropdownMenuItem>
           <DropdownMenuSeparator />
@@ -166,20 +229,7 @@ function LeaderMenu({ member }: { member: WorshipAccount }) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={newPin !== null} onOpenChange={(o) => !o && setNewPin(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>New PIN for {member.full_name}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Give them this PIN. They can change it in their profile after signing in.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <p className="py-2 text-center font-mono text-4xl font-bold tracking-[0.3em]">{newPin}</p>
-          <AlertDialogFooter>
-            <AlertDialogAction>Done</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ResetPinFlow member={member} open={resetOpen} onOpenChange={setResetOpen} />
     </>
   );
 }
@@ -191,6 +241,10 @@ function TeamPage({ me }: { me: WorshipAccount }) {
   });
   const isHeadLeader = me.role === "owner";
   const [inviteOpen, setInviteOpen] = useState(false);
+  // Tapping a "forgot their PIN" notification lands on /worship?reset=<id>.
+  const resetId = new URLSearchParams(useSearch()).get("reset");
+  const [, setLocation] = useLocation();
+  const resetMember = isHeadLeader && resetId ? data?.members.find((m) => m.id === resetId) : undefined;
 
   return (
     <div>
@@ -212,6 +266,13 @@ function TeamPage({ me }: { me: WorshipAccount }) {
         </span>
       </button>
       <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
+      {resetMember && (
+        <ResetPinFlow
+          member={resetMember}
+          open
+          onOpenChange={(o) => !o && setLocation("/worship", { replace: true })}
+        />
+      )}
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">The team</h1>
         {data && (
