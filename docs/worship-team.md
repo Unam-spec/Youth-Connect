@@ -19,26 +19,25 @@ Some worship team members are not JG Youth members, so the worship area is a **s
 - **Separate look and entry point.** `/worship` has its own design and no JG Youth header, footer or dashboard links. The only way in is a discreet **"Worship Team"** link in the landing page footer, next to "Leader Portal".
 - **Checked on the server.** Every `/api/worship/*` route requires a worship session. A JG Youth login or leader PIN session does not work there, and the reverse is also true.
 
-## Two roles: leaders and members
+## Roles: head leader, leaders, members
 
-There's no admin setup, just **leaders** and **members**. Leaders decide who joins.
+Shaped like the JG Youth leader system (Super Admin → Leaders → Members). Everyone sees the same pages; leaders just have one extra responsibility.
 
-| Action | Member | Leader |
-|---|---|---|
-| Edit own profile and song list | ✅ | ✅ |
-| View everyone's profiles and songs | ✅ | ✅ |
-| Add songs to the shared library | ✅ | ✅ |
-| Get team notifications | ✅ | ✅ |
-| Approve or decline join requests | — | ✅ |
-| Remove someone from the team | — | ✅ |
-| Make a member a leader (or switch a leader back to member) | — | ✅ |
-| Edit or delete any song in the library | — | ✅ |
-| Build Sunday setlists | — | ✅ |
+| Action | Member | Leader | Head leader |
+|---|---|---|---|
+| Edit own profile and song list | ✅ | ✅ | ✅ |
+| View everyone's profiles and songs | ✅ | ✅ | ✅ |
+| Add songs to the shared library, edit own songs | ✅ | ✅ | ✅ |
+| Get team notifications | ✅ | ✅ | ✅ |
+| **Accept or decline join requests** (and get notified of them) | — | ✅ | ✅ |
+| Make someone a leader, or switch a leader back to member | — | — | ✅ |
+| Remove someone, reset a forgotten PIN | — | — | ✅ |
+| Edit or delete anyone's song | — | — | ✅ |
 
-- The **first person to sign up becomes a leader** automatically, so the team starts without anyone setting it up.
-- Leaders see a small **"Join requests"** section at the top of the team page, with an approve or decline button on each request. There's no separate admin page.
-- Leaders get a notification when someone requests to join.
-- There must always be at least one leader, so the last leader can't remove themselves or switch themselves back to member.
+- The **first person to sign up becomes the head leader** (stored as role `owner`). There is one head leader, who can't be removed, demoted or leave.
+- If an account was created before the head-leader role existed, the server makes the earliest approved leader the head leader when it starts.
+- Leaders and the head leader see a **"Join requests"** section at the top of the team page. Only the head leader sees the menu on each person.
+- When someone is accepted, they get a notification: *"You're in! <name> accepted you onto the worship team 🎉"*. While waiting, they can tap "Notify me when I'm accepted" to get it as a push notification.
 
 ## Notifications (worship team only)
 
@@ -47,7 +46,7 @@ There's no admin setup, just **leaders** and **members**. Leaders decide who joi
 - The existing push sender (`pushSender.ts`, VAPID keys) is reused. Only the list of devices it sends to is different.
 - **In-app inbox:** a bell icon on the worship page lists recent activity, so people who haven't turned on push notifications still see what's new.
 - Each member can mute notifications in their profile settings.
-- Leaders also get a notification when someone requests to join.
+- The head leader and leaders get a notification when someone requests to join. The person who joined is notified when they are accepted.
 - Later: notifications for "new setlist published" and "you've been assigned to lead a song".
 
 ## Screens

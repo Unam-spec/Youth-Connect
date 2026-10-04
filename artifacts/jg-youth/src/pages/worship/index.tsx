@@ -24,8 +24,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { WorshipGate } from "@/components/worship/WorshipGate";
 import {
+  canApprove,
   initials,
   instrumentLabel,
+  roleLabel,
   worshipFetch,
   worshipKeys,
   worshipPost,
@@ -94,7 +96,8 @@ function JoinRequests() {
   );
 }
 
-function LeaderMenu({ member, me }: { member: WorshipAccount; me: WorshipAccount }) {
+/** Head leader only: promote/demote, reset PIN, remove. */
+function LeaderMenu({ member }: { member: WorshipAccount }) {
   const queryClient = useQueryClient();
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [newPin, setNewPin] = useState<string | null>(null);
@@ -136,17 +139,13 @@ function LeaderMenu({ member, me }: { member: WorshipAccount; me: WorshipAccount
             <Crown className="mr-2 h-4 w-4" />
             {isLeader ? "Make member" : "Make leader"}
           </DropdownMenuItem>
-          {member.id !== me.id && (
-            <>
-              <DropdownMenuItem onSelect={() => resetPin.mutate()}>
-                <KeyRound className="mr-2 h-4 w-4" /> Reset PIN
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive" onSelect={() => setConfirmRemove(true)}>
-                <UserMinus className="mr-2 h-4 w-4" /> Remove from team
-              </DropdownMenuItem>
-            </>
-          )}
+          <DropdownMenuItem onSelect={() => resetPin.mutate()}>
+            <KeyRound className="mr-2 h-4 w-4" /> Reset PIN
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem className="text-destructive" onSelect={() => setConfirmRemove(true)}>
+            <UserMinus className="mr-2 h-4 w-4" /> Remove from team
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -188,11 +187,11 @@ function TeamPage({ me }: { me: WorshipAccount }) {
     queryKey: worshipKeys.members,
     queryFn: () => worshipFetch<{ members: WorshipAccount[] }>("/members"),
   });
-  const isLeader = me.role === "leader";
+  const isHeadLeader = me.role === "owner";
 
   return (
     <div>
-      {isLeader && <JoinRequests />}
+      {canApprove(me) && <JoinRequests />}
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">The team</h1>
         {data && (
@@ -222,9 +221,9 @@ function TeamPage({ me }: { me: WorshipAccount }) {
                     {m.instruments.length ? m.instruments.map(instrumentLabel).join(", ") : "Worship team"}
                   </p>
                   <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
-                    {m.role === "leader" && (
+                    {roleLabel(m.role) && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 font-semibold text-primary">
-                        <Crown className="h-3 w-3" /> Leader
+                        <Crown className="h-3 w-3" /> {roleLabel(m.role)}
                       </span>
                     )}
                     <span>
@@ -233,7 +232,7 @@ function TeamPage({ me }: { me: WorshipAccount }) {
                   </div>
                 </div>
               </Link>
-              {isLeader && <LeaderMenu member={m} me={me} />}
+              {isHeadLeader && m.role !== "owner" && <LeaderMenu member={m} />}
             </div>
           ))}
         </div>

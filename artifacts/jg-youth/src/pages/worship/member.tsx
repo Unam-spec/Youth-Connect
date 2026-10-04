@@ -10,6 +10,7 @@ import { KeyBadge, SongFormDialog } from "@/components/worship/songs";
 import {
   initials,
   instrumentLabel,
+  roleLabel,
   worshipFetch,
   worshipKeys,
   worshipPost,
@@ -51,9 +52,9 @@ function MemberPage({ me, id }: { me: WorshipAccount; id: string }) {
             {member.full_name}
           </h1>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            {member.role === "leader" && (
+            {roleLabel(member.role) && (
               <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 font-semibold text-primary">
-                <Crown className="h-3 w-3" /> Leader
+                <Crown className="h-3 w-3" /> {roleLabel(member.role)}
               </span>
             )}
             {member.instruments.map((i) => (

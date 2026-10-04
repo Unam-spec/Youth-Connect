@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Clock, Loader2, Lock } from "lucide-react";
+import { ArrowLeft, BellRing, Clock, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,7 @@ import {
   type WorshipAccount,
   type WorshipSession,
 } from "@/lib/worship";
+import { enableWorshipPush } from "@/lib/worshipPush";
 import { InstrumentPicker } from "./ProfileDialog";
 import { signOutOfWorship, WorshipFrame, WorshipShell } from "./WorshipShell";
 
@@ -73,7 +74,9 @@ function JoinForm() {
     onSuccess: (r) => {
       setWorshipSession(r);
       queryClient.setQueryData(worshipKeys.me, r.account);
-      if (r.account.status === "approved") toast.success("Welcome! You're the first one here, so you're a leader.");
+      if (r.account.status === "approved") {
+        toast.success("Welcome! You're the first one here, so you're the head leader.");
+      }
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -170,9 +173,23 @@ function Waiting({ account }: { account: WorshipAccount }) {
           Thanks, {account.full_name.split(" ")[0]}!
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Your request is waiting for a worship leader to approve it. Check back soon.
+          Your request is waiting for a worship leader to accept it. We'll let you know when you're in.
         </p>
         <div className="mt-6 flex flex-col gap-2">
+          <Button
+            variant="outline"
+            onClick={async () => {
+              const r = await enableWorshipPush();
+              if (r === "subscribed") toast.success("We'll send a notification to this device when you're accepted.");
+              else if (r === "denied") toast.error("Notifications are blocked. Allow them in your browser settings.");
+              else if (r === "ios-needs-install")
+                toast.message("On iPhone, add this site to your Home Screen first, then turn notifications on.");
+              else toast.error("Couldn't turn on notifications on this device.");
+            }}
+          >
+            <BellRing className="mr-2 h-4 w-4" />
+            Notify me when I'm accepted
+          </Button>
           <Button onClick={() => me.refetch()} disabled={me.isFetching}>
             {me.isFetching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Check again

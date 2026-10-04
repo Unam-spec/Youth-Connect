@@ -561,16 +561,17 @@ export const kioskSettingsTable = pgTable("kiosk_settings", {
 
 // ── Worship Team (2026-10) ────────────────────────────────────────────────────
 // A separate membership from JG Youth: some worship team members aren't JG
-// Youth members, so none of these tables reference profiles. Two roles only
-// (leader / member); leaders approve join requests. Declined requests are
-// deleted, so status is just pending or approved.
+// Youth members, so none of these tables reference profiles. Roles mirror the
+// JG Youth leader system: one head leader ("owner", the first account) who
+// manages leaders, leaders who accept join requests, and members. Declined
+// requests are deleted, so status is just pending or approved.
 export const worshipAccountsTable = pgTable("worship_accounts", {
   id: uuid("id").primaryKey().defaultRandom(),
   full_name: text("full_name").notNull(),
   // Stored normalized (trimmed, lowercased) — unique per worship account.
   phone: text("phone").notNull().unique(),
   pin_hash: text("pin_hash").notNull(),
-  role: text("role").notNull().default("member"), // "leader" | "member"
+  role: text("role").notNull().default("member"), // "owner" (head leader) | "leader" | "member"
   status: text("status").notNull().default("pending"), // "pending" | "approved"
   instruments: text("instruments").array().notNull().default([]),
   vocal_range: text("vocal_range"),

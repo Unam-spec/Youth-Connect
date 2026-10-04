@@ -64,7 +64,7 @@ export async function notifySongAdded(
   });
 }
 
-/** Leaders hear about a new join request. */
+/** The head leader and leaders hear about a new join request. */
 export async function notifyJoinRequest(requester: { id: string; full_name: string }): Promise<void> {
   const leaders = await db
     .select({
@@ -72,12 +72,31 @@ export async function notifyJoinRequest(requester: { id: string; full_name: stri
       notifications_muted: worshipAccountsTable.notifications_muted,
     })
     .from(worshipAccountsTable)
-    .where(and(eq(worshipAccountsTable.status, "approved"), eq(worshipAccountsTable.role, "leader")));
+    .where(
+      and(
+        eq(worshipAccountsTable.status, "approved"),
+        inArray(worshipAccountsTable.role, ["owner", "leader"]),
+      ),
+    );
   await notify(leaders, {
     actorId: requester.id,
     type: "join_request",
     title: "Worship Team",
     message: `${requester.full_name} asked to join the worship team`,
+    url: "/worship",
+  });
+}
+
+/** Tells someone their join request was accepted. */
+export async function notifyAccepted(
+  member: { id: string; notifications_muted: boolean },
+  approver: { id: string; full_name: string },
+): Promise<void> {
+  await notify([member], {
+    actorId: approver.id,
+    type: "accepted",
+    title: "Worship Team",
+    message: `You're in! ${approver.full_name} accepted you onto the worship team 🎉`,
     url: "/worship",
   });
 }

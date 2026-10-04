@@ -1,10 +1,25 @@
 /**
  * Pure rules for the Worship Team area (no DB), so they're unit-testable.
- * Worship is its own membership: two roles (leader / member), leaders approve
- * join requests, and there must always be at least one leader.
+ * Worship is its own membership, with roles shaped like JG Youth's leader
+ * system:
+ *  - owner (head leader): the first account. The only one who can make or
+ *    unmake leaders, remove people, reset PINs and edit any song. Can't be
+ *    removed or demoted.
+ *  - leader: same view as everyone; their one extra responsibility is
+ *    accepting/declining join requests (and they're notified of them).
+ *  - member.
  */
 
-export type WorshipRole = "leader" | "member";
+export type WorshipRole = "owner" | "leader" | "member";
+
+/** Owner and leaders can accept/decline join requests. */
+export function canApprove(actor: { role: string }): boolean {
+  return actor.role === "owner" || actor.role === "leader";
+}
+
+export function isOwner(actor: { role: string }): boolean {
+  return actor.role === "owner";
+}
 
 export const INSTRUMENTS = [
   "vocals",
@@ -111,32 +126,27 @@ export function validateSongInput(body: Record<string, unknown>): Check<SongInpu
   };
 }
 
-/** Leaders can edit any song; members only the songs they added. */
+/** The head leader can edit any song; everyone else only the songs they added. */
 export function canEditSong(
   actor: { id: string; role: string },
   song: { created_by: string | null },
 ): boolean {
-  return actor.role === "leader" || song.created_by === actor.id;
+  return isOwner(actor) || song.created_by === actor.id;
 }
 
 /**
- * Whether a leader may remove someone or change their role, given how many
- * approved leaders there are. Blocks anything that would leave zero leaders.
+ * Whether the head leader may make `target` a leader/member or remove them.
+ * The head leader's own account is never changed or removed this way.
  */
-export function checkLeaderChange(
+export function checkMemberChange(
   target: { role: string; status: string },
   change: "remove" | "make_member" | "make_leader",
-  approvedLeaderCount: number,
 ): Check<null> {
-  if (change === "make_leader") {
-    if (target.status !== "approved") {
-      return { ok: false, error: "Approve this person before making them a leader." };
-    }
-    return { ok: true, value: null };
+  if (isOwner(target)) {
+    return { ok: false, error: "The head leader can't be changed or removed." };
   }
-  const losesLeader = target.role === "leader" && target.status === "approved";
-  if (losesLeader && approvedLeaderCount <= 1) {
-    return { ok: false, error: "The team needs at least one leader. Make someone else a leader first." };
+  if (change === "make_leader" && target.status !== "approved") {
+    return { ok: false, error: "Approve this person before making them a leader." };
   }
   return { ok: true, value: null };
 }

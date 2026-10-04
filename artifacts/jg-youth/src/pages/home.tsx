@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useGetDashboardKpis, getGetDashboardKpisQueryKey, useListEvents, getListEventsQueryKey } from "@workspace/api-client-react";
 import { format } from "date-fns";
-import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, KeyRound } from "lucide-react";
+import { Calendar as CalendarIcon, MapPin, Clock, UserPlus, LogIn, KeyRound, Music, ArrowRight, Lock } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Redirect } from "wouter";
 import { isEventVisibleTo } from "@/lib/eventVisibility";
@@ -73,6 +73,37 @@ function PublicHome() {
               </Button>
             </div>
           </div>
+        </section>
+
+        {/* Worship Team: its own members-only space, styled to match /worship */}
+        <section>
+          <button
+            type="button"
+            onClick={() => setLocation("/worship")}
+            className="group relative block w-full overflow-hidden rounded-2xl bg-[hsl(250,35%,8%)] p-6 text-left text-white shadow-lg transition-transform hover:-translate-y-0.5 sm:p-8"
+          >
+            <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-violet-500/30 blur-3xl" />
+            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-4">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-violet-500/25">
+                  <Music className="h-7 w-7 text-violet-300" />
+                </span>
+                <div>
+                  <p className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight sm:text-3xl">
+                    Worship Team
+                  </p>
+                  <p className="mt-1 flex items-center gap-1.5 text-sm text-white/65">
+                    <Lock className="h-3.5 w-3.5" />
+                    Your songs, keys and lyrics. Members only.
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-violet-400 px-6 text-base font-semibold text-[hsl(250,35%,8%)] transition-colors group-hover:bg-violet-300">
+                Enter
+                <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
+              </span>
+            </div>
+          </button>
         </section>
 
         {/* KPIs */}

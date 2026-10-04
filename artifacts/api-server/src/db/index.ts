@@ -383,6 +383,16 @@ CREATE TABLE IF NOT EXISTS "worship_push_subscriptions" (
   "auth" text NOT NULL,
   "created_at" timestamp with time zone NOT NULL DEFAULT now()
 );
+
+-- Head leader (2026-10): the first approved leader becomes the head leader
+-- ("owner") if there isn't one yet. A no-op once an owner exists.
+UPDATE "worship_accounts" SET "role" = 'owner'
+WHERE "id" = (
+  SELECT "id" FROM "worship_accounts"
+  WHERE "role" = 'leader' AND "status" = 'approved'
+  ORDER BY "created_at" LIMIT 1
+)
+AND NOT EXISTS (SELECT 1 FROM "worship_accounts" WHERE "role" = 'owner');
 `;
 
 export async function runMigrations() {

@@ -7,6 +7,7 @@ import {
   type WorshipAccount,
 } from "@workspace/db";
 import { isUuid, SESSION_TTL_MS } from "./sessions";
+import { canApprove, isOwner } from "./worshipRules";
 
 /**
  * Worship Team sessions. Completely separate from JG Youth logins: the token
@@ -59,10 +60,13 @@ async function accountForToken(token: string): Promise<WorshipAccount | null> {
 
 /**
  * Requires a worship session. By default the account must be approved;
- * `allowPending` lets a waiting join request read its own status. `leader`
- * restricts to worship leaders.
+ * `allowPending` lets a waiting join request read its own status.
+ * `approver` allows the head leader and leaders (accepting join requests);
+ * `owner` allows only the head leader.
  */
-export function requireWorship(opts: { allowPending?: boolean; leader?: boolean } = {}) {
+export function requireWorship(
+  opts: { allowPending?: boolean; approver?: boolean; owner?: boolean } = {},
+) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
       const token = worshipTokenFrom(req);
@@ -72,8 +76,11 @@ export function requireWorship(opts: { allowPending?: boolean; leader?: boolean 
       if (account.status !== "approved" && !opts.allowPending) {
         return res.status(403).json({ error: "A worship leader still needs to approve you." });
       }
-      if (opts.leader && account.role !== "leader") {
+      if (opts.approver && !canApprove(account)) {
         return res.status(403).json({ error: "Only worship leaders can do that." });
+      }
+      if (opts.owner && !isOwner(account)) {
+        return res.status(403).json({ error: "Only the head leader can do that." });
       }
       req.worshipAccount = account;
       req.worshipToken = token;

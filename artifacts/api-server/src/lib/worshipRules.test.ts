@@ -4,8 +4,9 @@ import {
   normalizeWorshipPhone,
   normalizeInstruments,
   validateSongInput,
+  canApprove,
   canEditSong,
-  checkLeaderChange,
+  checkMemberChange,
   LoginLimiter,
 } from "./worshipRules";
 
@@ -74,29 +75,38 @@ describe("validateSongInput", () => {
   });
 });
 
+describe("canApprove", () => {
+  it("lets the head leader and leaders accept requests, not members", () => {
+    expect(canApprove({ role: "owner" })).toBe(true);
+    expect(canApprove({ role: "leader" })).toBe(true);
+    expect(canApprove({ role: "member" })).toBe(false);
+  });
+});
+
 describe("canEditSong", () => {
-  it("lets leaders edit anything and members only their own", () => {
-    expect(canEditSong({ id: "a", role: "leader" }, { created_by: "b" })).toBe(true);
+  it("lets the head leader edit anything and others only their own", () => {
+    expect(canEditSong({ id: "a", role: "owner" }, { created_by: "b" })).toBe(true);
+    expect(canEditSong({ id: "a", role: "leader" }, { created_by: "b" })).toBe(false);
     expect(canEditSong({ id: "a", role: "member" }, { created_by: "a" })).toBe(true);
-    expect(canEditSong({ id: "a", role: "member" }, { created_by: "b" })).toBe(false);
     expect(canEditSong({ id: "a", role: "member" }, { created_by: null })).toBe(false);
   });
 });
 
-describe("checkLeaderChange", () => {
+describe("checkMemberChange", () => {
+  const owner = { role: "owner", status: "approved" };
   const leader = { role: "leader", status: "approved" };
   const member = { role: "member", status: "approved" };
-  it("blocks removing or demoting the last leader", () => {
-    expect(checkLeaderChange(leader, "remove", 1).ok).toBe(false);
-    expect(checkLeaderChange(leader, "make_member", 1).ok).toBe(false);
+  it("never changes or removes the head leader", () => {
+    expect(checkMemberChange(owner, "remove").ok).toBe(false);
+    expect(checkMemberChange(owner, "make_member").ok).toBe(false);
   });
-  it("allows it when another leader exists", () => {
-    expect(checkLeaderChange(leader, "make_member", 2).ok).toBe(true);
+  it("allows promoting, demoting and removing others", () => {
+    expect(checkMemberChange(member, "make_leader").ok).toBe(true);
+    expect(checkMemberChange(leader, "make_member").ok).toBe(true);
+    expect(checkMemberChange(leader, "remove").ok).toBe(true);
   });
-  it("allows removing members and promoting approved people", () => {
-    expect(checkLeaderChange(member, "remove", 1).ok).toBe(true);
-    expect(checkLeaderChange(member, "make_leader", 1).ok).toBe(true);
-    expect(checkLeaderChange({ role: "member", status: "pending" }, "make_leader", 1).ok).toBe(false);
+  it("only promotes approved people", () => {
+    expect(checkMemberChange({ role: "member", status: "pending" }, "make_leader").ok).toBe(false);
   });
 });
 

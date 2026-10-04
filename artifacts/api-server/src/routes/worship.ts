@@ -21,7 +21,8 @@ import {
 } from "../lib/worshipAuth";
 import {
   canEditSong,
-  checkLeaderChange,
+  checkMemberChange,
+  isOwner,
   LoginLimiter,
   normalizeInstruments,
   normalizeKey,
@@ -29,7 +30,7 @@ import {
   optionalText,
   validateSongInput,
 } from "../lib/worshipRules";
-import { inBackground, notifyJoinRequest, notifySongAdded } from "../lib/worshipNotify";
+import { inBackground, notifyAccepted, notifyJoinRequest, notifySongAdded } from "../lib/worshipNotify";
 
 /**
  * Worship Team API — its own membership, separate from JG Youth. Every route
@@ -38,9 +39,9 @@ import { inBackground, notifyJoinRequest, notifySongAdded } from "../lib/worship
 const router = Router();
 const loginLimiter = new LoginLimiter();
 
-// Serializes "first account becomes leader" and "keep at least one leader"
-// checks so two requests can't race past them.
-const LEADER_LOCK = sql`select pg_advisory_xact_lock(hashtext('worship_leaders'))`;
+// Serializes "first account becomes head leader" so two sign-ups can't both
+// claim it.
+const OWNER_LOCK = sql`select pg_advisory_xact_lock(hashtext('worship_owner'))`;
 
 function body(req: Request): Record<string, unknown> {
   return (req.body ?? {}) as Record<string, unknown>;
@@ -62,7 +63,7 @@ function ownAccount(a: WorshipAccount) {
 // ── Joining & signing in ──────────────────────────────────────────────────────
 
 // POST /worship/auth/join — public. Creates a join request (or, for the very
-// first person, an approved leader account) and signs the device in.
+// first person, the approved head leader account) and signs the device in.
 router.post("/worship/auth/join", async (req, res) => {
   try {
     const b = body(req);
@@ -79,16 +80,15 @@ router.post("/worship/auth/join", async (req, res) => {
 
     const pinHash = await bcrypt.hash(pin.value, 12);
     const account = await db.transaction(async (tx) => {
-      await tx.execute(LEADER_LOCK);
+      await tx.execute(OWNER_LOCK);
       const existing = await tx.query.worshipAccountsTable.findFirst({
         where: eq(worshipAccountsTable.phone, phone),
       });
       if (existing) return null;
-      const [{ leaders }] = await tx
-        .select({ leaders: count() })
-        .from(worshipAccountsTable)
-        .where(and(eq(worshipAccountsTable.role, "leader"), eq(worshipAccountsTable.status, "approved")));
-      const isFirst = leaders === 0;
+      const owner = await tx.query.worshipAccountsTable.findFirst({
+        where: eq(worshipAccountsTable.role, "owner"),
+      });
+      const isFirst = !owner;
       const [row] = await tx
         .insert(worshipAccountsTable)
         .values({
@@ -96,7 +96,7 @@ router.post("/worship/auth/join", async (req, res) => {
           phone,
           pin_hash: pinHash,
           instruments,
-          role: isFirst ? "leader" : "member",
+          role: isFirst ? "owner" : "member",
           status: isFirst ? "approved" : "pending",
           approved_at: isFirst ? new Date() : null,
         })
@@ -164,15 +164,10 @@ router.get("/worship/me", requireWorship({ allowPending: true }), (req, res) => 
 router.delete("/worship/me", requireWorship({ allowPending: true }), async (req, res) => {
   try {
     const account = me(req);
-    const result = await db.transaction(async (tx) => {
-      await tx.execute(LEADER_LOCK);
-      const leaders = await approvedLeaderCount(tx);
-      const check = checkLeaderChange(account, "remove", leaders);
-      if (!check.ok) return check;
-      await tx.delete(worshipAccountsTable).where(eq(worshipAccountsTable.id, account.id));
-      return check;
-    });
-    if (!result.ok) return res.status(400).json({ error: result.error });
+    if (isOwner(account)) {
+      return res.status(400).json({ error: "The head leader can't leave the team." });
+    }
+    await db.delete(worshipAccountsTable).where(eq(worshipAccountsTable.id, account.id));
     return res.json({ ok: true });
   } catch (err) {
     return fail(req, res, err);
@@ -240,16 +235,6 @@ router.post("/worship/me/pin", requireWorship(), async (req, res) => {
 
 // ── Team ──────────────────────────────────────────────────────────────────────
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-async function approvedLeaderCount(tx: Tx | typeof db): Promise<number> {
-  const [{ n }] = await tx
-    .select({ n: count() })
-    .from(worshipAccountsTable)
-    .where(and(eq(worshipAccountsTable.role, "leader"), eq(worshipAccountsTable.status, "approved")));
-  return n;
-}
-
 router.get("/worship/members", requireWorship(), async (req, res) => {
   try {
     const rows = await db
@@ -258,7 +243,11 @@ router.get("/worship/members", requireWorship(), async (req, res) => {
       .leftJoin(worshipMemberSongsTable, eq(worshipMemberSongsTable.account_id, worshipAccountsTable.id))
       .where(eq(worshipAccountsTable.status, "approved"))
       .groupBy(worshipAccountsTable.id)
-      .orderBy(desc(sql`${worshipAccountsTable.role} = 'leader'`), asc(worshipAccountsTable.full_name));
+      .orderBy(
+        desc(sql`${worshipAccountsTable.role} = 'owner'`),
+        desc(sql`${worshipAccountsTable.role} = 'leader'`),
+        asc(worshipAccountsTable.full_name),
+      );
     return res.json({
       members: rows.map((r) => ({ ...publicAccount(r.account), song_count: r.song_count })),
     });
@@ -297,9 +286,9 @@ router.get("/worship/members/:id", requireWorship(), async (req, res) => {
   }
 });
 
-// ── Leader: requests & roles ──────────────────────────────────────────────────
+// ── Join requests (head leader + leaders) ─────────────────────────────────────
 
-router.get("/worship/requests", requireWorship({ leader: true }), async (req, res) => {
+router.get("/worship/requests", requireWorship({ approver: true }), async (req, res) => {
   try {
     const rows = await db
       .select()
@@ -312,7 +301,7 @@ router.get("/worship/requests", requireWorship({ leader: true }), async (req, re
   }
 });
 
-router.post("/worship/requests/:id/approve", requireWorship({ leader: true }), async (req, res) => {
+router.post("/worship/requests/:id/approve", requireWorship({ approver: true }), async (req, res) => {
   try {
     const [updated] = await db
       .update(worshipAccountsTable)
@@ -325,6 +314,7 @@ router.post("/worship/requests/:id/approve", requireWorship({ leader: true }), a
       )
       .returning();
     if (!updated) return res.status(404).json({ error: "That request is no longer waiting." });
+    inBackground("accepted notify", notifyAccepted(updated, me(req)));
     return res.json({ member: publicAccount(updated) });
   } catch (err) {
     return fail(req, res, err);
@@ -332,7 +322,7 @@ router.post("/worship/requests/:id/approve", requireWorship({ leader: true }), a
 });
 
 // Declining deletes the request so the person can ask again later.
-router.post("/worship/requests/:id/decline", requireWorship({ leader: true }), async (req, res) => {
+router.post("/worship/requests/:id/decline", requireWorship({ approver: true }), async (req, res) => {
   try {
     const deleted = await db
       .delete(worshipAccountsTable)
@@ -350,67 +340,58 @@ router.post("/worship/requests/:id/decline", requireWorship({ leader: true }), a
   }
 });
 
-router.patch("/worship/members/:id/role", requireWorship({ leader: true }), async (req, res) => {
+// ── Head leader only: roles, removal, PIN resets ──────────────────────────────
+
+async function findAccount(id: string) {
+  return db.query.worshipAccountsTable.findFirst({ where: eq(worshipAccountsTable.id, id) });
+}
+
+router.patch("/worship/members/:id/role", requireWorship({ owner: true }), async (req, res) => {
   try {
     const role = body(req).role;
     if (role !== "leader" && role !== "member") return res.status(400).json({ error: "Invalid role." });
-    const result = await db.transaction(async (tx) => {
-      await tx.execute(LEADER_LOCK);
-      const target = await tx.query.worshipAccountsTable.findFirst({
-        where: eq(worshipAccountsTable.id, String(req.params.id)),
-      });
-      if (!target) return { status: 404, error: "Team member not found." } as const;
-      const check = checkLeaderChange(
-        target,
-        role === "leader" ? "make_leader" : "make_member",
-        await approvedLeaderCount(tx),
-      );
-      if (!check.ok) return { status: 400, error: check.error } as const;
-      const [updated] = await tx
-        .update(worshipAccountsTable)
-        .set({ role })
-        .where(eq(worshipAccountsTable.id, target.id))
-        .returning();
-      return { status: 200, member: publicAccount(updated) } as const;
-    });
-    if (result.status !== 200) return res.status(result.status).json({ error: result.error });
-    return res.json({ member: result.member });
+    const target = await findAccount(String(req.params.id));
+    if (!target) return res.status(404).json({ error: "Team member not found." });
+    const check = checkMemberChange(target, role === "leader" ? "make_leader" : "make_member");
+    if (!check.ok) return res.status(400).json({ error: check.error });
+    const [updated] = await db
+      .update(worshipAccountsTable)
+      .set({ role })
+      .where(eq(worshipAccountsTable.id, target.id))
+      .returning();
+    return res.json({ member: publicAccount(updated) });
   } catch (err) {
     return fail(req, res, err);
   }
 });
 
-router.delete("/worship/members/:id", requireWorship({ leader: true }), async (req, res) => {
+router.delete("/worship/members/:id", requireWorship({ owner: true }), async (req, res) => {
   try {
-    const result = await db.transaction(async (tx) => {
-      await tx.execute(LEADER_LOCK);
-      const target = await tx.query.worshipAccountsTable.findFirst({
-        where: eq(worshipAccountsTable.id, String(req.params.id)),
-      });
-      if (!target) return { status: 404, error: "Team member not found." } as const;
-      const check = checkLeaderChange(target, "remove", await approvedLeaderCount(tx));
-      if (!check.ok) return { status: 400, error: check.error } as const;
-      await tx.delete(worshipAccountsTable).where(eq(worshipAccountsTable.id, target.id));
-      return { status: 200 } as const;
-    });
-    if (result.status !== 200) return res.status(result.status).json({ error: result.error });
+    const target = await findAccount(String(req.params.id));
+    if (!target) return res.status(404).json({ error: "Team member not found." });
+    const check = checkMemberChange(target, "remove");
+    if (!check.ok) return res.status(400).json({ error: check.error });
+    await db.delete(worshipAccountsTable).where(eq(worshipAccountsTable.id, target.id));
     return res.json({ ok: true });
   } catch (err) {
     return fail(req, res, err);
   }
 });
 
-// Leader resets a forgotten PIN; the new PIN is returned once to hand over.
-router.post("/worship/members/:id/reset-pin", requireWorship({ leader: true }), async (req, res) => {
+// Head leader resets a forgotten PIN; the new PIN is returned once to hand over.
+router.post("/worship/members/:id/reset-pin", requireWorship({ owner: true }), async (req, res) => {
   try {
+    const target = await findAccount(String(req.params.id));
+    if (!target) return res.status(404).json({ error: "Team member not found." });
+    if (target.id === me(req).id) {
+      return res.status(400).json({ error: "Change your own PIN from your profile." });
+    }
     const pin = generatePin();
-    const [updated] = await db
+    await db
       .update(worshipAccountsTable)
       .set({ pin_hash: await bcrypt.hash(pin, 12) })
-      .where(eq(worshipAccountsTable.id, String(req.params.id)))
-      .returning({ id: worshipAccountsTable.id });
-    if (!updated) return res.status(404).json({ error: "Team member not found." });
-    await revokeAllWorshipSessions(updated.id);
+      .where(eq(worshipAccountsTable.id, target.id));
+    await revokeAllWorshipSessions(target.id);
     return res.json({ pin });
   } catch (err) {
     return fail(req, res, err);
@@ -519,7 +500,7 @@ router.patch("/worship/songs/:id", requireWorship(), async (req, res) => {
     });
     if (!song) return res.status(404).json({ error: "Song not found." });
     if (!canEditSong(me(req), song)) {
-      return res.status(403).json({ error: "Only the person who added this song or a leader can edit it." });
+      return res.status(403).json({ error: "Only the person who added this song or the head leader can edit it." });
     }
     const input = validateSongInput({ ...song, ...body(req) });
     if (!input.ok) return res.status(400).json({ error: input.error });
@@ -541,7 +522,7 @@ router.delete("/worship/songs/:id", requireWorship(), async (req, res) => {
     });
     if (!song) return res.status(404).json({ error: "Song not found." });
     if (!canEditSong(me(req), song)) {
-      return res.status(403).json({ error: "Only the person who added this song or a leader can delete it." });
+      return res.status(403).json({ error: "Only the person who added this song or the head leader can delete it." });
     }
     await db.delete(worshipSongsTable).where(eq(worshipSongsTable.id, song.id));
     return res.json({ ok: true });
@@ -655,7 +636,8 @@ router.post("/worship/notifications/read", requireWorship(), async (req, res) =>
 });
 
 // Worship devices live in their own table so only the team gets these pushes.
-router.post("/worship/push/subscribe", requireWorship(), async (req, res) => {
+// Pending requests can subscribe too, so they hear when they're accepted.
+router.post("/worship/push/subscribe", requireWorship({ allowPending: true }), async (req, res) => {
   try {
     const b = req.body as { endpoint?: unknown; keys?: { p256dh?: unknown; auth?: unknown } };
     if (

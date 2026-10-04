@@ -15,7 +15,7 @@ export interface WorshipSession {
 export interface WorshipAccount {
   id: string;
   full_name: string;
-  role: "leader" | "member";
+  role: "owner" | "leader" | "member";
   status: "pending" | "approved";
   instruments: string[];
   vocal_range: string | null;
@@ -170,6 +170,17 @@ export function useWorshipMe(
     staleTime: 30_000,
     ...opts,
   });
+}
+
+/** Head leader ("owner") and leaders can accept join requests. */
+export function canApprove(a: { role: string }): boolean {
+  return a.role === "owner" || a.role === "leader";
+}
+
+export function roleLabel(role: string): string | null {
+  if (role === "owner") return "Head leader";
+  if (role === "leader") return "Leader";
+  return null;
 }
 
 export function instrumentLabel(i: string): string {

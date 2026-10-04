@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import {
   clearWorshipSession,
   initials,
+  roleLabel,
   worshipFetch,
   worshipKeys,
   worshipPost,
@@ -192,7 +193,7 @@ export function WorshipShell({
               <DropdownMenuLabel className="font-normal">
                 <p className="text-sm font-semibold">{account.full_name}</p>
                 <p className="text-xs text-muted-foreground">
-                  {account.role === "leader" ? "Worship leader" : "Worship team"}
+                  {roleLabel(account.role) ?? "Worship team"}
                 </p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
