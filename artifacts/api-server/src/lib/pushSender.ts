@@ -43,9 +43,20 @@ interface SubscriptionRow {
   auth: string;
 }
 
-async function sendToSubscriptions(
+async function removeDeadProfileSubscriptions(ids: string[]): Promise<void> {
+  await db
+    .delete(pushSubscriptionsTable)
+    .where(inArray(pushSubscriptionsTable.id, ids));
+}
+
+/**
+ * Sends to the given devices. Expired ones are passed to `removeDead` so each
+ * caller cleans up its own table (JG Youth and Worship keep separate ones).
+ */
+export async function sendToSubscriptions(
   subs: SubscriptionRow[],
   payload: PushPayload,
+  removeDead: (ids: string[]) => Promise<void> = removeDeadProfileSubscriptions,
 ): Promise<number> {
   if (!ensureConfigured() || subs.length === 0) return 0;
   const body = JSON.stringify(payload);
@@ -75,9 +86,7 @@ async function sendToSubscriptions(
   );
 
   if (dead.length > 0) {
-    await db
-      .delete(pushSubscriptionsTable)
-      .where(inArray(pushSubscriptionsTable.id, dead));
+    await removeDead(dead);
     logger.info({ count: dead.length }, "[push] Removed expired subscriptions");
   }
   return sent;

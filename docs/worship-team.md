@@ -1,6 +1,8 @@
 # Worship Team feature — plan
 
-Branch: `feature/worship-team`. Right now only a "Coming soon" page exists at `/worship`.
+**Status:** steps 1–4 below are built: accounts, join requests and approvals, profiles, the song library, personal song lists, chord charts that change key, stage mode, and team-only notifications. Setlists are next.
+
+Code: `artifacts/api-server/src/routes/worship.ts` (API), `lib/worship*.ts` (auth, rules, notifications), `artifacts/jg-youth/src/pages/worship/` and `components/worship/` (screens). The tables are created when the server starts (`WORSHIP_SCHEMA` in `artifacts/api-server/src/db/index.ts`).
 
 ## Goal
 
@@ -50,8 +52,8 @@ There's no admin setup, just **leaders** and **members**. Leaders decide who joi
 
 ## Screens
 
-1. **`/worship`:** a sign-in page (phone + PIN), plus a "Request to join" option. After requesting, people see "Waiting for a leader to approve you".
-2. **`/worship/team`, the team page:** a grid of approved members (photo, name, role such as "Vocals" or "Keys", and a "Leader" badge), a bell icon for notifications, and a "My profile" button. Leaders also see join requests at the top, and a menu on each person with "Make leader" and "Remove".
+1. **`/worship`:** for signed-out people, a sign-in page (phone + PIN) plus a "Request to join" option. After requesting, people see "Waiting for a leader to approve you". For approved members it shows the team page.
+2. **The team page (`/worship`):** a grid of approved members (photo, name, role such as "Vocals" or "Keys", and a "Leader" badge), a bell icon for notifications, and a "My profile" button. Leaders also see join requests at the top, and a menu on each person with "Make leader" and "Remove".
 3. **`/worship/members/:id`, a member profile:** name, role(s) and vocal range, then their song list: each row shows the title, artist, *their* key as a badge, and tempo. On your own profile you get "Add song" and edit controls.
 4. **`/worship/songs/:id`, a song:** lyrics with chords above the lines. A key picker transposes the chords live, opening in the viewer's own saved key. Big-text "stage mode" for practice.
 5. **`/worship/library`, the shared library:** every song the team knows, searchable. "Add to my list" saves it with your own key and notifies the team.
@@ -61,12 +63,12 @@ There's no admin setup, just **leaders** and **members**. Leaders decide who joi
 
 All tables are separate from `profiles`. None have a foreign key to JG Youth tables.
 
-- `worship_accounts`: `id`, `full_name`, `phone` (unique), `pin_hash`, `photo_url`, `roles` (text[]: vocals, keys, guitar, bass, drums…), `vocal_range`, `bio`, `role` (leader / member), `status` (pending / approved / declined / removed), `notifications_muted`, timestamps
+- `worship_accounts`: `id`, `full_name`, `phone` (unique), `pin_hash`, `instruments` (text[]: vocals, keys, guitar, bass, drums…), `vocal_range`, `bio`, `role` (leader / member), `status` (pending / approved; declined or removed accounts are deleted), `notifications_muted`, timestamps
 - `worship_sessions`: one row per signed-in device (same pattern as the existing sessions table)
-- `worship_push_subscriptions`: `worship_account_id`, `endpoint` (unique), `p256dh`, `auth`
+- `worship_push_subscriptions`: `account_id`, `endpoint` (unique), `p256dh`, `auth`
 - `worship_notifications`: `id`, `recipient_id`, `actor_id`, `type` (song_added, join_request…), `song_id`, `read_at`, `created_at`, which feeds the in-app inbox
-- `songs`: `id`, `title`, `artist`, `original_key`, `tempo_bpm`, `lyrics_chordpro` (ChordPro text, so chords can be transposed), `created_by`
-- `member_songs`: `worship_account_id`, `song_id`, `preferred_key`, `notes`, unique on (member, song)
+- `worship_songs`: `id`, `title`, `artist`, `original_key`, `tempo_bpm`, `lyrics` (chords inline in brackets, e.g. `[G]Amazing [C]grace`, so they can be transposed), `created_by`
+- `worship_member_songs`: `account_id`, `song_id`, `preferred_key`, `notes`, unique on (member, song)
 - *(Phase 2)* `setlists`, `setlist_songs`
 
 Lyrics are stored once per song. Keys are stored per person.

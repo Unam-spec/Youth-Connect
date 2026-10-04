@@ -34,6 +34,9 @@ import SessionQr from "@/pages/session-qr";
 import QrResolver from "@/pages/qr-resolver";
 import Kiosk from "@/pages/kiosk";
 import Worship from "@/pages/worship";
+import WorshipMember from "@/pages/worship/member";
+import WorshipSong from "@/pages/worship/song";
+import WorshipLibrary from "@/pages/worship/library";
 
 const queryClient = new QueryClient();
 
@@ -239,6 +242,9 @@ function ClerkProviderWithRoutes() {
           <Route path="/my" component={MyDashboard} />
           <Route path="/become-member" component={BecomeMember} />
           <Route path="/worship" component={Worship} />
+          <Route path="/worship/library" component={WorshipLibrary} />
+          <Route path="/worship/members/:id" component={WorshipMember} />
+          <Route path="/worship/songs/:id" component={WorshipSong} />
           <Route path="/dashboard/analytics" component={Analytics} />
           <Route path="/dashboard/follow-ups" component={FollowUpHub} />
           <Route path="/dashboard/templates" component={Templates} />

@@ -319,6 +319,72 @@ CREATE TABLE IF NOT EXISTS "kiosk_settings" (
 );
 `;
 
+// Worship Team (2026-10): its own membership, separate from profiles. Run as
+// its own batch so a failure in an older patch above can't skip these tables.
+const WORSHIP_SCHEMA = `
+CREATE TABLE IF NOT EXISTS "worship_accounts" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "full_name" text NOT NULL,
+  "phone" text NOT NULL UNIQUE,
+  "pin_hash" text NOT NULL,
+  "role" text NOT NULL DEFAULT 'member',
+  "status" text NOT NULL DEFAULT 'pending',
+  "instruments" text[] NOT NULL DEFAULT '{}',
+  "vocal_range" text,
+  "bio" text,
+  "notifications_muted" boolean NOT NULL DEFAULT false,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "approved_at" timestamp with time zone
+);
+CREATE TABLE IF NOT EXISTS "worship_sessions" (
+  "token" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "account_id" uuid NOT NULL REFERENCES "worship_accounts"("id") ON DELETE CASCADE,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "expires_at" timestamp with time zone NOT NULL,
+  "user_agent" text
+);
+CREATE INDEX IF NOT EXISTS "worship_sessions_account_id_idx" ON "worship_sessions" ("account_id");
+CREATE TABLE IF NOT EXISTS "worship_songs" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "title" text NOT NULL,
+  "artist" text,
+  "original_key" text,
+  "tempo_bpm" integer,
+  "lyrics" text NOT NULL DEFAULT '',
+  "created_by" uuid REFERENCES "worship_accounts"("id") ON DELETE SET NULL,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS "worship_member_songs" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "account_id" uuid NOT NULL REFERENCES "worship_accounts"("id") ON DELETE CASCADE,
+  "song_id" uuid NOT NULL REFERENCES "worship_songs"("id") ON DELETE CASCADE,
+  "preferred_key" text,
+  "notes" text,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT "worship_member_songs_account_song_unique" UNIQUE ("account_id", "song_id")
+);
+CREATE TABLE IF NOT EXISTS "worship_notifications" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "recipient_id" uuid NOT NULL REFERENCES "worship_accounts"("id") ON DELETE CASCADE,
+  "actor_id" uuid REFERENCES "worship_accounts"("id") ON DELETE SET NULL,
+  "type" text NOT NULL,
+  "message" text NOT NULL,
+  "url" text NOT NULL,
+  "read_at" timestamp with time zone,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "worship_notifications_recipient_idx" ON "worship_notifications" ("recipient_id", "created_at" DESC);
+CREATE TABLE IF NOT EXISTS "worship_push_subscriptions" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "account_id" uuid NOT NULL REFERENCES "worship_accounts"("id") ON DELETE CASCADE,
+  "endpoint" text NOT NULL UNIQUE,
+  "p256dh" text NOT NULL,
+  "auth" text NOT NULL,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+`;
+
 export async function runMigrations() {
   if (!process.env.DATABASE_URL) {
     logger.warn("DATABASE_URL not set – skipping schema sync");
@@ -349,6 +415,13 @@ export async function runMigrations() {
     // Log but do NOT crash the server — some patches may fail if the table
     // itself doesn't exist yet (handled separately by existing migrations)
     logger.error({ err }, "Schema sync warning (non-fatal)");
+  }
+
+  try {
+    await client.query(WORSHIP_SCHEMA);
+    logger.info("Worship schema sync complete.");
+  } catch (err: any) {
+    logger.error({ err }, "Worship schema sync warning (non-fatal)");
   } finally {
     client.release();
     await pool.end();

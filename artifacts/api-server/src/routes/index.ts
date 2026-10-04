@@ -19,12 +19,15 @@ import birthdaysRouter from "./birthdays";
 import pushRouter from "./push";
 import kioskRouter from "./kiosk";
 import emailPrefsRouter from "./emailPrefs";
+import worshipRouter from "./worship";
 
 const router: IRouter = Router();
 
 // Public endpoint — must be mounted BEFORE any auth-gated routers
 router.use(registerRouter);
 router.use(pinAccountsRouter);
+// Worship Team: separate membership with its own x-worship-session auth.
+router.use(worshipRouter);
 
 router.use(healthRouter);
 router.use(profilesRouter);

@@ -181,6 +181,47 @@
   --shadow-2xl: 0px 2px 0px 0px hsl(40 16% 7% / 0.06);
 }
 
+/* Worship Team: its own dark violet look, applied to <html> only while on
+   /worship pages (so dialogs, which portal to <body>, match too). */
+.worship-theme {
+  --button-outline: rgba(255,255,255, .10);
+  --badge-outline: rgba(255,255,255, .08);
+  --elevate-1: rgba(255,255,255, .04);
+  --elevate-2: rgba(255,255,255, .08);
+  --background: 250 35% 8%;
+  --foreground: 0 0% 98%;
+  --border: 250 18% 20%;
+  --input: 250 18% 22%;
+  --ring: 262 83% 70%;
+  --card: 250 28% 12%;
+  --card-foreground: 0 0% 98%;
+  --card-border: 250 18% 20%;
+  --popover: 250 28% 12%;
+  --popover-foreground: 0 0% 98%;
+  --popover-border: 250 18% 20%;
+  --primary: 262 83% 68%;
+  --primary-foreground: 250 35% 8%;
+  --secondary: 250 20% 18%;
+  --secondary-foreground: 0 0% 98%;
+  --muted: 250 20% 16%;
+  --muted-foreground: 250 10% 68%;
+  --accent: 262 60% 24%;
+  --accent-foreground: 0 0% 98%;
+  --destructive: 0 72% 58%;
+  --destructive-foreground: 0 0% 100%;
+  color-scheme: dark;
+}
+
+/* Bare `border` utilities fall back to currentColor (white here); give them
+   the theme border colour. In the base layer so border-* utilities still win. */
+@layer base {
+  .worship-theme *,
+  .worship-theme ::before,
+  .worship-theme ::after {
+    border-color: hsl(var(--border));
+  }
+}
+
 @layer base {
   body {
     background-color: hsl(var(--background));

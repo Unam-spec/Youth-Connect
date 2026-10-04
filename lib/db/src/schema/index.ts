@@ -558,3 +558,123 @@ export const kioskSettingsTable = pgTable("kiosk_settings", {
     .defaultNow(),
 });
 
+
+// ── Worship Team (2026-10) ────────────────────────────────────────────────────
+// A separate membership from JG Youth: some worship team members aren't JG
+// Youth members, so none of these tables reference profiles. Two roles only
+// (leader / member); leaders approve join requests. Declined requests are
+// deleted, so status is just pending or approved.
+export const worshipAccountsTable = pgTable("worship_accounts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  full_name: text("full_name").notNull(),
+  // Stored normalized (trimmed, lowercased) — unique per worship account.
+  phone: text("phone").notNull().unique(),
+  pin_hash: text("pin_hash").notNull(),
+  role: text("role").notNull().default("member"), // "leader" | "member"
+  status: text("status").notNull().default("pending"), // "pending" | "approved"
+  instruments: text("instruments").array().notNull().default([]),
+  vocal_range: text("vocal_range"),
+  bio: text("bio"),
+  notifications_muted: boolean("notifications_muted").notNull().default(false),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  approved_at: timestamp("approved_at", { withTimezone: true }),
+});
+
+export type WorshipAccount = typeof worshipAccountsTable.$inferSelect;
+
+export const worshipSessionsTable = pgTable("worship_sessions", {
+  token: uuid("token").primaryKey().defaultRandom(),
+  account_id: uuid("account_id")
+    .notNull()
+    .references(() => worshipAccountsTable.id, { onDelete: "cascade" }),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  expires_at: timestamp("expires_at", { withTimezone: true }).notNull(),
+  user_agent: text("user_agent"),
+});
+
+// Shared song library. Lyrics are stored once per song with chords inline in
+// square brackets ("[G]Amazing [C]grace") so they can be transposed.
+export const worshipSongsTable = pgTable("worship_songs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  artist: text("artist"),
+  original_key: text("original_key"),
+  tempo_bpm: integer("tempo_bpm"),
+  lyrics: text("lyrics").notNull().default(""),
+  created_by: uuid("created_by").references(() => worshipAccountsTable.id, {
+    onDelete: "set null",
+  }),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export type WorshipSong = typeof worshipSongsTable.$inferSelect;
+
+// A person's song list: which library songs they lead/play, in their own key.
+export const worshipMemberSongsTable = pgTable(
+  "worship_member_songs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    account_id: uuid("account_id")
+      .notNull()
+      .references(() => worshipAccountsTable.id, { onDelete: "cascade" }),
+    song_id: uuid("song_id")
+      .notNull()
+      .references(() => worshipSongsTable.id, { onDelete: "cascade" }),
+    preferred_key: text("preferred_key"),
+    notes: text("notes"),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => ({
+    accountSongUnique: unique("worship_member_songs_account_song_unique").on(
+      t.account_id,
+      t.song_id,
+    ),
+  }),
+);
+
+// In-app inbox (the bell). One row per recipient.
+export const worshipNotificationsTable = pgTable("worship_notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  recipient_id: uuid("recipient_id")
+    .notNull()
+    .references(() => worshipAccountsTable.id, { onDelete: "cascade" }),
+  actor_id: uuid("actor_id").references(() => worshipAccountsTable.id, {
+    onDelete: "set null",
+  }),
+  type: text("type").notNull(), // "song_added" | "join_request"
+  message: text("message").notNull(),
+  url: text("url").notNull(),
+  read_at: timestamp("read_at", { withTimezone: true }),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+// Worship devices for push, kept apart from JG Youth's push_subscriptions so
+// only worship team members ever receive worship notifications.
+export const worshipPushSubscriptionsTable = pgTable(
+  "worship_push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    account_id: uuid("account_id")
+      .notNull()
+      .references(() => worshipAccountsTable.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    created_at: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+);
