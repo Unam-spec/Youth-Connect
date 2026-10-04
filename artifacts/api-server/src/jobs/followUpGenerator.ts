@@ -7,7 +7,11 @@
  * weeks absent, leaders/super admins on a stricter 1/2/4-week ladder.
  *
  * Messages are NOT sent automatically – leaders review & approve them in the
- * Follow-up Hub UI first.
+ * Follow-up Hub UI first. Leaders are pushed when there's messaging to do:
+ *   - when this week's follow-up list is made ("N people have been away")
+ *   - daily at 12:00 while follow-ups are still waiting to be sent
+ *   - an hour before check-in closes, to send ONE check-in reminder to the
+ *     group (replaces the old per-person check-in reminder queue)
  */
 import { eq, and, inArray, sql } from "drizzle-orm";
 import {
@@ -32,6 +36,13 @@ import {
   APP_URL,
 } from "../lib/followUpStages";
 import { logger } from "../lib/logger";
+import { dueNow } from "../lib/autoMessages";
+import {
+  PENDING_FOLLOWUPS_TIME,
+  checkinGroupNudgePayload,
+  newFollowUpsPayload,
+  pendingFollowUpsPayload,
+} from "../lib/leaderNudges";
 
 function firstName(name: string | null | undefined): string {
   return (name ?? "").trim().split(/\s+/)[0] ?? "";
@@ -62,93 +73,31 @@ function getSastNow(): { dayOfWeek: number; hhmm: string } {
 
 /** Has the cron already fired in the current window? Prevents duplicates. */
 let lastFiredDate: string | null = null;
-let lastCheckinFiredDate: string | null = null;
 // In-memory shortcut only — the real dedupe is the push_send_log DB unique.
 let lastCheckinPushDate: string | null = null;
 
-export async function generateCheckinReminders(): Promise<number> {
-  const today = new Date().toISOString().split("T")[0];
-
-  // Members who have opted into WhatsApp and have a phone number,
-  // but do NOT have an attendance record for today.
-  const overdueProfiles = await db
-    .select({
-      id: profilesTable.id,
-      full_name: profilesTable.full_name,
-      phone: profilesTable.phone,
-      role: profilesTable.role,
-    })
+/** Every JG Youth leader and super admin. */
+async function leaderIds(): Promise<string[]> {
+  const rows = await db
+    .select({ id: profilesTable.id })
     .from(profilesTable)
-    .leftJoin(
-      attendanceTable,
-      and(
-        eq(profilesTable.id, attendanceTable.profile_id),
-        eq(attendanceTable.session_date, today),
-      ),
-    )
-    .where(
-      and(
-        inArray(profilesTable.role, [
-          "member",
-          "visitor",
-          "leader",
-          "super_admin",
-        ]),
-        eq(profilesTable.whatsapp_opt_in, true),
-        sql`btrim(${profilesTable.phone}) <> ''`,
-        sql`${attendanceTable.id} IS NULL`, // No check-in today
-      ),
-    );
+    .where(inArray(profilesTable.role, ["leader", "super_admin"]));
+  return rows.map((r) => r.id);
+}
 
-  if (overdueProfiles.length === 0) return 0;
+/** SAST calendar date (YYYY-MM-DD). */
+function sastDate(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Johannesburg" }).format(new Date());
+}
 
-  // Check which profiles already have a check-in reminder (stage_weeks: 0) generated today
-  const existingPending = await db
-    .select({ profile_id: followUpQueueTable.profile_id })
-    .from(followUpQueueTable)
-    .where(
-      and(
-        eq(followUpQueueTable.stage_weeks, 0),
-        sql`${followUpQueueTable.created_at}::date = current_date`,
-      ),
-    );
-  
-  const existingSet = new Set(existingPending.map((e) => e.profile_id));
-
-  const inserts: {
-    profile_id: string;
-    stage_weeks: number;
-    weeks_absent: number;
-    message_preview: string;
-    template_id: string | null;
-    status: "pending";
-  }[] = [];
-
-  for (const row of overdueProfiles) {
-    if (existingSet.has(row.id)) continue;
-    
-    inserts.push({
-      profile_id: row.id,
-      stage_weeks: 0,
-      weeks_absent: 0,
-      message_preview: isStaffRole(row.role)
-        ? `Hi ${firstName(row.full_name)}, leaders check in too — don't forget to check in for JG Youth tonight!`
-        : `Hi ${firstName(row.full_name)}, don't forget to check in for JG Youth tonight!`,
-      template_id: null,
-      status: "pending",
-    });
-  }
-
-  if (inserts.length === 0) return 0;
-
-  await db.insert(followUpQueueTable).values(inserts);
-
-  logger.info(
-    { count: inserts.length },
-    "[followUpGenerator] Queued check-in reminders for leader review",
-  );
-
-  return inserts.length;
+/** Claims a once-a-day run in push_send_log; false if already done today. */
+async function claimDaily(kind: string, date: string): Promise<boolean> {
+  const claimed = await db
+    .insert(pushSendLogTable)
+    .values({ kind, sent_on: date })
+    .onConflictDoNothing()
+    .returning();
+  return claimed.length > 0;
 }
 
 export async function generateFollowUpQueue(): Promise<number> {
@@ -332,10 +281,15 @@ async function tick() {
         logger.info("[followUpGenerator] Follow-up automation window hit — generating queue…");
         const count = await generateFollowUpQueue();
         logger.info({ count }, "[followUpGenerator] Follow-up queue generation complete");
+        if (count > 0 && (await claimDaily("leader_followups_new", sastDate()))) {
+          const devices = await sendPushToProfiles(await leaderIds(), newFollowUpsPayload(count));
+          logger.info({ devices }, "[followUpGenerator] Leaders told about new follow-ups");
+        }
       }
     }
 
-    // --- 2. Check-in Reminders (1 hour before window closes) ---
+    // --- 2. One check-in reminder for the group (1 hour before window closes).
+    // Leaders get a push that opens the group message; no per-person queue.
     const activeWindow = await db
       .select()
       .from(checkinWindowsTable)
@@ -353,11 +307,12 @@ async function tick() {
       // Target time is exactly 1 hour (60 minutes) before the end time
       const targetTotal = endTotal - 60;
       
-      if (Math.abs(nowTotal - targetTotal) <= 2 && lastCheckinFiredDate !== today) {
-        lastCheckinFiredDate = today;
-        logger.info("[followUpGenerator] Check-in reminder window hit (-1h) — generating queue…");
-        const count = await generateCheckinReminders();
-        logger.info({ count }, "[followUpGenerator] Check-in reminders generation complete");
+      if (
+        Math.abs(nowTotal - targetTotal) <= 2 &&
+        (await claimDaily("leader_checkin_group", sastDate()))
+      ) {
+        const devices = await sendPushToProfiles(await leaderIds(), checkinGroupNudgePayload());
+        logger.info({ devices }, "[followUpGenerator] Leaders nudged to send the group check-in reminder");
       }
     }
 
@@ -393,6 +348,26 @@ async function tick() {
           logger.info("[followUpGenerator] Check-in window open — sending push…");
           const sent = await sendPushToProfiles("all", checkinOpenPayload());
           logger.info({ sent }, "[followUpGenerator] Check-in open push complete");
+        }
+      }
+    }
+
+    // --- 4. Daily: follow-up messages still waiting to be sent. Skipped on a
+    // day the "new follow-ups" push already went out.
+    if (dueNow(hhmm, PENDING_FOLLOWUPS_TIME)) {
+      const date = sastDate();
+      if (await claimDaily("leader_pending_followups", date)) {
+        const [{ n }] = await db
+          .select({ n: sql<number>`count(*)::int` })
+          .from(followUpQueueTable)
+          .where(and(eq(followUpQueueTable.status, "pending"), sql`${followUpQueueTable.stage_weeks} > 0`));
+        const alreadyToldToday = await db
+          .select({ kind: pushSendLogTable.kind })
+          .from(pushSendLogTable)
+          .where(and(eq(pushSendLogTable.kind, "leader_followups_new"), eq(pushSendLogTable.sent_on, date)));
+        if (n > 0 && alreadyToldToday.length === 0) {
+          const devices = await sendPushToProfiles(await leaderIds(), pendingFollowUpsPayload(n));
+          logger.info({ devices, pending: n }, "[followUpGenerator] Leaders reminded of waiting follow-ups");
         }
       }
     }

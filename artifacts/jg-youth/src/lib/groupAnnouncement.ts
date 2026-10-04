@@ -28,3 +28,23 @@ export function buildGroupAnnouncement(
     "Bring a friend — new faces welcome 🙌",
   ].join("\n");
 }
+
+/**
+ * The ONE check-in reminder a leader posts to the youth WhatsApp group (an
+ * hour before check-in closes) — replaces messaging people one by one.
+ */
+export function buildCheckinReminder(
+  windows: { day_of_week: number; start_time: string; end_time?: string; enabled: boolean }[],
+  appUrl: string,
+): string {
+  const today = new Date().getDay();
+  const w = windows.find((x) => x.enabled && x.day_of_week === today) ?? windows.find((x) => x.enabled);
+  const closes = w?.end_time ? ` Check-in closes at ${friendlyTime(w.end_time)}.` : "";
+  return [
+    `⏰ *Don't forget to check in at JG Youth tonight!*${closes}`,
+    "",
+    `Tap to check in 👉 ${appUrl}/checkin`,
+    "",
+    "Keep your streak going 🔥",
+  ].join("\n");
+}

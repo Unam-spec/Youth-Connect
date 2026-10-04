@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Redirect } from "wouter";
+import { Redirect, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -18,11 +18,13 @@ import {
   CheckCircle,
   CalendarDays,
   BellRing,
+  MessageCircle,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard-layout";
 import { getLeaderSession } from "@/lib/auth";
 import { useApiFetch } from "@/lib/api";
 import { openWhatsApp } from "@/lib/whatsapp";
+import { buildCheckinReminder } from "@/lib/groupAnnouncement";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -86,9 +88,60 @@ const ROLE_BADGES: Record<string, { label: string; className: string }> = {
 };
 
 
+/**
+ * The one check-in reminder for the youth WhatsApp group. Leaders get a push
+ * an hour before check-in closes that lands here (?send=checkin).
+ */
+function CheckinGroupMessage({ highlight }: { highlight: boolean }) {
+  const { data: windows = [] } = useQuery({
+    queryKey: ["checkin-schedule-windows"],
+    queryFn: async () => {
+      // Public endpoint: no sign-in needed.
+      const res = await fetch("/api/checkin/schedule");
+      if (!res.ok) return [];
+      return (
+        ((await res.json()) as {
+          windows?: { day_of_week: number; start_time: string; end_time?: string; enabled: boolean }[];
+        }).windows ?? []
+      );
+    },
+  });
+  const message = buildCheckinReminder(windows, window.location.origin);
+  const send = () => {
+    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    const opened = window.open(url, "_blank");
+    if (!opened) window.location.href = url;
+  };
+  return (
+    <div
+      className={`rounded-2xl border p-5 transition-shadow ${
+        highlight ? "border-primary ring-4 ring-primary/20" : "border-border"
+      } bg-card`}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-lg font-semibold">Check-in reminder</h2>
+          <p className="text-sm text-muted-foreground">
+            One message for the whole youth WhatsApp group. Send it about an hour before check-in closes — you'll get a
+            notification when it's time.
+          </p>
+        </div>
+        <Button className="shrink-0 gap-1.5" onClick={send}>
+          <MessageCircle className="h-4 w-4" /> Send to group
+        </Button>
+      </div>
+      <pre className="mt-4 whitespace-pre-wrap rounded-xl bg-muted/50 p-3 font-[family-name:var(--app-font-sans)] text-sm">
+        {message}
+      </pre>
+    </div>
+  );
+}
+
 export default function FollowUpHub() {
   const session = getLeaderSession();
   const apiFetch = useApiFetch();
+  // The "check-in closes in an hour" push opens /dashboard/follow-ups?send=checkin.
+  const highlightCheckin = new URLSearchParams(useSearch()).get("send") === "checkin";
   const queryClient = useQueryClient();
   const [showSettings, setShowSettings] = useState(false);
   const [selectedEventId, setSelectedEventId] = useState<string>("");
@@ -264,10 +317,11 @@ export default function FollowUpHub() {
 
           {/* ── Tab 1: Re-engagement ─────────────────────────────────────────── */}
           <TabsContent value="re-engagement" className="space-y-6 outline-none">
+            <CheckinGroupMessage highlight={highlightCheckin} />
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Follow-ups & Reminders</h2>
-                <p className="text-sm text-muted-foreground">Generated queue of members absent 2+ weeks and leaders/admins absent 1+ week, plus check-in reminders.</p>
+                <p className="text-sm text-muted-foreground">Generated queue of members absent 2+ weeks and leaders/admins absent 1+ week.</p>
               </div>
               <div className="flex gap-2 shrink-0">
                 <Button

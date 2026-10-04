@@ -305,6 +305,10 @@ CREATE TABLE IF NOT EXISTS "auto_message_log" (
   CONSTRAINT "auto_message_log_once" UNIQUE ("profile_id", "kind", "stage", "anchor")
 );
 
+-- One group check-in message (2026-10) replaced per-person check-in
+-- reminders (stage 0); clear any still waiting in the queue.
+UPDATE "follow_up_queue" SET "status" = 'rejected' WHERE "stage_weeks" = 0 AND "status" = 'pending';
+
 -- 24h cap for leader "Notify members" event pushes.
 ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "last_notified_at" timestamp with time zone;
 
