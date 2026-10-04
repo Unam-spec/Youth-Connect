@@ -1,4 +1,4 @@
-import { SESSION_TTL_MS } from "./auth";
+import { rollStoredExpiry, SESSION_TTL_MS } from "./auth";
 
 export interface PinSession {
   role: "visitor" | "member";
@@ -24,7 +24,7 @@ export function getPinSession(): PinSession | null {
       localStorage.removeItem("jg_pin_session");
       return null;
     }
-    return session;
+    return rollStoredExpiry("jg_pin_session", session);
   } catch {
     return null;
   }

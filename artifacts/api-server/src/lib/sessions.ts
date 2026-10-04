@@ -5,10 +5,29 @@ import { db, authSessionsTable, profilesTable } from "@workspace/db";
  * Login sessions for PIN leaders and username+PIN accounts.
  *
  * Each login gets its own row in auth_sessions, so signing in on a phone no
- * longer logs you out on the laptop. Sessions last 30 days; the expiry is
- * enforced here on the server, not trusted from the client.
+ * longer logs you out on the laptop. Sessions roll: they expire after 30 days
+ * of *not* using the app, because every use pushes the expiry forward (at
+ * most once a day). The expiry is enforced here on the server, not trusted
+ * from the client.
  */
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+/** How often a used session's expiry is pushed forward. */
+const SESSION_EXTEND_EVERY_MS = 24 * 60 * 60 * 1000; // 1 day
+
+/**
+ * Whether a still-valid session should be extended to now + 30 days. True
+ * once it's been extended more than a day ago, so active people never hit
+ * the 30-day cutoff while the DB sees at most one write per device per day.
+ */
+export function shouldExtendSession(expiresAt: Date, now = Date.now()): boolean {
+  return expiresAt.getTime() - now < SESSION_TTL_MS - SESSION_EXTEND_EVERY_MS;
+}
+
+/** The new expiry for a session that's just been used. */
+export function extendedExpiry(now = Date.now()): Date {
+  return new Date(now + SESSION_TTL_MS);
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

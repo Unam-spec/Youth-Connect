@@ -1,5 +1,26 @@
-/** Sessions last 30 days (server-enforced in api-server lib/sessions.ts). */
+/**
+ * Sessions last 30 days since you last used the app (server-enforced and
+ * rolled forward in api-server lib/sessions.ts).
+ */
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const ROLL_EVERY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Keeps a stored login's local expiry in step with the server's rolling one:
+ * at most once a day, push it to now + 30 days. The server still decides if
+ * the session is valid; this only stops the app discarding a live login.
+ */
+export function rollStoredExpiry<T extends { expires_at: number }>(key: string, session: T): T {
+  const now = Date.now();
+  if (session.expires_at - now >= SESSION_TTL_MS - ROLL_EVERY_MS) return session;
+  const rolled = { ...session, expires_at: now + SESSION_TTL_MS };
+  try {
+    localStorage.setItem(key, JSON.stringify(rolled));
+  } catch {
+    /* storage blocked — keep using the in-memory copy */
+  }
+  return rolled;
+}
 
 export interface LeaderSession {
   role: "super_admin" | "leader";
@@ -36,7 +57,7 @@ export function getLeaderSession(): LeaderSession | null {
       localStorage.removeItem("jg_leader_session");
       return null;
     }
-    return session;
+    return rollStoredExpiry("jg_leader_session", session);
   } catch {
     return null;
   }

@@ -6,7 +6,7 @@ import {
   worshipSessionsTable,
   type WorshipAccount,
 } from "@workspace/db";
-import { isUuid, SESSION_TTL_MS } from "./sessions";
+import { extendedExpiry, isUuid, SESSION_TTL_MS, shouldExtendSession } from "./sessions";
 import { canApprove, isOwner } from "./worshipRules";
 
 /**
@@ -46,16 +46,24 @@ export function worshipTokenFrom(req: Request): string | null {
   return typeof raw === "string" && isUuid(raw) ? raw : null;
 }
 
+/** Looks up a live session's account, rolling its 30-day expiry forward. */
 async function accountForToken(token: string): Promise<WorshipAccount | null> {
   const [row] = await db
-    .select({ account: worshipAccountsTable })
+    .select({ account: worshipAccountsTable, expires_at: worshipSessionsTable.expires_at })
     .from(worshipSessionsTable)
     .innerJoin(worshipAccountsTable, eq(worshipSessionsTable.account_id, worshipAccountsTable.id))
     .where(
       and(eq(worshipSessionsTable.token, token), gt(worshipSessionsTable.expires_at, new Date())),
     )
     .limit(1);
-  return row?.account ?? null;
+  if (!row) return null;
+  if (shouldExtendSession(row.expires_at)) {
+    await db
+      .update(worshipSessionsTable)
+      .set({ expires_at: extendedExpiry() })
+      .where(eq(worshipSessionsTable.token, token));
+  }
+  return row.account;
 }
 
 /**

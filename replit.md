@@ -44,7 +44,7 @@ A full-stack church youth registration and attendance tracking web app for Jerem
 ## Architecture decisions
 
 - PIN-based auth for leaders alongside Clerk (leaders may not have Clerk accounts)
-- Leader PIN session stored in localStorage with 8h expiry
+- PIN and worship logins last 30 days since last use (rolling; server-enforced in api-server lib/sessions.ts)
 - QR codes are slugs in DB, evergreen (regeneratable) via /api/qrcodes/regenerate
 - Role stored in `profiles` table, not in Clerk (Clerk is identity only)
 - All public pages (landing, register, checkin) are accessible without auth

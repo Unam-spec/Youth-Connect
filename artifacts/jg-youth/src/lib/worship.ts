@@ -4,6 +4,7 @@
  * its own `x-worship-session` header — never Clerk or the leader/PIN session.
  */
 import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import { rollStoredExpiry } from "./auth";
 
 const STORAGE_KEY = "jg_worship_session";
 
@@ -85,7 +86,7 @@ export function getWorshipSession(): WorshipSession | null {
       localStorage.removeItem(STORAGE_KEY);
       return null;
     }
-    return s;
+    return rollStoredExpiry(STORAGE_KEY, s);
   } catch {
     return null;
   }
