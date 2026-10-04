@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Crown, KeyRound, MoreVertical, UserMinus, UserPlus, X } from "lucide-react";
+import { Check, Crown, KeyRound, MoreVertical, Send, UserMinus, UserPlus, X } from "lucide-react";
+import { InviteDialog } from "@/components/worship/InviteDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -188,10 +189,25 @@ function TeamPage({ me }: { me: WorshipAccount }) {
     queryFn: () => worshipFetch<{ members: WorshipAccount[] }>("/members"),
   });
   const isHeadLeader = me.role === "owner";
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   return (
     <div>
       {canApprove(me) && <JoinRequests />}
+      <button
+        type="button"
+        onClick={() => setInviteOpen(true)}
+        className="mb-6 flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/10 p-4 text-left transition-colors hover:bg-primary/15"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/20">
+          <Send className="h-5 w-5 text-primary" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Invite someone to the team</span>
+          <span className="block text-xs text-muted-foreground">Send the join link on WhatsApp to anyone on the youth worship team.</span>
+        </span>
+      </button>
+      <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
       <div className="mb-4 flex items-baseline justify-between">
         <h1 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">The team</h1>
         {data && (

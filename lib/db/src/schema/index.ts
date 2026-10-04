@@ -679,3 +679,36 @@ export const worshipPushSubscriptionsTable = pgTable(
       .defaultNow(),
   },
 );
+
+// Sunday setlists (2026-10): a date plus ordered songs, each with who leads it
+// and the key it's played in. Built by the head leader and leaders.
+export const worshipSetlistsTable = pgTable("worship_setlists", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  service_date: date("service_date").notNull(),
+  title: text("title"),
+  notes: text("notes"),
+  created_by: uuid("created_by").references(() => worshipAccountsTable.id, {
+    onDelete: "set null",
+  }),
+  created_at: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const worshipSetlistSongsTable = pgTable("worship_setlist_songs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  setlist_id: uuid("setlist_id")
+    .notNull()
+    .references(() => worshipSetlistsTable.id, { onDelete: "cascade" }),
+  song_id: uuid("song_id")
+    .notNull()
+    .references(() => worshipSongsTable.id, { onDelete: "cascade" }),
+  lead_id: uuid("lead_id").references(() => worshipAccountsTable.id, {
+    onDelete: "set null",
+  }),
+  song_key: text("song_key"),
+  position: integer("position").notNull(),
+});

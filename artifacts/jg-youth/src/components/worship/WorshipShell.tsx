@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
-import { Bell, BellRing, ListMusic, LogOut, Music, Settings, User, Users } from "lucide-react";
+import { Bell, BellRing, CalendarDays, ListMusic, LogOut, Music, Settings, User, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
@@ -26,6 +26,7 @@ import {
   type WorshipNotification,
 } from "@/lib/worship";
 import { enableWorshipPush } from "@/lib/worshipPush";
+import { InviteDialog } from "./InviteDialog";
 import { ProfileDialog } from "./ProfileDialog";
 
 /** Applies the worship colour theme to <html> while mounted (dialogs portal to body). */
@@ -162,6 +163,7 @@ export function WorshipShell({
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const nav = [
     { href: "/worship", label: "Team", icon: Users, active: location === "/worship" },
@@ -170,6 +172,12 @@ export function WorshipShell({
       label: "Songs",
       icon: ListMusic,
       active: location.startsWith("/worship/library") || location.startsWith("/worship/songs"),
+    },
+    {
+      href: "/worship/setlists",
+      label: "Setlists",
+      icon: CalendarDays,
+      active: location.startsWith("/worship/setlists"),
     },
     {
       href: `/worship/members/${account.id}`,
@@ -183,6 +191,9 @@ export function WorshipShell({
     <WorshipFrame
       right={
         <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" aria-label="Invite someone" onClick={() => setInviteOpen(true)}>
+            <UserPlus className="h-5 w-5" />
+          </Button>
           <NotificationsBell />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -203,6 +214,9 @@ export function WorshipShell({
               <DropdownMenuItem onSelect={() => setProfileOpen(true)}>
                 <Settings className="mr-2 h-4 w-4" /> Edit profile
               </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setInviteOpen(true)}>
+                <UserPlus className="mr-2 h-4 w-4" /> Invite someone
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onSelect={() => {
                   signOutOfWorship(queryClient);
@@ -222,19 +236,20 @@ export function WorshipShell({
             key={href}
             href={href}
             className={cn(
-              "flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors",
+              "flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-sm font-medium transition-colors sm:px-4",
               active
                 ? "border-primary/40 bg-primary/15 text-primary"
                 : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            <Icon className="h-4 w-4" />
+            <Icon className="hidden h-4 w-4 sm:block" />
             {label}
           </Link>
         ))}
       </nav>
       {children}
       <ProfileDialog account={account} open={profileOpen} onOpenChange={setProfileOpen} />
+      <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
     </WorshipFrame>
   );
 }

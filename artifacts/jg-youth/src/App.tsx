@@ -38,6 +38,8 @@ import Worship from "@/pages/worship";
 import WorshipMember from "@/pages/worship/member";
 import WorshipSong from "@/pages/worship/song";
 import WorshipLibrary from "@/pages/worship/library";
+import WorshipSetlists from "@/pages/worship/setlists";
+import WorshipSetlist from "@/pages/worship/setlist";
 
 const queryClient = new QueryClient();
 
@@ -247,6 +249,8 @@ function ClerkProviderWithRoutes() {
           <Route path="/worship/library" component={WorshipLibrary} />
           <Route path="/worship/members/:id" component={WorshipMember} />
           <Route path="/worship/songs/:id" component={WorshipSong} />
+          <Route path="/worship/setlists" component={WorshipSetlists} />
+          <Route path="/worship/setlists/:id" component={WorshipSetlist} />
           <Route path="/dashboard/analytics" component={Analytics} />
           <Route path="/dashboard/follow-ups" component={FollowUpHub} />
           <Route path="/dashboard/templates" component={Templates} />

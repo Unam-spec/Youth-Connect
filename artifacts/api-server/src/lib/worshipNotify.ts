@@ -101,6 +101,33 @@ export async function notifyAccepted(
   });
 }
 
+/** Everyone else on the team hears that a setlist was posted. */
+export async function notifySetlistPosted(
+  actor: { id: string; full_name: string },
+  setlist: { id: string; service_date: string },
+): Promise<void> {
+  const recipients = await db
+    .select({
+      id: worshipAccountsTable.id,
+      notifications_muted: worshipAccountsTable.notifications_muted,
+    })
+    .from(worshipAccountsTable)
+    .where(and(eq(worshipAccountsTable.status, "approved"), ne(worshipAccountsTable.id, actor.id)));
+  const [y, m, d] = setlist.service_date.split("-").map(Number);
+  const day = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][
+    new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  ];
+  const month = new Date(Date.UTC(y, m - 1, d)).toLocaleString("en-GB", { month: "long", timeZone: "UTC" });
+  const when = `${day} ${d} ${month}`;
+  await notify(recipients, {
+    actorId: actor.id,
+    type: "setlist_posted",
+    title: "Worship Team",
+    message: `${actor.full_name} posted the setlist for ${when} 🎶`,
+    url: `/worship/setlists/${setlist.id}`,
+  });
+}
+
 /** Fire-and-forget wrapper so a slow push never delays the API response. */
 export function inBackground(label: string, work: Promise<void>): void {
   work.catch((err) => logger.error({ err }, `[worship] ${label} failed`));

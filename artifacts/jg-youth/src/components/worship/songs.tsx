@@ -24,12 +24,14 @@ export function KeySelect({
   onChange,
   id,
   allowNone = true,
+  noneLabel = "No key",
   className,
 }: {
   value: string | null;
   onChange: (v: string | null) => void;
   id?: string;
   allowNone?: boolean;
+  noneLabel?: string;
   className?: string;
 }) {
   return (
@@ -42,7 +44,7 @@ export function KeySelect({
         className,
       )}
     >
-      {allowNone && <option value="">No key</option>}
+      {allowNone && <option value="">{noneLabel}</option>}
       <optgroup label="Major">
         {KEYS.map((k) => (
           <option key={k} value={k}>

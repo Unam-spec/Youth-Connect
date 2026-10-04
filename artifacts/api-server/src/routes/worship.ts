@@ -7,6 +7,8 @@ import {
   worshipMemberSongsTable,
   worshipNotificationsTable,
   worshipPushSubscriptionsTable,
+  worshipSetlistSongsTable,
+  worshipSetlistsTable,
   worshipSongsTable,
   type WorshipAccount,
 } from "@workspace/db";
@@ -20,6 +22,7 @@ import {
   revokeWorshipSession,
 } from "../lib/worshipAuth";
 import {
+  canApprove,
   canEditSong,
   checkMemberChange,
   isOwner,
@@ -28,9 +31,17 @@ import {
   normalizeKey,
   normalizeWorshipPhone,
   optionalText,
+  validateSetlistInput,
   validateSongInput,
+  type SetlistInput,
 } from "../lib/worshipRules";
-import { inBackground, notifyAccepted, notifyJoinRequest, notifySongAdded } from "../lib/worshipNotify";
+import {
+  inBackground,
+  notifyAccepted,
+  notifyJoinRequest,
+  notifySetlistPosted,
+  notifySongAdded,
+} from "../lib/worshipNotify";
 
 /**
  * Worship Team API — its own membership, separate from JG Youth. Every route
@@ -587,6 +598,153 @@ router.delete("/worship/me/songs/:songId", requireWorship(), async (req, res) =>
           eq(worshipMemberSongsTable.song_id, String(req.params.songId)),
         ),
       );
+    return res.json({ ok: true });
+  } catch (err) {
+    return fail(req, res, err);
+  }
+});
+
+// ── Sunday setlists (everyone views; head leader + leaders build) ─────────────
+
+router.get("/worship/setlists", requireWorship(), async (req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: worshipSetlistsTable.id,
+        service_date: worshipSetlistsTable.service_date,
+        title: worshipSetlistsTable.title,
+        song_count: sql<number>`(select count(*)::int from ${worshipSetlistSongsTable} where ${worshipSetlistSongsTable.setlist_id} = ${worshipSetlistsTable.id})`,
+      })
+      .from(worshipSetlistsTable)
+      .orderBy(desc(worshipSetlistsTable.service_date), desc(worshipSetlistsTable.created_at))
+      .limit(60);
+    return res.json({ setlists: rows });
+  } catch (err) {
+    return fail(req, res, err);
+  }
+});
+
+async function loadSetlist(id: string) {
+  const setlist = await db.query.worshipSetlistsTable.findFirst({
+    where: eq(worshipSetlistsTable.id, id),
+  });
+  if (!setlist) return null;
+  const songs = await db
+    .select({
+      song_id: worshipSongsTable.id,
+      title: worshipSongsTable.title,
+      artist: worshipSongsTable.artist,
+      original_key: worshipSongsTable.original_key,
+      tempo_bpm: worshipSongsTable.tempo_bpm,
+      song_key: worshipSetlistSongsTable.song_key,
+      lead_id: worshipSetlistSongsTable.lead_id,
+      lead_name: worshipAccountsTable.full_name,
+    })
+    .from(worshipSetlistSongsTable)
+    .innerJoin(worshipSongsTable, eq(worshipSetlistSongsTable.song_id, worshipSongsTable.id))
+    .leftJoin(worshipAccountsTable, eq(worshipSetlistSongsTable.lead_id, worshipAccountsTable.id))
+    .where(eq(worshipSetlistSongsTable.setlist_id, id))
+    .orderBy(asc(worshipSetlistSongsTable.position));
+  return { setlist, songs };
+}
+
+router.get("/worship/setlists/:id", requireWorship(), async (req, res) => {
+  try {
+    const data = await loadSetlist(String(req.params.id));
+    if (!data) return res.status(404).json({ error: "Setlist not found." });
+    return res.json({ ...data, can_edit: canApprove(me(req)) });
+  } catch (err) {
+    return fail(req, res, err);
+  }
+});
+
+/**
+ * Writes a setlist's songs. A song without a key gets its leader's own key
+ * for it (from their song list), else the song's original key.
+ */
+async function writeSetlistSongs(tx: Tx, setlistId: string, songs: SetlistInput["songs"]) {
+  await tx.delete(worshipSetlistSongsTable).where(eq(worshipSetlistSongsTable.setlist_id, setlistId));
+  const rows = [];
+  for (const [i, s] of songs.entries()) {
+    const song = await tx.query.worshipSongsTable.findFirst({ where: eq(worshipSongsTable.id, s.song_id) });
+    if (!song) throw new SetlistError("One of the songs is no longer in the library.");
+    if (s.lead_id) {
+      const lead = await tx.query.worshipAccountsTable.findFirst({
+        where: and(eq(worshipAccountsTable.id, s.lead_id), eq(worshipAccountsTable.status, "approved")),
+      });
+      if (!lead) throw new SetlistError("One of the song leaders isn't on the team.");
+    }
+    let key = s.song_key;
+    if (!key && s.lead_id) {
+      const theirs = await tx.query.worshipMemberSongsTable.findFirst({
+        where: and(
+          eq(worshipMemberSongsTable.account_id, s.lead_id),
+          eq(worshipMemberSongsTable.song_id, s.song_id),
+        ),
+      });
+      key = theirs?.preferred_key ?? null;
+    }
+    rows.push({
+      setlist_id: setlistId,
+      song_id: s.song_id,
+      lead_id: s.lead_id,
+      song_key: key ?? song.original_key,
+      position: i,
+    });
+  }
+  await tx.insert(worshipSetlistSongsTable).values(rows);
+}
+
+class SetlistError extends Error {}
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+router.post("/worship/setlists", requireWorship({ approver: true }), async (req, res) => {
+  try {
+    const input = validateSetlistInput(body(req));
+    if (!input.ok) return res.status(400).json({ error: input.error });
+    const { songs, ...fields } = input.value;
+    const created = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .insert(worshipSetlistsTable)
+        .values({ ...fields, created_by: me(req).id })
+        .returning();
+      await writeSetlistSongs(tx, row.id, songs);
+      return row;
+    });
+    inBackground("setlist notify", notifySetlistPosted(me(req), created));
+    return res.status(201).json({ setlist: created });
+  } catch (err) {
+    if (err instanceof SetlistError) return res.status(400).json({ error: err.message });
+    return fail(req, res, err);
+  }
+});
+
+router.put("/worship/setlists/:id", requireWorship({ approver: true }), async (req, res) => {
+  try {
+    const input = validateSetlistInput(body(req));
+    if (!input.ok) return res.status(400).json({ error: input.error });
+    const { songs, ...fields } = input.value;
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(worshipSetlistsTable)
+        .set({ ...fields, updated_at: new Date() })
+        .where(eq(worshipSetlistsTable.id, String(req.params.id)))
+        .returning();
+      if (!row) return null;
+      await writeSetlistSongs(tx, row.id, songs);
+      return row;
+    });
+    if (!updated) return res.status(404).json({ error: "Setlist not found." });
+    return res.json({ setlist: updated });
+  } catch (err) {
+    if (err instanceof SetlistError) return res.status(400).json({ error: err.message });
+    return fail(req, res, err);
+  }
+});
+
+router.delete("/worship/setlists/:id", requireWorship({ approver: true }), async (req, res) => {
+  try {
+    await db.delete(worshipSetlistsTable).where(eq(worshipSetlistsTable.id, String(req.params.id)));
     return res.json({ ok: true });
   } catch (err) {
     return fail(req, res, err);

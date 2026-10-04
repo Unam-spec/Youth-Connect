@@ -183,3 +183,52 @@ export class LoginLimiter {
     this.failures.delete(key);
   }
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type SetlistSongInput = { song_id: string; lead_id: string | null; song_key: string | null };
+export type SetlistInput = {
+  service_date: string;
+  title: string | null;
+  notes: string | null;
+  songs: SetlistSongInput[];
+};
+
+/** Validates a setlist: a real date, 1–30 distinct songs, optional lead + key. */
+export function validateSetlistInput(body: Record<string, unknown>): Check<SetlistInput> {
+  const date = typeof body.service_date === "string" ? body.service_date.trim() : "";
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00Z`) : null;
+  if (!parsed || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
+    return { ok: false, error: "Pick the date for this setlist." };
+  }
+  const title = optionalText(body.title, 80);
+  if (title === undefined) return { ok: false, error: "Title is too long (80 characters max)." };
+  const notes = optionalText(body.notes, 500);
+  if (notes === undefined) return { ok: false, error: "Notes are too long (500 characters max)." };
+
+  if (!Array.isArray(body.songs) || body.songs.length === 0) {
+    return { ok: false, error: "Add at least one song." };
+  }
+  if (body.songs.length > 30) return { ok: false, error: "That's a lot of songs — 30 max." };
+  const songs: SetlistSongInput[] = [];
+  const seen = new Set<string>();
+  for (const raw of body.songs as unknown[]) {
+    const s = (raw ?? {}) as Record<string, unknown>;
+    if (typeof s.song_id !== "string" || !UUID_RE.test(s.song_id)) {
+      return { ok: false, error: "One of the songs isn't valid." };
+    }
+    if (seen.has(s.song_id)) return { ok: false, error: "A song is in the setlist twice." };
+    seen.add(s.song_id);
+    let lead: string | null = null;
+    if (s.lead_id !== undefined && s.lead_id !== null && s.lead_id !== "") {
+      if (typeof s.lead_id !== "string" || !UUID_RE.test(s.lead_id)) {
+        return { ok: false, error: "One of the song leaders isn't valid." };
+      }
+      lead = s.lead_id;
+    }
+    const key = normalizeKey(s.song_key);
+    if (key === undefined) return { ok: false, error: "Key must look like G, Bb or F#m." };
+    songs.push({ song_id: s.song_id, lead_id: lead, song_key: key });
+  }
+  return { ok: true, value: { service_date: date, title, notes, songs } };
+}

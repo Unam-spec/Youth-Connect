@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, BellRing, Clock, Loader2, Lock } from "lucide-react";
@@ -134,6 +134,8 @@ const backLink = (
 );
 
 function SignedOut() {
+  // The invite link (/worship?join=1) opens straight on "Request to join".
+  const startOnJoin = new URLSearchParams(useSearch()).has("join");
   return (
     <WorshipFrame right={backLink}>
       <div className="mx-auto max-w-sm pt-8">
@@ -147,7 +149,7 @@ function SignedOut() {
           <p className="text-sm text-muted-foreground">Sign in, or ask to join the team.</p>
         </div>
         <div className="rounded-2xl border border-border bg-card p-5">
-          <Tabs defaultValue="signin">
+          <Tabs defaultValue={startOnJoin ? "join" : "signin"}>
             <TabsList className="mb-5 grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign in</TabsTrigger>
               <TabsTrigger value="join">Request to join</TabsTrigger>

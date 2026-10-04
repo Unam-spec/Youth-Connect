@@ -8,6 +8,7 @@ import {
   canEditSong,
   checkMemberChange,
   LoginLimiter,
+  validateSetlistInput,
 } from "./worshipRules";
 
 describe("normalizeKey", () => {
@@ -125,5 +126,35 @@ describe("LoginLimiter", () => {
     l.recordFailure("p", 0);
     l.reset("p");
     expect(l.isBlocked("p", 0)).toBe(false);
+  });
+});
+
+describe("validateSetlistInput", () => {
+  const A = "11111111-1111-4111-8111-111111111111";
+  const B = "22222222-2222-4222-8222-222222222222";
+  it("accepts a valid setlist and normalizes keys", () => {
+    const r = validateSetlistInput({
+      service_date: "2026-10-11",
+      title: " Youth Sunday ",
+      songs: [{ song_id: A, lead_id: B, song_key: "g" }, { song_id: B }],
+    });
+    expect(r).toEqual({
+      ok: true,
+      value: {
+        service_date: "2026-10-11",
+        title: "Youth Sunday",
+        notes: null,
+        songs: [
+          { song_id: A, lead_id: B, song_key: "G" },
+          { song_id: B, lead_id: null, song_key: null },
+        ],
+      },
+    });
+  });
+  it("rejects bad dates, empty lists and duplicates", () => {
+    expect(validateSetlistInput({ service_date: "2026-02-30", songs: [{ song_id: A }] }).ok).toBe(false);
+    expect(validateSetlistInput({ service_date: "2026-10-11", songs: [] }).ok).toBe(false);
+    expect(validateSetlistInput({ service_date: "2026-10-11", songs: [{ song_id: A }, { song_id: A }] }).ok).toBe(false);
+    expect(validateSetlistInput({ service_date: "2026-10-11", songs: [{ song_id: "x" }] }).ok).toBe(false);
   });
 });

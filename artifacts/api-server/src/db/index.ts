@@ -384,6 +384,27 @@ CREATE TABLE IF NOT EXISTS "worship_push_subscriptions" (
   "created_at" timestamp with time zone NOT NULL DEFAULT now()
 );
 
+-- Sunday setlists (2026-10).
+CREATE TABLE IF NOT EXISTS "worship_setlists" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "service_date" date NOT NULL,
+  "title" text,
+  "notes" text,
+  "created_by" uuid REFERENCES "worship_accounts"("id") ON DELETE SET NULL,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS "worship_setlists_date_idx" ON "worship_setlists" ("service_date" DESC);
+CREATE TABLE IF NOT EXISTS "worship_setlist_songs" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "setlist_id" uuid NOT NULL REFERENCES "worship_setlists"("id") ON DELETE CASCADE,
+  "song_id" uuid NOT NULL REFERENCES "worship_songs"("id") ON DELETE CASCADE,
+  "lead_id" uuid REFERENCES "worship_accounts"("id") ON DELETE SET NULL,
+  "song_key" text,
+  "position" integer NOT NULL
+);
+CREATE INDEX IF NOT EXISTS "worship_setlist_songs_setlist_idx" ON "worship_setlist_songs" ("setlist_id", "position");
+
 -- Head leader (2026-10): the first approved leader becomes the head leader
 -- ("owner") if there isn't one yet. A no-op once an owner exists.
 UPDATE "worship_accounts" SET "role" = 'owner'

@@ -1,6 +1,6 @@
 # Worship Team feature — plan
 
-**Status:** steps 1–4 below are built: accounts, join requests and approvals, profiles, the song library, personal song lists, chord charts that change key, stage mode, and team-only notifications. Setlists are next.
+**Status:** all five steps below are built: accounts, join requests and approvals, profiles, the song library, personal song lists, chord charts that change key, stage mode, team-only notifications, Sunday setlists shareable to WhatsApp, and an invite link anyone on the team can send.
 
 Code: `artifacts/api-server/src/routes/worship.ts` (API), `lib/worship*.ts` (auth, rules, notifications), `artifacts/jg-youth/src/pages/worship/` and `components/worship/` (screens). The tables are created when the server starts (`WORSHIP_SCHEMA` in `artifacts/api-server/src/db/index.ts`).
 
@@ -30,6 +30,8 @@ Shaped like the JG Youth leader system (Super Admin → Leaders → Members). Ev
 | Add songs to the shared library, edit own songs | ✅ | ✅ | ✅ |
 | Get team notifications | ✅ | ✅ | ✅ |
 | **Accept or decline join requests** (and get notified of them) | — | ✅ | ✅ |
+| Create, edit and delete Sunday setlists | — | ✅ | ✅ |
+| View and share setlists, invite people | ✅ | ✅ | ✅ |
 | Make someone a leader, or switch a leader back to member | — | — | ✅ |
 | Remove someone, reset a forgotten PIN | — | — | ✅ |
 | Edit or delete anyone's song | — | — | ✅ |
@@ -56,7 +58,8 @@ Shaped like the JG Youth leader system (Super Admin → Leaders → Members). Ev
 3. **`/worship/members/:id`, a member profile:** name, role(s) and vocal range, then their song list: each row shows the title, artist, *their* key as a badge, and tempo. On your own profile you get "Add song" and edit controls.
 4. **`/worship/songs/:id`, a song:** lyrics with chords above the lines. A key picker transposes the chords live, opening in the viewer's own saved key. Big-text "stage mode" for practice.
 5. **`/worship/library`, the shared library:** every song the team knows, searchable. "Add to my list" saves it with your own key and notifies the team.
-6. *(Phase 2)* **`/worship/setlists`:** a leader builds the songs for a date and chooses who leads each one. Each leader's key fills in automatically.
+6. **`/worship/setlists`:** everyone sees upcoming and past setlists. The head leader and leaders create and edit them: a date (defaults to next Sunday), an optional title and notes, and ordered songs, each with who leads it and the key. A key left on "Lead's key" uses that person's own key for the song, else the original. **Share to WhatsApp** (and Copy) sends a formatted list with a link to the chords. Posting one notifies the rest of the team.
+7. **Invite:** an "Invite someone to the team" card on the team page plus a button in the header, for everyone. It sends a WhatsApp message explaining the worship area with a link to `/worship?join=1`, which opens straight on "Request to join".
 
 ## Data model (Drizzle, `lib/db/src/schema`)
 
@@ -68,7 +71,8 @@ All tables are separate from `profiles`. None have a foreign key to JG Youth tab
 - `worship_notifications`: `id`, `recipient_id`, `actor_id`, `type` (song_added, join_request…), `song_id`, `read_at`, `created_at`, which feeds the in-app inbox
 - `worship_songs`: `id`, `title`, `artist`, `original_key`, `tempo_bpm`, `lyrics` (chords inline in brackets, e.g. `[G]Amazing [C]grace`, so they can be transposed), `created_by`
 - `worship_member_songs`: `account_id`, `song_id`, `preferred_key`, `notes`, unique on (member, song)
-- *(Phase 2)* `setlists`, `setlist_songs`
+- `worship_setlists`: `id`, `service_date`, `title`, `notes`, `created_by`, timestamps
+- `worship_setlist_songs`: `setlist_id`, `song_id`, `lead_id`, `song_key`, `position`
 
 Lyrics are stored once per song. Keys are stored per person.
 
@@ -80,7 +84,8 @@ Lyrics are stored once per song. Keys are stored per person.
 - `POST/PATCH/DELETE /api/worship/members/me/songs/:songId`. The POST also creates notifications and sends pushes, in the background so adding a song stays fast.
 - `GET /api/worship/notifications`, `POST /api/worship/notifications/read`
 - `POST/DELETE /api/worship/push/subscribe`
-- Leader only: `GET /api/worship/requests`, `POST /api/worship/requests/:id/approve` and `/decline`, `PATCH /api/worship/members/:id` (change role), `DELETE /api/worship/members/:id`, setlists
+- Leader only: `GET /api/worship/requests`, `POST /api/worship/requests/:id/approve` and `/decline`, `PATCH /api/worship/members/:id` (change role), `DELETE /api/worship/members/:id`
+- Setlists: `GET /api/worship/setlists`, `GET /api/worship/setlists/:id` (everyone); `POST`, `PUT /:id`, `DELETE /:id` (head leader + leaders)
 
 ## Build order
 
