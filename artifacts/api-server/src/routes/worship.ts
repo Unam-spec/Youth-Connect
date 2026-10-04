@@ -49,9 +49,8 @@ import {
  */
 const router = Router();
 const loginLimiter = new LoginLimiter();
-// 15-minute lockout after 5 wrong PINs. Paused for now at the head leader's
-// request; set back to true to turn it on again.
-const LOGIN_LOCKOUT_ENABLED = false;
+// 15-minute lockout after 5 wrong PINs. Set to false to pause it.
+const LOGIN_LOCKOUT_ENABLED = true;
 
 // Serializes "first account becomes head leader" so two sign-ups can't both
 // claim it.
