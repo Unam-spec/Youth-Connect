@@ -1,10 +1,17 @@
 # Worship Team feature — plan
 
-Branch: `feature/worship-team`. Right now only a "Coming soon" page exists at `/worship`, linked from the member dashboard (`/my`).
+Branch: `feature/worship-team`. Right now only a "Coming soon" page exists at `/worship`.
 
 ## Goal
 
 Each worship team member has their own profile showing their personal song list, with the key they sing or play each song in and the lyrics. Everyone on the team can view every other member's profile. Only the owner can edit their own.
+
+## Separate from JG Youth, members only
+
+- The worship area is its own space. It has its own look and no JG Youth header, footer or dashboard links. Regular members never see it inside the app.
+- The only way in is a discreet **"Worship Team"** link in the landing page footer, next to "Leader Portal".
+- Once built, that link leads to a worship sign-in. Worship team members go straight to their worship profile. Anyone else is turned away, and nothing worship-related loads for them.
+- The check happens on the server, not just in the page. Every `/api/worship/*` route rejects anyone who isn't on the worship team.
 
 ## Who can do what
 

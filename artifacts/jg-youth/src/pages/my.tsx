@@ -33,7 +33,7 @@ import {
 import { isPostServiceWindow, serviceBannerKey } from "@/lib/serviceBanner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload, Check, BookOpen, Star, Bell, Music } from "lucide-react";
+import { CalendarIcon, Clock, GraduationCap, MapPin, CheckCircle, XCircle, Phone, QrCode, Camera, User, Upload, Check, BookOpen, Star, Bell } from "lucide-react";
 import { useGetCheckinSchedule, getGetCheckinScheduleQueryKey } from "@workspace/api-client-react";
 import { isCheckinOpen } from "@/lib/checkinScheduleClient";
 import { Link, useLocation } from "wouter";
@@ -843,22 +843,6 @@ export default function MyDashboard() {
           <div className="mt-4">
             <StreakWidget sessionDates={(myAttendance ?? []).map((a) => a.session_date)} />
           </div>
-        </section>
-
-        {/* Worship Team (coming soon) */}
-        <section>
-          <Link href="/worship">
-            <div className="rounded-2xl border border-border bg-card p-5 flex items-center gap-4 cursor-pointer hover:border-primary/40 transition-colors">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Music className="w-6 h-6 text-primary" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold text-sm text-foreground">Worship Team</p>
-                <p className="text-xs text-muted-foreground mt-0.5">Your songs, keys and lyrics</p>
-              </div>
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-primary shrink-0">Coming soon</span>
-            </div>
-          </Link>
         </section>
 
         {/* My Check-ins */}

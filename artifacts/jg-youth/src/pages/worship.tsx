@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import {
   ArrowLeft,
+  Lock,
   Music,
   UserCircle,
   ListMusic,
@@ -9,13 +10,15 @@ import {
   Users,
   CalendarDays,
 } from "lucide-react";
-import { Layout } from "@/components/layout";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 
 // Placeholder for the Worship Team hub. The real feature (member profiles with
 // personal song lists, keys and lyrics) is being built on the
 // `feature/worship-team` branch; see docs/worship-team.md for the plan.
+//
+// Deliberately standalone: no JG Youth header/footer or dashboard links. The
+// only way in is the discreet "Worship Team" link in the site footer, and once
+// built the page will be restricted to worship team members.
 const PLANNED_FEATURES = [
   {
     icon: UserCircle,
@@ -51,61 +54,71 @@ const PLANNED_FEATURES = [
 
 export default function Worship() {
   return (
-    <Layout>
-      <div className="mx-auto max-w-3xl space-y-8">
-        <Link
-          href="/my"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to my dashboard
-        </Link>
-
-        <section className="relative overflow-hidden rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-6 sm:p-8">
-          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/10 blur-2xl" />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/15">
-              <Music className="h-7 w-7 text-primary" />
+    <div className="min-h-[100dvh] bg-[hsl(250,35%,8%)] text-white selection:bg-violet-400 selection:text-black">
+      <div className="pointer-events-none fixed inset-x-0 top-0 h-80 bg-gradient-to-b from-violet-600/25 to-transparent" />
+      <div className="relative mx-auto max-w-3xl space-y-8 px-4 py-6 sm:py-10">
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-500/20">
+              <Music className="h-5 w-5 text-violet-300" />
             </div>
-            <div className="space-y-1.5">
-              <Badge variant="outline" className="border-primary/40 text-primary">
-                Coming soon
-              </Badge>
-              <h1 className="font-[family-name:var(--app-font-heading)] text-3xl font-semibold tracking-tight text-foreground">
-                Worship Team
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                A home for the worship team: your songs, your keys and your lyrics, all in one place.
-              </p>
-            </div>
+            <span className="font-[family-name:var(--app-font-heading)] text-lg font-semibold tracking-tight">
+              Worship Team
+            </span>
           </div>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" />
+            JG Youth
+          </Link>
+        </header>
+
+        <section className="space-y-4 pt-6 text-center sm:pt-10">
+          <div className="flex justify-center gap-2">
+            <Badge variant="outline" className="border-violet-400/40 text-violet-200">
+              Coming soon
+            </Badge>
+            <Badge variant="outline" className="border-white/20 text-white/70">
+              <Lock className="mr-1 h-3 w-3" />
+              Members only
+            </Badge>
+          </div>
+          <h1 className="font-[family-name:var(--app-font-heading)] text-4xl font-semibold tracking-tight sm:text-5xl">
+            Your songs. Your keys.
+          </h1>
+          <p className="mx-auto max-w-md text-sm text-white/60">
+            A private space for the worship team, with each person's song list, keys and lyrics in one place.
+          </p>
         </section>
 
         <section>
-          <h2 className="mb-4 font-[family-name:var(--app-font-heading)] text-xl font-semibold tracking-tight text-foreground">
+          <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-white/40">
             What's on the way
           </h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {PLANNED_FEATURES.map(({ icon: Icon, title, description }) => (
-              <Card key={title} className="rounded-2xl">
-                <CardContent className="flex gap-3 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
-                    <Icon className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div
+                key={title}
+                className="flex gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-4"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-500/15">
+                  <Icon className="h-5 w-5 text-violet-300" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">{title}</p>
+                  <p className="mt-0.5 text-xs text-white/55">{description}</p>
+                </div>
+              </div>
             ))}
           </div>
         </section>
 
-        <p className="text-center text-xs text-muted-foreground">
-          We're still building this. Check back soon.
+        <p className="pb-4 text-center text-xs text-white/40">
+          Worship team sign-in is coming soon.
         </p>
       </div>
-    </Layout>
+    </div>
   );
 }

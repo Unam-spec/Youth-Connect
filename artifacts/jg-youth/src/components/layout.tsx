@@ -72,6 +72,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             Built for Jeremiah Generation Youth AFM.
           </p>
           <div className="flex items-center gap-4">
+            <Link href="/worship" className="text-sm text-muted-foreground hover:text-primary transition-colors">
+              Worship Team
+            </Link>
             <Link href="/leader-login" className="text-sm text-muted-foreground hover:text-primary transition-colors">
               Leader Portal
             </Link>
