@@ -35,7 +35,7 @@ export function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChan
         <DialogHeader>
           <DialogTitle>Invite someone to the team</DialogTitle>
           <DialogDescription>
-            Send this to anyone on the youth worship team. A leader will accept them when they ask to join.
+            Send this to anyone on the worship team. A leader will accept them when they ask to join.
           </DialogDescription>
         </DialogHeader>
         <pre className="whitespace-pre-wrap rounded-xl border border-border bg-muted/50 p-3 font-[family-name:var(--app-font-sans)] text-sm">

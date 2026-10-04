@@ -52,17 +52,17 @@ export function buildSetlistMessage(
 
 export function buildInviteMessage(link: string): string {
   return [
-    "🎶 *JG Youth Worship Team*",
+    "🎶 *Worship Team*",
     "",
-    "We've got our own worship team space in the JG Youth app:",
+    "We've got our own worship team app:",
     "• Your own song list, with the key you sing or play each song in",
     "• Lyrics & chords that change to any key",
     "• Sunday setlists, so everyone knows what we're playing",
     "• Notifications when the team adds songs",
     "",
-    `If you're on the youth worship team, request to join here 👉 ${link}`,
+    `If you're on the worship team, request to join here 👉 ${link}`,
     "",
-    "A worship leader will accept you. You don't need to be a JG Youth member to join 🙌",
+    "A worship leader will accept you 🙌",
   ].join("\n");
 }
 

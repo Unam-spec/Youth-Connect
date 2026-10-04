@@ -308,7 +308,7 @@ export function WorshipOnboarding({
             <div className="space-y-4 text-center">
               <DialogTitle className="font-[family-name:var(--app-font-heading)] text-xl">Bring the team in</DialogTitle>
               <DialogDescription>
-                Know someone on the youth worship team? Send them the join link on WhatsApp. You can always find it under
+                Know someone on the worship team? Send them the join link on WhatsApp. You can always find it under
                 the ➕👤 button at the top.
               </DialogDescription>
               <Button variant="outline" className="w-full" onClick={() => setInviteOpen(true)}>

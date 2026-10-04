@@ -262,7 +262,7 @@ function TeamPage({ me }: { me: WorshipAccount }) {
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">Invite someone to the team</span>
-          <span className="block text-xs text-muted-foreground">Send the join link on WhatsApp to anyone on the youth worship team.</span>
+          <span className="block text-xs text-muted-foreground">Send the join link on WhatsApp to anyone on the worship team.</span>
         </span>
       </button>
       <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />

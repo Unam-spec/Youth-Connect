@@ -47,7 +47,7 @@ function ForgotPinForm({ initialPhone, onBack }: { initialPhone: string; onBack:
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm">
-          You're the head leader, so there's no one above you to reset it. Ask the JG Youth app admin for a new PIN.
+          You're the head leader, so there's no one above you to reset it. Ask the app admin for a new PIN.
         </p>
         <Button variant="outline" className="w-full" onClick={onBack}>
           Back to sign in
@@ -212,7 +212,7 @@ function JoinForm() {
         Request to join
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        A worship leader will approve you. You don't need to be a JG Youth member.
+        A worship leader will approve you.
       </p>
     </form>
   );
