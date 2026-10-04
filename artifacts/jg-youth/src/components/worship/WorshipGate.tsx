@@ -6,6 +6,7 @@ import { ArrowLeft, BellRing, Clock, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   setWorshipSession,
@@ -20,6 +21,11 @@ import { InstrumentPicker } from "./ProfileDialog";
 import { signOutOfWorship, WorshipFrame, WorshipShell } from "./WorshipShell";
 
 type AuthResponse = WorshipSession & { account: WorshipAccount };
+
+/** The phone field holds just the dial code (e.g. "+27") until a number is typed. */
+function hasPhoneNumber(phone: string): boolean {
+  return phone.replace(/\D/g, "").length >= 8;
+}
 
 function pinInput(set: (v: string) => void) {
   return (e: React.ChangeEvent<HTMLInputElement>) => set(e.target.value.replace(/\D/g, "").slice(0, 6));
@@ -47,13 +53,13 @@ function SignInForm() {
     >
       <div className="space-y-1.5">
         <Label htmlFor="wl-phone">Phone number</Label>
-        <Input id="wl-phone" type="tel" autoComplete="tel" placeholder="082 123 4567" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <PhoneInput id="wl-phone" value={phone} onChange={setPhone} />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="wl-pin">PIN</Label>
         <Input id="wl-pin" type="password" inputMode="numeric" autoComplete="current-password" placeholder="4–6 digits" value={pin} onChange={pinInput(setPin)} />
       </div>
-      <Button type="submit" className="w-full" disabled={login.isPending || !phone || pin.length < 4}>
+      <Button type="submit" className="w-full" disabled={login.isPending || !hasPhoneNumber(phone) || pin.length < 4}>
         {login.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Sign in
       </Button>
@@ -94,7 +100,7 @@ function JoinForm() {
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="wj-phone">Phone number</Label>
-        <Input id="wj-phone" type="tel" autoComplete="tel" placeholder="082 123 4567" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <PhoneInput id="wj-phone" value={phone} onChange={setPhone} />
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="wj-pin">Choose a PIN</Label>
@@ -105,7 +111,11 @@ function JoinForm() {
         <Label>What do you do on the team?</Label>
         <InstrumentPicker value={instruments} onChange={setInstruments} />
       </div>
-      <Button type="submit" className="w-full" disabled={join.isPending || !name.trim() || !phone || pin.length < 4}>
+      <Button
+        type="submit"
+        className="w-full"
+        disabled={join.isPending || !name.trim() || !hasPhoneNumber(phone) || pin.length < 4}
+      >
         {join.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Request to join
       </Button>

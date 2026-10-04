@@ -40,7 +40,10 @@ export function useWorshipTheme() {
 export function signOutOfWorship(queryClient: ReturnType<typeof useQueryClient>) {
   worshipPost("/auth/logout").catch(() => {});
   clearWorshipSession();
-  queryClient.removeQueries({ queryKey: ["worship"] });
+  // Drop cached team data, then tell the mounted gate it's signed out now
+  // (removing the "me" query alone leaves its observer showing the old user).
+  queryClient.removeQueries({ queryKey: ["worship"], predicate: (q) => q.queryKey[1] !== "me" });
+  queryClient.setQueryData(worshipKeys.me, null);
 }
 
 /** Bare worship chrome: brand + back-to-JG link. Used when signed out. */
