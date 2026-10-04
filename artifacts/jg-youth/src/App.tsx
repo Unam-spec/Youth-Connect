@@ -33,6 +33,7 @@ import LeaderQr from "@/pages/leader-qr";
 import SessionQr from "@/pages/session-qr";
 import QrResolver from "@/pages/qr-resolver";
 import Kiosk from "@/pages/kiosk";
+import Worship from "@/pages/worship";
 
 const queryClient = new QueryClient();
 
@@ -237,6 +238,7 @@ function ClerkProviderWithRoutes() {
 
           <Route path="/my" component={MyDashboard} />
           <Route path="/become-member" component={BecomeMember} />
+          <Route path="/worship" component={Worship} />
           <Route path="/dashboard/analytics" component={Analytics} />
           <Route path="/dashboard/follow-ups" component={FollowUpHub} />
           <Route path="/dashboard/templates" component={Templates} />
