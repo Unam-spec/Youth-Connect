@@ -5,6 +5,7 @@ import { CalendarDays, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WorshipGate } from "@/components/worship/WorshipGate";
+import { PageBack } from "@/components/worship/PageBack";
 import { SetlistEditor } from "@/components/worship/SetlistEditor";
 import { canApprove, worshipFetch, type WorshipAccount } from "@/lib/worship";
 import { formatServiceDate } from "@/lib/worshipShare";
@@ -59,6 +60,7 @@ function SetlistsPage({ me }: { me: WorshipAccount }) {
 
   return (
     <div className="space-y-5">
+      <PageBack />
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Setlists</h1>
         {canApprove(me) && (

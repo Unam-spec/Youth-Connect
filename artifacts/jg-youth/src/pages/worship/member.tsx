@@ -6,6 +6,7 @@ import { Crown, Library, Music2, Plus, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WorshipGate } from "@/components/worship/WorshipGate";
+import { PageBack } from "@/components/worship/PageBack";
 import { KeyBadge, SongFormDialog } from "@/components/worship/songs";
 import {
   initials,
@@ -43,6 +44,7 @@ function MemberPage({ me, id }: { me: WorshipAccount; id: string }) {
 
   return (
     <div className="space-y-6">
+      <PageBack />
       <section className="flex items-start gap-4 rounded-2xl border border-border bg-card p-5">
         <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary/15 text-lg font-semibold text-primary">
           {initials(member.full_name)}

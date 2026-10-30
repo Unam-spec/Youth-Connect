@@ -2,20 +2,23 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Music2, Plus, Search } from "lucide-react";
+import { Check, Download, Music2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WorshipGate } from "@/components/worship/WorshipGate";
 import { KeyBadge, SongFormDialog } from "@/components/worship/songs";
 import { useDebouncedValue } from "@/lib/useDebounce";
-import { worshipFetch, worshipKeys, worshipPost, type LibrarySong } from "@/lib/worship";
+import { canApprove, worshipFetch, worshipKeys, worshipPost, type LibrarySong, type WorshipAccount } from "@/lib/worship";
+import { PageBack } from "@/components/worship/PageBack";
+import { FreeShowImport } from "@/components/worship/FreeShowImport";
 
-function LibraryPage() {
+function LibraryPage({ me }: { me: WorshipAccount }) {
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const q = useDebouncedValue(search.trim(), 250);
   const { data, isLoading } = useQuery({
     queryKey: worshipKeys.songs(q),
@@ -32,11 +35,19 @@ function LibraryPage() {
 
   return (
     <div className="space-y-4">
+      <PageBack />
       <div className="flex items-center justify-between gap-3">
         <h1 className="font-[family-name:var(--app-font-heading)] text-2xl font-semibold tracking-tight">Song library</h1>
-        <Button size="sm" onClick={() => setAdding(true)}>
-          <Plus className="mr-1.5 h-4 w-4" /> New song
-        </Button>
+        <div className="flex shrink-0 gap-2">
+          {canApprove(me) && (
+            <Button size="sm" variant="outline" onClick={() => setImporting(true)}>
+              <Download className="mr-1.5 h-4 w-4" /> FreeShow
+            </Button>
+          )}
+          <Button size="sm" onClick={() => setAdding(true)}>
+            <Plus className="mr-1.5 h-4 w-4" /> New song
+          </Button>
+        </div>
       </div>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -89,11 +100,12 @@ function LibraryPage() {
           ))}
         </div>
       )}
+      <FreeShowImport open={importing} onOpenChange={setImporting} />
       <SongFormDialog open={adding} onOpenChange={setAdding} onSaved={(song) => setLocation(`/worship/songs/${song.id}`)} />
     </div>
   );
 }
 
 export default function WorshipLibrary() {
-  return <WorshipGate>{() => <LibraryPage />}</WorshipGate>;
+  return <WorshipGate>{(me) => <LibraryPage me={me} />}</WorshipGate>;
 }

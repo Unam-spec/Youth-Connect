@@ -34,7 +34,17 @@ import {
   validateSetlistInput,
   validateSongInput,
   type SetlistInput,
+  type SongInput,
 } from "../lib/worshipRules";
+import { fetchPublicText, FetchBlockedError } from "../lib/safeFetch";
+import {
+  chordProToSong,
+  genericPageSong,
+  looksLikeChordPro,
+  ultimateGuitarSearchResults,
+  ultimateGuitarSong,
+  type ImportedSong,
+} from "../lib/songImport";
 import {
   inBackground,
   notifyAccepted,
@@ -503,6 +513,116 @@ router.get("/worship/songs", requireWorship(), async (req, res) => {
       .orderBy(asc(worshipSongsTable.title))
       .limit(500);
     return res.json({ songs: rows });
+  } catch (err) {
+    return fail(req, res, err);
+  }
+});
+
+// ── Finding songs online & bulk import ───────────────────────────────────────
+// (Declared before /worship/songs/:id so these paths aren't read as an id.)
+
+// A few lookups a minute per person keeps us polite to the chord sites.
+const onlineCalls = new Map<string, number[]>();
+function tooManyOnlineCalls(accountId: string): boolean {
+  const now = Date.now();
+  const recent = (onlineCalls.get(accountId) ?? []).filter((t) => now - t < 60_000);
+  recent.push(now);
+  onlineCalls.set(accountId, recent);
+  return recent.length > 20;
+}
+
+// GET /worship/songs/search-online?q= — chord sheets on Ultimate Guitar.
+router.get("/worship/songs/search-online", requireWorship(), async (req, res) => {
+  try {
+    const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 100) : "";
+    if (q.length < 2) return res.json({ results: [] });
+    if (tooManyOnlineCalls(me(req).id)) {
+      return res.status(429).json({ error: "Too many searches. Wait a minute and try again." });
+    }
+    const url = `https://www.ultimate-guitar.com/search.php?search_type=title&value=${encodeURIComponent(q)}`;
+    const { text } = await fetchPublicText(url);
+    return res.json({ results: ultimateGuitarSearchResults(text) });
+  } catch (err) {
+    if (err instanceof FetchBlockedError) return res.status(502).json({ error: "Couldn't search right now. Try again, or paste a link." });
+    return fail(req, res, err);
+  }
+});
+
+// POST /worship/songs/from-url — read a chord sheet page and fill in a song.
+router.post("/worship/songs/from-url", requireWorship(), async (req, res) => {
+  try {
+    const raw = body(req).url;
+    if (typeof raw !== "string" || !raw.trim()) return res.status(400).json({ error: "Paste a link to the song." });
+    if (tooManyOnlineCalls(me(req).id)) {
+      return res.status(429).json({ error: "Too many lookups. Wait a minute and try again." });
+    }
+    const { url, text } = await fetchPublicText(raw);
+    const host = new URL(url).hostname;
+    let song: ImportedSong | null = null;
+    if (/(^|\.)ultimate-guitar\.com$/.test(host)) song = ultimateGuitarSong(text);
+    if (!song && looksLikeChordPro(text) && !/<html/i.test(text)) song = chordProToSong(text);
+    if (!song) song = /<html|<body/i.test(text) ? genericPageSong(text) : { ...chordProToSong(text) };
+    if (!song.lyrics && !song.title) {
+      return res.status(422).json({ error: "Couldn't find a song on that page. Try an Ultimate Guitar link, or paste the lyrics." });
+    }
+    return res.json({
+      song: {
+        title: song.title.slice(0, 120),
+        artist: song.artist?.slice(0, 120) ?? null,
+        original_key: normalizeKey(song.original_key) ?? null,
+        tempo_bpm: song.tempo_bpm,
+        lyrics: song.lyrics.slice(0, 20000),
+      },
+      found_lyrics: Boolean(song.lyrics),
+    });
+  } catch (err) {
+    if (err instanceof FetchBlockedError) return res.status(422).json({ error: err.message });
+    return fail(req, res, err);
+  }
+});
+
+// POST /worship/songs/import — add many songs to the library at once (e.g.
+// from FreeShow). They go on nobody's list. Songs already in the library
+// (same title + artist) are skipped. Head leader + leaders.
+router.post("/worship/songs/import", requireWorship({ approver: true }), async (req, res) => {
+  try {
+    const list = body(req).songs;
+    if (!Array.isArray(list) || list.length === 0) return res.status(400).json({ error: "No songs to import." });
+    if (list.length > 1000) return res.status(400).json({ error: "That's a lot! Import 1000 songs or fewer at a time." });
+
+    const existing = await db
+      .select({ title: worshipSongsTable.title, artist: worshipSongsTable.artist })
+      .from(worshipSongsTable);
+    const keyOf = (t: string, a: string | null) => `${t.trim().toLowerCase()}|${(a ?? "").trim().toLowerCase()}`;
+    const seen = new Set(existing.map((s) => keyOf(s.title, s.artist)));
+
+    const rows: (SongInput & { created_by: string })[] = [];
+    let skipped = 0;
+    let invalid = 0;
+    for (const raw of list) {
+      const r = (raw ?? {}) as Record<string, unknown>;
+      const input = validateSongInput({
+        ...r,
+        // Keys we can't read become "no key" rather than failing the song.
+        original_key: normalizeKey(r.original_key) === undefined ? null : r.original_key,
+        tempo_bpm: null,
+      });
+      if (!input.ok) {
+        invalid++;
+        continue;
+      }
+      const k = keyOf(input.value.title, input.value.artist);
+      if (seen.has(k)) {
+        skipped++;
+        continue;
+      }
+      seen.add(k);
+      rows.push({ ...input.value, created_by: me(req).id });
+    }
+    for (let i = 0; i < rows.length; i += 200) {
+      await db.insert(worshipSongsTable).values(rows.slice(i, i + 200));
+    }
+    return res.json({ added: rows.length, skipped, invalid });
   } catch (err) {
     return fail(req, res, err);
   }

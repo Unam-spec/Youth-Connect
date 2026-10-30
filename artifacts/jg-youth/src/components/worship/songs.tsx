@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Globe, Link2, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { worshipPost, type WorshipSong } from "@/lib/worship";
+import { worshipFetch, worshipPost, type WorshipSong } from "@/lib/worship";
 import { canonicalKey, KEYS, MINOR_KEYS, parseChart } from "@/lib/worshipChords";
 
 /** Native select keeps this simple and mobile-friendly. */
@@ -130,6 +130,99 @@ I [C#m]worship You, I [A]worship You
 [Chorus]
 Way [E]maker, miracle [B]worker`;
 
+type OnlineResult = { title: string; artist: string; url: string; rating: number | null; votes: number };
+type FoundSong = {
+  title: string;
+  artist: string | null;
+  original_key: string | null;
+  tempo_bpm: number | null;
+  lyrics: string;
+};
+
+/**
+ * "Find it online": search a song name (Ultimate Guitar) or paste a link to
+ * any chord sheet, and the form fills itself in for checking.
+ */
+function FindOnline({ onFound }: { onFound: (song: FoundSong) => void }) {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState<OnlineResult[] | null>(null);
+  const isLink = /^https?:\/\//i.test(query.trim());
+
+  const fromUrl = useMutation({
+    mutationFn: (url: string) => worshipPost<{ song: FoundSong; found_lyrics: boolean }>("/songs/from-url", { url }),
+    onSuccess: (r) => {
+      onFound(r.song);
+      setResults(null);
+      if (r.found_lyrics) toast.success("Filled in. Check the words and chords before saving.");
+      else toast.message("Got the title, but no lyrics on that page. Paste them in below.");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+  const search = useMutation({
+    mutationFn: () =>
+      worshipFetch<{ results: OnlineResult[] }>(`/songs/search-online?q=${encodeURIComponent(query.trim())}`),
+    onSuccess: (r) => {
+      setResults(r.results);
+      if (!r.results.length) toast.message("No chord sheets found. Try another spelling, or paste a link.");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+  const go = () => (isLink ? fromUrl.mutate(query.trim()) : search.mutate());
+  const busy = fromUrl.isPending || search.isPending;
+
+  return (
+    <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+      <Label htmlFor="ws-find" className="flex items-center gap-1.5">
+        <Globe className="h-4 w-4 text-primary" /> Find it online
+      </Label>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (query.trim().length >= 2) go();
+        }}
+      >
+        <Input
+          id="ws-find"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Song name, or paste a link"
+        />
+        <Button type="submit" variant="outline" disabled={busy || query.trim().length < 2} className="shrink-0">
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : isLink ? <Link2 className="h-4 w-4" /> : <Search className="h-4 w-4" />}
+          <span className="ml-1.5">{isLink ? "Fill in" : "Search"}</span>
+        </Button>
+      </form>
+      {results && results.length > 0 && (
+        <ul className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border bg-background">
+          {results.map((r) => (
+            <li key={r.url}>
+              <button
+                type="button"
+                disabled={fromUrl.isPending}
+                onClick={() => fromUrl.mutate(r.url)}
+                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-medium">{r.title}</span>
+                  <span className="block truncate text-xs text-muted-foreground">{r.artist}</span>
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {r.rating ? `★ ${r.rating} · ` : ""}
+                  {r.votes} votes
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-xs text-muted-foreground">
+        Searches Ultimate Guitar. Links from other chord sites work too if they show the chords as text.
+      </p>
+    </div>
+  );
+}
+
 /** Add a new song to the library (optionally to my list), or edit one. */
 export function SongFormDialog({
   open,
@@ -201,6 +294,17 @@ export function SongFormDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {!song && (
+            <FindOnline
+              onFound={(found) => {
+                setTitle(found.title);
+                setArtist(found.artist ?? "");
+                setOriginalKey(found.original_key);
+                setTempo(found.tempo_bpm ? String(found.tempo_bpm) : "");
+                setLyrics(found.lyrics);
+              }}
+            />
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="ws-title">Title</Label>
             <Input id="ws-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Way Maker" />

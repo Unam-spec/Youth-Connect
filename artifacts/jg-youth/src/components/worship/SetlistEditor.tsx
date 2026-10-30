@@ -204,6 +204,7 @@ export function SetlistEditor({
                 <option key={s.id} value={s.id}>
                   {s.title}
                   {s.artist ? ` · ${s.artist}` : ""}
+                  {s.original_key ? ` (${s.original_key})` : ""}
                 </option>
               ))}
             </select>

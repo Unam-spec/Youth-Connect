@@ -103,3 +103,11 @@ export function parseChart(lyrics: string, steps = 0, targetKey: string | null =
     return { kind: "line", segments, hasChords };
   });
 }
+
+/** Lyrics text with every chord moved by `steps` (for exporting a song in its setlist key). */
+export function transposeLyrics(lyrics: string, steps: number, targetKey: string | null): string {
+  if (steps % 12 === 0) return lyrics;
+  return lyrics.replace(/\[([^\]]+)\]/g, (whole, inner: string) =>
+    isChord(inner) ? `[${transposeChord(inner, steps, targetKey)}]` : whole,
+  );
+}

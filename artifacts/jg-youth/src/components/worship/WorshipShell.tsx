@@ -29,6 +29,7 @@ import { enableWorshipPush } from "@/lib/worshipPush";
 import { InviteDialog } from "./InviteDialog";
 import { WorshipOnboarding } from "./WorshipOnboarding";
 import { ProfileDialog } from "./ProfileDialog";
+import { useTrackWorshipNav } from "./PageBack";
 
 /** Applies the worship colour theme to <html> while mounted (dialogs portal to body). */
 export function useWorshipTheme() {
@@ -173,6 +174,7 @@ export function WorshipShell({
 }) {
   const queryClient = useQueryClient();
   const [location, setLocation] = useLocation();
+  useTrackWorshipNav(location);
   const [profileOpen, setProfileOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   // First time in: the welcome sequence opens by itself.

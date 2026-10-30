@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Maximize2, Minimize2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Check, Maximize2, Minimize2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { WorshipGate } from "@/components/worship/WorshipGate";
+import { PageBack } from "@/components/worship/PageBack";
 import { ChordChart, KeyBadge, KeySelect, SongFormDialog } from "@/components/worship/songs";
 import { cn } from "@/lib/utils";
 import { worshipFetch, worshipKeys, worshipPost, type WorshipAccount, type WorshipSong } from "@/lib/worship";
@@ -157,9 +158,7 @@ function SongPage({ id }: { id: string }) {
 
   return (
     <div className="space-y-5">
-      <Link href="/worship/library" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Songs
-      </Link>
+      <PageBack fallback="/worship/library" />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="font-[family-name:var(--app-font-heading)] text-3xl font-semibold tracking-tight">{song.title}</h1>
