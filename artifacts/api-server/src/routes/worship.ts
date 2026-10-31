@@ -24,8 +24,10 @@ import {
 import {
   canApprove,
   canEditSong,
+  canTransferSong,
   checkMemberChange,
   isOwner,
+  isSameSong,
   LoginLimiter,
   normalizeInstruments,
   normalizeKey,
@@ -48,6 +50,7 @@ import {
 import {
   inBackground,
   notifyAccepted,
+  notifySongTransferred,
   notifyJoinRequest,
   notifyPinResetRequest,
   notifySetlistPosted,
@@ -491,11 +494,6 @@ router.get("/worship/songs", requireWorship(), async (req, res) => {
   try {
     const q = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 80) : "";
     const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-    const mine = db
-      .select({ song_id: worshipMemberSongsTable.song_id, preferred_key: worshipMemberSongsTable.preferred_key })
-      .from(worshipMemberSongsTable)
-      .where(eq(worshipMemberSongsTable.account_id, me(req).id))
-      .as("mine");
     const rows = await db
       .select({
         id: worshipSongsTable.id,
@@ -503,16 +501,24 @@ router.get("/worship/songs", requireWorship(), async (req, res) => {
         artist: worshipSongsTable.artist,
         original_key: worshipSongsTable.original_key,
         tempo_bpm: worshipSongsTable.tempo_bpm,
-        my_key: mine.preferred_key,
-        in_my_list: sql<boolean>`${mine.song_id} is not null`,
-        member_count: sql<number>`(select count(*)::int from ${worshipMemberSongsTable} where ${worshipMemberSongsTable.song_id} = ${worshipSongsTable.id})`,
+        holder_id: worshipMemberSongsTable.account_id,
+        holder_name: worshipAccountsTable.full_name,
+        holder_key: worshipMemberSongsTable.preferred_key,
       })
       .from(worshipSongsTable)
-      .leftJoin(mine, eq(mine.song_id, worshipSongsTable.id))
+      .leftJoin(worshipMemberSongsTable, eq(worshipMemberSongsTable.song_id, worshipSongsTable.id))
+      .leftJoin(worshipAccountsTable, eq(worshipAccountsTable.id, worshipMemberSongsTable.account_id))
       .where(q ? or(ilike(worshipSongsTable.title, pattern), ilike(worshipSongsTable.artist, pattern)) : undefined)
       .orderBy(asc(worshipSongsTable.title))
       .limit(500);
-    return res.json({ songs: rows });
+    const myId = me(req).id;
+    return res.json({
+      songs: rows.map(({ holder_key, ...r }) => ({
+        ...r,
+        in_my_list: r.holder_id === myId,
+        my_key: r.holder_id === myId ? holder_key : null,
+      })),
+    });
   } catch (err) {
     return fail(req, res, err);
   }
@@ -590,11 +596,9 @@ router.post("/worship/songs/import", requireWorship({ approver: true }), async (
     if (!Array.isArray(list) || list.length === 0) return res.status(400).json({ error: "No songs to import." });
     if (list.length > 1000) return res.status(400).json({ error: "That's a lot! Import 1000 songs or fewer at a time." });
 
-    const existing = await db
+    const seen = await db
       .select({ title: worshipSongsTable.title, artist: worshipSongsTable.artist })
       .from(worshipSongsTable);
-    const keyOf = (t: string, a: string | null) => `${t.trim().toLowerCase()}|${(a ?? "").trim().toLowerCase()}`;
-    const seen = new Set(existing.map((s) => keyOf(s.title, s.artist)));
 
     const rows: (SongInput & { created_by: string })[] = [];
     let skipped = 0;
@@ -611,12 +615,11 @@ router.post("/worship/songs/import", requireWorship({ approver: true }), async (
         invalid++;
         continue;
       }
-      const k = keyOf(input.value.title, input.value.artist);
-      if (seen.has(k)) {
+      if (seen.some((s) => isSameSong(s, input.value))) {
         skipped++;
         continue;
       }
-      seen.add(k);
+      seen.push(input.value);
       rows.push({ ...input.value, created_by: me(req).id });
     }
     for (let i = 0; i < rows.length; i += 200) {
@@ -634,28 +637,36 @@ router.get("/worship/songs/:id", requireWorship(), async (req, res) => {
       where: eq(worshipSongsTable.id, String(req.params.id)),
     });
     if (!song) return res.status(404).json({ error: "Song not found." });
-    const members = await db
-      .select({
-        id: worshipAccountsTable.id,
-        full_name: worshipAccountsTable.full_name,
-        preferred_key: worshipMemberSongsTable.preferred_key,
-        notes: worshipMemberSongsTable.notes,
-      })
-      .from(worshipMemberSongsTable)
-      .innerJoin(worshipAccountsTable, eq(worshipMemberSongsTable.account_id, worshipAccountsTable.id))
-      .where(and(eq(worshipMemberSongsTable.song_id, song.id), eq(worshipAccountsTable.status, "approved")))
-      .orderBy(asc(worshipAccountsTable.full_name));
-    const mine = members.find((m) => m.id === me(req).id) ?? null;
+    const holder = await songHolder(song.id);
+    const mine = holder?.id === me(req).id;
     return res.json({
       song,
-      members,
-      my_entry: mine ? { preferred_key: mine.preferred_key, notes: mine.notes } : null,
+      holder: holder ? { id: holder.id, full_name: holder.full_name, preferred_key: holder.preferred_key } : null,
+      my_entry: mine ? { preferred_key: holder.preferred_key, notes: holder.notes } : null,
       can_edit: canEditSong(me(req), song),
+      can_transfer: holder ? canTransferSong(me(req), holder.id) : false,
     });
   } catch (err) {
     return fail(req, res, err);
   }
 });
+
+/** Who has picked a song, if anyone. */
+async function songHolder(songId: string) {
+  const [holder] = await db
+    .select({
+      entry_id: worshipMemberSongsTable.id,
+      id: worshipAccountsTable.id,
+      full_name: worshipAccountsTable.full_name,
+      preferred_key: worshipMemberSongsTable.preferred_key,
+      notes: worshipMemberSongsTable.notes,
+    })
+    .from(worshipMemberSongsTable)
+    .innerJoin(worshipAccountsTable, eq(worshipMemberSongsTable.account_id, worshipAccountsTable.id))
+    .where(eq(worshipMemberSongsTable.song_id, songId))
+    .limit(1);
+  return holder ?? null;
+}
 
 // POST /worship/songs — add to the library; optionally straight to my list.
 router.post("/worship/songs", requireWorship(), async (req, res) => {
@@ -666,6 +677,15 @@ router.post("/worship/songs", requireWorship(), async (req, res) => {
     const addToMine = b.add_to_my_list === true;
     const myKey = normalizeKey(b.my_key);
     if (myKey === undefined) return res.status(400).json({ error: "Key must look like G, Bb or F#m." });
+
+    const sameTitle = await db
+      .select({ id: worshipSongsTable.id, title: worshipSongsTable.title, artist: worshipSongsTable.artist })
+      .from(worshipSongsTable)
+      .where(sql`lower(btrim(${worshipSongsTable.title})) = ${input.value.title.toLowerCase()}`);
+    const twin = sameTitle.find((s) => isSameSong(s, input.value));
+    if (twin) {
+      return res.status(409).json({ error: `"${twin.title}" is already in the library.`, song_id: twin.id });
+    }
 
     const song = await db.transaction(async (tx) => {
       const [created] = await tx
@@ -728,8 +748,8 @@ router.delete("/worship/songs/:id", requireWorship(), async (req, res) => {
   }
 });
 
-// PUT /worship/me/songs/:songId — add a library song to my list, or update my
-// key/notes for it. Adding (not updating) notifies the rest of the team.
+// PUT /worship/me/songs/:songId — pick an unassigned song, or update my key and
+// notes for one I hold. Picking (not updating) notifies the rest of the team.
 router.put("/worship/me/songs/:songId", requireWorship(), async (req, res) => {
   try {
     const b = body(req);
@@ -763,12 +783,51 @@ router.put("/worship/me/songs/:songId", requireWorship(), async (req, res) => {
         preferred_key: key ?? song.original_key,
         notes,
       })
-      .onConflictDoNothing()
+      .onConflictDoNothing({ target: worshipMemberSongsTable.song_id })
       .returning({ id: worshipMemberSongsTable.id });
-    if (inserted.length > 0) {
-      inBackground("song added notify", notifySongAdded(me(req), song, key ?? song.original_key));
+    if (inserted.length === 0) {
+      const holder = await songHolder(song.id);
+      if (holder?.id === me(req).id) return res.json({ added: false });
+      return res.status(409).json({
+        error: `${holder?.full_name ?? "Someone"} already has this song. They can transfer it to you.`,
+      });
     }
-    return res.status(201).json({ added: inserted.length > 0 });
+    inBackground("song added notify", notifySongAdded(me(req), song, key ?? song.original_key));
+    return res.status(201).json({ added: true });
+  } catch (err) {
+    return fail(req, res, err);
+  }
+});
+
+// POST /worship/songs/:id/transfer — hand a song to someone else on the team.
+// Their key and notes start fresh: the old holder's were personal to them.
+router.post("/worship/songs/:id/transfer", requireWorship(), async (req, res) => {
+  try {
+    const song = await db.query.worshipSongsTable.findFirst({
+      where: eq(worshipSongsTable.id, String(req.params.id)),
+    });
+    if (!song) return res.status(404).json({ error: "Song not found." });
+    const holder = await songHolder(song.id);
+    if (!holder) return res.status(400).json({ error: "Nobody has this song yet, so there's nothing to transfer." });
+    if (!canTransferSong(me(req), holder.id)) {
+      return res.status(403).json({ error: `Only ${holder.full_name} or the head leader can transfer this song.` });
+    }
+    const to = await db.query.worshipAccountsTable.findFirst({
+      where: and(eq(worshipAccountsTable.id, String(body(req).to)), eq(worshipAccountsTable.status, "approved")),
+    });
+    if (!to) return res.status(404).json({ error: "Team member not found." });
+    if (to.id === holder.id) return res.status(400).json({ error: `${to.full_name} already has this song.` });
+
+    const moved = await db
+      .update(worshipMemberSongsTable)
+      .set({ account_id: to.id, preferred_key: song.original_key, notes: null })
+      .where(and(eq(worshipMemberSongsTable.id, holder.entry_id), eq(worshipMemberSongsTable.account_id, holder.id)))
+      .returning({ id: worshipMemberSongsTable.id });
+    if (moved.length === 0) {
+      return res.status(409).json({ error: "This song has just changed hands. Refresh and try again." });
+    }
+    inBackground("song transferred notify", notifySongTransferred(me(req), holder.id, to, song));
+    return res.json({ holder: { id: to.id, full_name: to.full_name } });
   } catch (err) {
     return fail(req, res, err);
   }

@@ -19,19 +19,25 @@ function LibraryPage({ me }: { me: WorshipAccount }) {
   const [search, setSearch] = useState("");
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [onlyUnassigned, setOnlyUnassigned] = useState(false);
   const q = useDebouncedValue(search.trim(), 250);
   const { data, isLoading } = useQuery({
     queryKey: worshipKeys.songs(q),
     queryFn: () => worshipFetch<{ songs: LibrarySong[] }>(`/songs${q ? `?q=${encodeURIComponent(q)}` : ""}`),
   });
-  const addToMine = useMutation({
+  const pick = useMutation({
     mutationFn: (s: LibrarySong) => worshipPost(`/me/songs/${s.id}`, { preferred_key: s.original_key }, "PUT"),
     onSuccess: () => {
-      toast.success("Added to your list. The team has been notified.");
+      toast.success("It's yours. The team has been notified.");
       queryClient.invalidateQueries({ queryKey: ["worship"] });
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      toast.error(err.message);
+      queryClient.invalidateQueries({ queryKey: ["worship"] }); // someone got there first
+    },
   });
+  const unassigned = data?.songs.filter((s) => !s.holder_id) ?? [];
+  const shown = onlyUnassigned ? unassigned : (data?.songs ?? []);
 
   return (
     <div className="space-y-4">
@@ -53,6 +59,14 @@ function LibraryPage({ me }: { me: WorshipAccount }) {
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input className="pl-9" placeholder="Search songs or artists" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
+      <div className="flex gap-2">
+        <Button size="sm" variant={onlyUnassigned ? "outline" : "default"} onClick={() => setOnlyUnassigned(false)}>
+          All
+        </Button>
+        <Button size="sm" variant={onlyUnassigned ? "default" : "outline"} onClick={() => setOnlyUnassigned(true)}>
+          Unassigned ({unassigned.length})
+        </Button>
+      </div>
 
       {isLoading ? (
         <div className="space-y-2">
@@ -60,23 +74,29 @@ function LibraryPage({ me }: { me: WorshipAccount }) {
             <Skeleton key={i} className="h-16 rounded-2xl" />
           ))}
         </div>
-      ) : !data?.songs.length ? (
+      ) : !shown.length ? (
         <div className="rounded-2xl border border-dashed border-border p-8 text-center">
           <Music2 className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
           <p className="text-sm text-muted-foreground">
-            {q ? "No songs match that search." : "The library is empty. Add the first song!"}
+            {q
+              ? "No songs match that search."
+              : onlyUnassigned
+                ? "Every song has been picked."
+                : "The library is empty. Add the first song!"}
           </p>
         </div>
       ) : (
         <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
-          {data.songs.map((s) => (
+          {shown.map((s) => (
             <div key={s.id} className="flex items-center gap-3 p-3">
               <Link href={`/worship/songs/${s.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                 <KeyBadge k={s.original_key} className="h-10 min-w-10 bg-muted text-sm text-foreground" />
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{s.title}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {[s.artist, `${s.member_count} on the team`].filter(Boolean).join(" · ")}
+                    {[s.artist, s.in_my_list ? null : s.holder_id ? `${s.holder_name}'s song` : "Unassigned"]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
                 </div>
               </Link>
@@ -86,15 +106,17 @@ function LibraryPage({ me }: { me: WorshipAccount }) {
                   {s.my_key ? `Yours in ${s.my_key}` : "On your list"}
                 </span>
               ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="shrink-0"
-                  disabled={addToMine.isPending}
-                  onClick={() => addToMine.mutate(s)}
-                >
-                  <Plus className="mr-1 h-4 w-4" /> Add
-                </Button>
+                !s.holder_id && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    disabled={pick.isPending}
+                    onClick={() => pick.mutate(s)}
+                  >
+                    <Plus className="mr-1 h-4 w-4" /> Pick
+                  </Button>
+                )
               )}
             </div>
           ))}

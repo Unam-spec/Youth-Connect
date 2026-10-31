@@ -10,6 +10,7 @@ import {
   jsonb,
   pgEnum,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -622,6 +623,7 @@ export const worshipSongsTable = pgTable("worship_songs", {
 export type WorshipSong = typeof worshipSongsTable.$inferSelect;
 
 // A person's song list: which library songs they lead/play, in their own key.
+// A song has one holder at a time: no row means it's unassigned.
 export const worshipMemberSongsTable = pgTable(
   "worship_member_songs",
   {
@@ -643,6 +645,7 @@ export const worshipMemberSongsTable = pgTable(
       t.account_id,
       t.song_id,
     ),
+    songUnique: uniqueIndex("worship_member_songs_song_unique").on(t.song_id),
   }),
 );
 

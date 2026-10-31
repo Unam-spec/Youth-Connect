@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useParams } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Maximize2, Minimize2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowLeftRight, Check, Maximize2, Minimize2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { WorshipGate } from "@/components/worship/WorshipGate";
 import { PageBack } from "@/components/worship/PageBack";
+import { TransferSongDialog } from "@/components/worship/TransferSongDialog";
 import { ChordChart, KeyBadge, KeySelect, SongFormDialog } from "@/components/worship/songs";
 import { cn } from "@/lib/utils";
 import { worshipFetch, worshipKeys, worshipPost, type WorshipAccount, type WorshipSong } from "@/lib/worship";
@@ -25,12 +26,14 @@ import { semitonesBetween, transposeKey } from "@/lib/worshipChords";
 
 interface SongDetail {
   song: WorshipSong;
-  members: { id: string; full_name: string; preferred_key: string | null; notes: string | null }[];
+  holder: { id: string; full_name: string; preferred_key: string | null } | null;
   my_entry: { preferred_key: string | null; notes: string | null } | null;
   can_edit: boolean;
+  can_transfer: boolean;
 }
 
-function MyEntry({ data }: { data: SongDetail }) {
+/** The song is mine, or nobody's yet and mine to pick. */
+function MyEntry({ data, onTransfer }: { data: SongDetail; onTransfer: () => void }) {
   const queryClient = useQueryClient();
   const { song, my_entry } = data;
   const [key, setKey] = useState<string | null>(my_entry?.preferred_key ?? song.original_key);
@@ -43,15 +46,18 @@ function MyEntry({ data }: { data: SongDetail }) {
   const save = useMutation({
     mutationFn: () => worshipPost<{ added: boolean }>(`/me/songs/${song.id}`, { preferred_key: key, notes }, "PUT"),
     onSuccess: (r) => {
-      toast.success(r.added ? "Added to your list. The team has been notified." : "Saved");
+      toast.success(r.added ? "It's yours. The team has been notified." : "Saved");
       queryClient.invalidateQueries({ queryKey: ["worship"] });
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      toast.error(err.message);
+      queryClient.invalidateQueries({ queryKey: ["worship"] }); // someone got there first
+    },
   });
   const remove = useMutation({
     mutationFn: () => worshipPost(`/me/songs/${song.id}`, undefined, "DELETE"),
     onSuccess: () => {
-      toast.success("Removed from your list");
+      toast.success("It's back in the unassigned songs");
       queryClient.invalidateQueries({ queryKey: ["worship"] });
     },
     onError: (err: Error) => toast.error(err.message),
@@ -59,7 +65,7 @@ function MyEntry({ data }: { data: SongDetail }) {
 
   return (
     <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
-      <p className="text-sm font-semibold">{my_entry ? "On your list" : "Add to your list"}</p>
+      <p className="text-sm font-semibold">{my_entry ? "Your song" : "Unassigned"}</p>
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="my-key" className="text-xs text-muted-foreground">
           Your key
@@ -73,15 +79,20 @@ function MyEntry({ data }: { data: SongDetail }) {
           onChange={(e) => setNotes(e.target.value)}
         />
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
           {my_entry ? <Check className="mr-1.5 h-4 w-4" /> : <Plus className="mr-1.5 h-4 w-4" />}
-          {my_entry ? "Save" : "Add to my list"}
+          {my_entry ? "Save" : "Pick this song"}
         </Button>
         {my_entry && (
-          <Button size="sm" variant="ghost" onClick={() => remove.mutate()} disabled={remove.isPending}>
-            Remove from my list
-          </Button>
+          <>
+            <Button size="sm" variant="outline" onClick={onTransfer}>
+              <ArrowLeftRight className="mr-1.5 h-4 w-4" /> Transfer
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => remove.mutate()} disabled={remove.isPending}>
+              Give it back
+            </Button>
+          </>
         )}
       </div>
     </div>
@@ -99,6 +110,7 @@ function SongPage({ id }: { id: string }) {
   const [stage, setStage] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [transferring, setTransferring] = useState(false);
 
   // Open in the viewer's own key when they have one, else the original.
   useEffect(() => {
@@ -180,29 +192,36 @@ function SongPage({ id }: { id: string }) {
         )}
       </div>
 
-      <MyEntry data={data} />
-
-      {data.members.length > 0 && (
+      {data.holder && !data.my_entry ? (
         <div className="rounded-2xl border border-border bg-card p-4">
-          <p className="mb-2 text-sm font-semibold">Who plays this</p>
-          <div className="flex flex-wrap gap-2">
-            {data.members.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => m.preferred_key && setViewKey(m.preferred_key)}
-                className={cn(
-                  "flex items-center gap-2 rounded-full border border-border py-1 pl-3 pr-1 text-sm hover:border-primary/40",
-                  m.preferred_key === viewKey && "border-primary/50",
-                )}
-                title={m.preferred_key ? `View in ${m.full_name}'s key` : undefined}
-              >
-                {m.full_name}
-                <KeyBadge k={m.preferred_key} className="h-6 min-w-6" />
-              </button>
-            ))}
+          <p className="mb-2 text-sm font-semibold">Whose song this is</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => data.holder?.preferred_key && setViewKey(data.holder.preferred_key)}
+              className={cn(
+                "flex items-center gap-2 rounded-full border border-border py-1 pl-3 pr-1 text-sm hover:border-primary/40",
+                data.holder.preferred_key === viewKey && "border-primary/50",
+              )}
+              title={data.holder.preferred_key ? `View in ${data.holder.full_name}'s key` : undefined}
+            >
+              {data.holder.full_name}
+              <KeyBadge k={data.holder.preferred_key} className="h-6 min-w-6" />
+            </button>
+            {data.can_transfer && (
+              <Button size="sm" variant="outline" onClick={() => setTransferring(true)}>
+                <ArrowLeftRight className="mr-1.5 h-4 w-4" /> Transfer
+              </Button>
+            )}
           </div>
+          {!data.can_transfer && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Only {data.holder.full_name} can transfer this song. Ask them if you need it.
+            </p>
+          )}
         </div>
+      ) : (
+        <MyEntry data={data} onTransfer={() => setTransferring(true)} />
       )}
 
       <div className="rounded-2xl border border-border bg-card p-5">
@@ -216,6 +235,14 @@ function SongPage({ id }: { id: string }) {
       </div>
 
       <SongFormDialog open={editing} onOpenChange={setEditing} song={song} />
+      {data.holder && (
+        <TransferSongDialog
+          song={song}
+          holderId={data.holder.id}
+          open={transferring}
+          onOpenChange={setTransferring}
+        />
+      )}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -421,6 +421,26 @@ WHERE "id" = (
   ORDER BY "created_at" LIMIT 1
 )
 AND NOT EXISTS (SELECT 1 FROM "worship_accounts" WHERE "role" = 'owner');
+
+-- One holder per song (2026-10): whoever picked a song first keeps it. Anyone
+-- else's entry moves to the archive, not lost. A no-op once it has run.
+CREATE TABLE IF NOT EXISTS "worship_member_songs_archive" (
+  LIKE "worship_member_songs",
+  "archived_at" timestamp with time zone NOT NULL DEFAULT now()
+);
+WITH "extra" AS (
+  SELECT "id" FROM (
+    SELECT "id", row_number() OVER (PARTITION BY "song_id" ORDER BY "created_at", "id") AS "n"
+    FROM "worship_member_songs"
+  ) "ranked"
+  WHERE "n" > 1
+), "moved" AS (
+  DELETE FROM "worship_member_songs" "m" USING "extra" WHERE "m"."id" = "extra"."id"
+  RETURNING "m".*
+)
+INSERT INTO "worship_member_songs_archive" ("id", "account_id", "song_id", "preferred_key", "notes", "created_at")
+SELECT "id", "account_id", "song_id", "preferred_key", "notes", "created_at" FROM "moved";
+CREATE UNIQUE INDEX IF NOT EXISTS "worship_member_songs_song_unique" ON "worship_member_songs" ("song_id");
 `;
 
 export async function runMigrations() {

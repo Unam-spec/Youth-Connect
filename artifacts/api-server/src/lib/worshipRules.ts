@@ -134,6 +134,21 @@ export function canEditSong(
   return isOwner(actor) || song.created_by === actor.id;
 }
 
+/** Whoever holds a song can hand it on; so can the head leader, for when someone stops coming. */
+export function canTransferSong(actor: { id: string; role: string }, holderId: string): boolean {
+  return isOwner(actor) || actor.id === holderId;
+}
+
+/** Two library entries are one song: same title, and the same artist unless one has none. */
+export function isSameSong(
+  a: { title: string; artist: string | null },
+  b: { title: string; artist: string | null },
+): boolean {
+  const clean = (s: string | null) => (s ?? "").trim().toLowerCase();
+  if (clean(a.title) !== clean(b.title)) return false;
+  return !clean(a.artist) || !clean(b.artist) || clean(a.artist) === clean(b.artist);
+}
+
 /**
  * Whether the head leader may make `target` a leader/member or remove them.
  * The head leader's own account is never changed or removed this way.

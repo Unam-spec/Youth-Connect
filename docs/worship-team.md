@@ -22,8 +22,20 @@ Some worship team members are not JG Youth members, so the worship area is a **s
 ## Songs from the internet and FreeShow
 
 - **Find it online** (Add a song): search a song name — results come from Ultimate Guitar, most-voted first — or paste a link. The server reads the page and fills in title, artist, key and lyrics with chords inline (`/api/worship/songs/search-online`, `/api/worship/songs/from-url`; parsing in `artifacts/api-server/src/lib/songImport.ts`). Works for Ultimate Guitar, ChordPro files and pages that show the chord sheet as text; WorshipTogether and similar sites block automated reading. Links are fetched only to public addresses (`lib/safeFetch.ts`).
-- **Import from FreeShow** (Songs page, head leader + leaders): pick FreeShow's Shows folder (usually Documents → FreeShow → Shows) or some `.show` files; every song goes into the library on nobody's list, skipping ones already there (`/api/worship/songs/import`).
+- **Import from FreeShow** (Songs page, head leader + leaders): pick FreeShow's Shows folder (usually Documents → FreeShow → Shows) or some `.show` files; every song goes into the library unassigned, skipping ones already there (`/api/worship/songs/import`).
 - **Download for FreeShow** (setlist page): a `.project` file with each song in its setlist key, one slide per section, chords kept. Import it in FreeShow. Conversion both ways is in `artifacts/jg-youth/src/lib/freeshow.ts`.
+
+## One holder per song
+
+A song belongs to one person at a time, and whoever picks it first has it.
+
+- **Unassigned songs:** a song nobody has picked. The Songs page has an Unassigned filter and a Pick button on each one.
+- **Taken songs can't be picked.** The database enforces this (`worship_member_songs_song_unique`), so two people tapping Pick at the same moment can't both get it. The second person is told who has it.
+- **Transfer** (`POST /api/worship/songs/:id/transfer`): the holder or the head leader moves a song to anyone on the team. The new holder's key and notes start fresh and they get a notification.
+- **Give it back:** the holder can return a song to unassigned. Songs also go back when someone is removed from the team.
+- **No duplicate songs:** adding a song whose title matches one in the library (same artist, or either has no artist) is refused with a link to the existing song.
+- **Setlists are separate:** a leader can still choose anyone to lead a song on a Sunday, whoever holds it.
+- **Moving to this rule:** when several people already had a song, the earliest kept it. The others' key and notes are in `worship_member_songs_archive`.
 
 ## Onboarding
 
@@ -69,7 +81,7 @@ Shaped like the JG Youth leader system (Super Admin → Leaders → Members). Ev
 2. **The team page (`/worship`):** a grid of approved members (photo, name, role such as "Vocals" or "Keys", and a "Leader" badge), a bell icon for notifications, and a "My profile" button. Leaders also see join requests at the top, and a menu on each person with "Make leader" and "Remove".
 3. **`/worship/members/:id`, a member profile:** name, role(s) and vocal range, then their song list: each row shows the title, artist, *their* key as a badge, and tempo. On your own profile you get "Add song" and edit controls.
 4. **`/worship/songs/:id`, a song:** lyrics with chords above the lines. A key picker transposes the chords live, opening in the viewer's own saved key. Big-text "stage mode" for practice.
-5. **`/worship/library`, the shared library:** every song the team knows, searchable. "Add to my list" saves it with your own key and notifies the team.
+5. **`/worship/library`, the shared library:** every song the team knows, searchable, with an Unassigned filter. "Pick" makes it yours and notifies the team.
 6. **`/worship/setlists`:** everyone sees upcoming and past setlists. The head leader and leaders create and edit them: a date (defaults to next Sunday), an optional title and notes, and ordered songs, each with who leads it and the key. A key left on "Lead's key" uses that person's own key for the song, else the original. **Share to WhatsApp** (and Copy) sends a formatted list with a link to the chords. Posting one notifies the rest of the team.
 7. **Invite:** an "Invite someone to the team" card on the team page plus a button in the header, for everyone. It sends a WhatsApp message explaining the worship area with a link to `/worship?join=1`, which opens straight on "Request to join".
 
@@ -82,11 +94,11 @@ All tables are separate from `profiles`. None have a foreign key to JG Youth tab
 - `worship_push_subscriptions`: `account_id`, `endpoint` (unique), `p256dh`, `auth`
 - `worship_notifications`: `id`, `recipient_id`, `actor_id`, `type` (song_added, join_request…), `song_id`, `read_at`, `created_at`, which feeds the in-app inbox
 - `worship_songs`: `id`, `title`, `artist`, `original_key`, `tempo_bpm`, `lyrics` (chords inline in brackets, e.g. `[G]Amazing [C]grace`, so they can be transposed), `created_by`
-- `worship_member_songs`: `account_id`, `song_id`, `preferred_key`, `notes`, unique on (member, song)
+- `worship_member_songs`: `account_id`, `song_id`, `preferred_key`, `notes`, unique on song (one holder at a time)
 - `worship_setlists`: `id`, `service_date`, `title`, `notes`, `created_by`, timestamps
 - `worship_setlist_songs`: `setlist_id`, `song_id`, `lead_id`, `song_key`, `position`
 
-Lyrics are stored once per song. Keys are stored per person.
+Lyrics are stored once per song. The key is stored with the song's holder.
 
 ## API (`lib/api-spec/openapi.yaml` → codegen)
 

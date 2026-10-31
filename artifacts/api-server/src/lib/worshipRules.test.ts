@@ -6,7 +6,9 @@ import {
   validateSongInput,
   canApprove,
   canEditSong,
+  canTransferSong,
   checkMemberChange,
+  isSameSong,
   LoginLimiter,
   validateSetlistInput,
 } from "./worshipRules";
@@ -90,6 +92,35 @@ describe("canEditSong", () => {
     expect(canEditSong({ id: "a", role: "leader" }, { created_by: "b" })).toBe(false);
     expect(canEditSong({ id: "a", role: "member" }, { created_by: "a" })).toBe(true);
     expect(canEditSong({ id: "a", role: "member" }, { created_by: null })).toBe(false);
+  });
+});
+
+describe("canTransferSong", () => {
+  it("lets whoever holds the song transfer it", () => {
+    expect(canTransferSong({ id: "a", role: "member" }, "a")).toBe(true);
+  });
+  it("stops everyone else, leaders included", () => {
+    expect(canTransferSong({ id: "a", role: "member" }, "b")).toBe(false);
+    expect(canTransferSong({ id: "a", role: "leader" }, "b")).toBe(false);
+  });
+  it("lets the head leader move a song someone isn't using", () => {
+    expect(canTransferSong({ id: "a", role: "owner" }, "b")).toBe(true);
+  });
+});
+
+describe("isSameSong", () => {
+  it("ignores case and stray spaces", () => {
+    expect(isSameSong({ title: " Way Maker", artist: "Sinach" }, { title: "way maker ", artist: "SINACH" })).toBe(true);
+  });
+  it("treats a missing artist as the same song", () => {
+    expect(isSameSong({ title: "Way Maker", artist: null }, { title: "Way Maker", artist: "Sinach" })).toBe(true);
+    expect(isSameSong({ title: "Way Maker", artist: "" }, { title: "Way Maker", artist: null })).toBe(true);
+  });
+  it("keeps same-titled songs by different artists apart", () => {
+    expect(isSameSong({ title: "Holy", artist: "Sinach" }, { title: "Holy", artist: "Tomlin" })).toBe(false);
+  });
+  it("keeps different titles apart", () => {
+    expect(isSameSong({ title: "Holy", artist: null }, { title: "Holy Forever", artist: null })).toBe(false);
   });
 });
 

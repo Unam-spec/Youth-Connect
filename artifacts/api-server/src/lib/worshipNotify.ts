@@ -65,6 +65,35 @@ export async function notifySongAdded(
 }
 
 /** The head leader and leaders hear about a new join request. */
+/** Tells the new holder a song is theirs, and the old one if someone else moved it. */
+export async function notifySongTransferred(
+  actor: { id: string; full_name: string },
+  fromId: string,
+  to: { id: string; full_name: string },
+  song: { id: string; title: string },
+): Promise<void> {
+  const people = await db
+    .select({
+      id: worshipAccountsTable.id,
+      notifications_muted: worshipAccountsTable.notifications_muted,
+    })
+    .from(worshipAccountsTable)
+    .where(inArray(worshipAccountsTable.id, [fromId, to.id]));
+  const base = { actorId: actor.id, type: "song_transferred", title: "Worship Team", url: `/worship/songs/${song.id}` };
+  if (actor.id !== to.id) {
+    await notify(people.filter((p) => p.id === to.id), {
+      ...base,
+      message: `${actor.full_name} transferred "${song.title}" to you`,
+    });
+  }
+  if (actor.id !== fromId) {
+    await notify(people.filter((p) => p.id === fromId), {
+      ...base,
+      message: `${actor.full_name} moved "${song.title}" from your list to ${to.full_name}`,
+    });
+  }
+}
+
 export async function notifyJoinRequest(requester: { id: string; full_name: string }): Promise<void> {
   const leaders = await db
     .select({

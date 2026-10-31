@@ -30,7 +30,7 @@ function MemberPage({ me, id }: { me: WorshipAccount; id: string }) {
   const removeSong = useMutation({
     mutationFn: (songId: string) => worshipPost(`/me/songs/${songId}`, undefined, "DELETE"),
     onSuccess: () => {
-      toast.success("Removed from your list");
+      toast.success("It's back in the unassigned songs");
       queryClient.invalidateQueries({ queryKey: ["worship"] });
     },
     onError: (err: Error) => toast.error(err.message),

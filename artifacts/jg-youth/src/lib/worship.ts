@@ -46,7 +46,8 @@ export interface LibrarySong {
   tempo_bpm: number | null;
   my_key: string | null;
   in_my_list: boolean;
-  member_count: number;
+  holder_id: string | null;
+  holder_name: string | null;
 }
 
 export interface MemberSong {
