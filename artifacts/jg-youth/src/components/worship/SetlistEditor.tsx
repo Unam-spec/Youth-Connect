@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { ArrowDown, ArrowUp, Loader2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Loader2, Plus, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,7 +14,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import { worshipFetch, worshipKeys, worshipPost, type LibrarySong, type WorshipAccount } from "@/lib/worship";
 import { nextSunday } from "@/lib/worshipShare";
 import { KeySelect } from "./songs";
@@ -41,6 +40,99 @@ type Row = { song_id: string; title: string; lead_id: string | null; song_key: s
 
 const selectClass =
   "h-10 rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+
+/** Lowercase, no accents or punctuation, so "se my" finds "Sê my hoe" and "hadnt" finds "hadn't". */
+function searchable(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/['’`]/g, "")
+    .toLowerCase();
+}
+
+/** Search the library and tap songs to add them. Stays open to add several in a row. */
+function AddSongPicker({
+  songs,
+  loading,
+  onAdd,
+}: {
+  songs: LibrarySong[];
+  loading: boolean;
+  onAdd: (song: LibrarySong) => void;
+}) {
+  const [picking, setPicking] = useState(false);
+  const [search, setSearch] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+
+  const words = searchable(search).split(/\s+/).filter(Boolean);
+  const matches = songs.filter((s) => {
+    const text = searchable(`${s.title} ${s.artist ?? ""}`);
+    return words.every((w) => text.includes(w));
+  });
+  const add = (song: LibrarySong) => {
+    onAdd(song);
+    setSearch("");
+    input.current?.focus();
+  };
+
+  if (!picking) {
+    return (
+      <Button variant="outline" className="w-full" disabled={loading} onClick={() => setPicking(true)}>
+        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+        {loading ? "Loading songs…" : "Add a song"}
+      </Button>
+    );
+  }
+  return (
+    <div className="space-y-2 rounded-xl border border-border bg-card p-3">
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            ref={input}
+            autoFocus
+            aria-label="Search songs"
+            className="pl-9"
+            placeholder="Search songs or artists"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && search.trim() && matches[0]) {
+                e.preventDefault();
+                add(matches[0]);
+              }
+            }}
+          />
+        </div>
+        <Button variant="ghost" size="sm" className="shrink-0" onClick={() => setPicking(false)}>
+          Done
+        </Button>
+      </div>
+      {matches.length === 0 ? (
+        <p className="py-3 text-center text-sm text-muted-foreground">
+          {search.trim() ? "No songs match that search." : "Every song is already on this setlist."}
+        </p>
+      ) : (
+        <div className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+          {matches.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => add(s)}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-muted/50"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium">{s.title}</span>
+                {s.artist && <span className="block truncate text-xs text-muted-foreground">{s.artist}</span>}
+              </span>
+              {s.original_key && <span className="shrink-0 text-xs text-muted-foreground">{s.original_key}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Create or edit a Sunday setlist (head leader + leaders). */
 export function SetlistEditor({
@@ -131,7 +223,7 @@ export function SetlistEditor({
             Leave a key on "Lead's key" to use the key that person sings it in.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="sl-date">Date</Label>
@@ -190,24 +282,13 @@ export function SetlistEditor({
                 </div>
               </div>
             ))}
-            <select
-              aria-label="Add a song"
-              className={cn(selectClass, "w-full")}
-              value=""
-              onChange={(e) => {
-                const song = available.find((s) => s.id === e.target.value);
-                if (song) setRows((r) => [...r, { song_id: song.id, title: song.title, lead_id: null, song_key: null }]);
-              }}
-            >
-              <option value="">{library.isLoading ? "Loading songs…" : "＋ Add a song from the library"}</option>
-              {available.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.title}
-                  {s.artist ? ` · ${s.artist}` : ""}
-                  {s.original_key ? ` (${s.original_key})` : ""}
-                </option>
-              ))}
-            </select>
+            <AddSongPicker
+              songs={available}
+              loading={library.isLoading}
+              onAdd={(song) =>
+                setRows((r) => [...r, { song_id: song.id, title: song.title, lead_id: null, song_key: null }])
+              }
+            />
           </div>
 
           <div className="space-y-1.5">
