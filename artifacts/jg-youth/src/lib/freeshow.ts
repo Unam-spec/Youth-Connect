@@ -28,12 +28,16 @@ type FsSlide = {
 };
 type FsShow = {
   name?: string;
+  category?: string | null;
   reference?: unknown;
   meta?: Record<string, string | undefined>;
   settings?: { activeLayout?: string };
   slides?: Record<string, FsSlide>;
   layouts?: Record<string, { slides?: { id: string }[] }>;
 };
+
+// FreeShow's own categories for shows that aren't songs (announcements, notes…).
+const NOT_SONG_CATEGORIES = new Set(["presentation", "scripture", "converted"]);
 
 function titleCase(s: string): string {
   return s.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -66,6 +70,7 @@ export function parseFreeShowShow(content: string, fileName = ""): ImportableSon
   }
   const show = (Array.isArray(parsed) ? parsed[1] : parsed) as FsShow | undefined;
   if (!show || typeof show !== "object" || show.reference || !show.slides) return null;
+  if (show.category && NOT_SONG_CATEGORIES.has(show.category)) return null;
 
   // Slide order: the active layout (parents, then their child slides).
   const layout = show.layouts?.[show.settings?.activeLayout ?? ""] ?? Object.values(show.layouts ?? {})[0];
@@ -100,6 +105,8 @@ export function parseFreeShowShow(content: string, fileName = ""): ImportableSon
 // ── Setlist → FreeShow project ────────────────────────────────────────────────
 
 const ITEM_STYLE = "top:88px;left:50px;height:904px;width:1820px;"; // FreeShow's default text box
+const TEXT_STYLE = "font-size:100px;text-transform:uppercase;"; // how the team's own slides look
+const MAX_LINES_PER_SLIDE = 8; // the most that fits at that size; longer sections carry on on a new slide
 const GLOBAL_GROUPS: Record<string, string> = {
   verse: "verse",
   chorus: "chorus",
@@ -121,6 +128,21 @@ function uid(length = 11): string {
   return Array.from(bytes, (b) => chars[b % chars.length]).join("");
 }
 
+/**
+ * The same song always gets the same id, so importing it again updates that
+ * copy. FreeShow gives a random id a new copy every time ("Song 2", "Song 3").
+ */
+function stableShowId(title: string): string {
+  let a = 0x811c9dc5;
+  let b = 5381;
+  for (const ch of title.trim().toLowerCase()) {
+    const c = ch.codePointAt(0) ?? 0;
+    a = Math.imul(a ^ c, 16777619) >>> 0;
+    b = (Math.imul(b, 33) + c) >>> 0;
+  }
+  return `wt${a.toString(36)}${b.toString(36)}`.slice(0, 11).padEnd(11, "0");
+}
+
 /** "[G]Amazing [C]grace" → FreeShow line { text, chords:[{pos,key}] }. */
 function toFreeShowLine(line: string) {
   let text = "";
@@ -135,7 +157,7 @@ function toFreeShowLine(line: string) {
     else text += m[0];
   }
   text += line.slice(last);
-  return { align: "", text: [{ value: text.trimEnd(), style: "" }], chords };
+  return { align: "", text: [{ value: text.trimEnd(), style: TEXT_STYLE }], chords };
 }
 
 /** Our lyrics → a FreeShow show (one slide per section / blank-line block). */
@@ -158,7 +180,7 @@ export function songToFreeShowShow(song: { title: string; artist: string | null;
     }
     const lyric = toFreeShowLine(line);
     if (!lyric.text[0].value.trim()) continue; // chord-only lines (intros) aren't projected
-    if (!current) {
+    if (!current || current.lines.length >= MAX_LINES_PER_SLIDE) {
       current = { group, lines: [] };
       blocks.push(current);
     }
@@ -176,13 +198,15 @@ export function songToFreeShowShow(song: { title: string; artist: string | null;
       ...(global ? { globalGroup: global } : {}),
       settings: {},
       notes: "",
-      items: [{ style: ITEM_STYLE, lines: b.lines.map(toFreeShowLine) }],
+      items: [{ type: "text", style: ITEM_STYLE, auto: true, lines: b.lines.map(toFreeShowLine) }],
     };
     layoutSlides.push({ id });
   }
   const layoutId = uid();
   return {
-    name: song.title,
+    // Not the bare title: that's the team's own FreeShow copy of the song, and
+    // FreeShow would answer the clash by renaming this one "Song 2".
+    name: `${song.title} (${song.key ?? "setlist"})`,
     category: null,
     settings: { activeLayout: layoutId, template: null },
     timestamps: { created: Date.now(), modified: null, used: null },
@@ -202,7 +226,7 @@ export function setlistToFreeShowProject(
   const shows: Record<string, unknown> = {};
   const refs: { id: string }[] = [];
   for (const song of songs) {
-    const id = uid();
+    const id = stableShowId(song.title);
     shows[id] = songToFreeShowShow(song);
     refs.push({ id });
   }
