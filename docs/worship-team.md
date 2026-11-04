@@ -39,7 +39,9 @@ A song belongs to one person at a time, and whoever picks it first has it.
 
 ## Onboarding
 
-The first time someone gets in (the head leader on sign-up, everyone else once accepted), a 7-step welcome opens: what their role means (head leader / leader / member wording), set up their profile (instruments, vocal range, saved straight away), add a first song or pick from the library, how keys and stage mode work, Sunday setlists (leaders get a shortcut to post one), turn on notifications, and invite someone. Skip or finish both mark it done on the server (`onboarded_at`, `POST /api/worship/me/onboarded`), so it shows once per person on any device. **Replay welcome** in the account menu reopens it.
+The first time someone gets in (the head leader on sign-up, everyone else once accepted), a 9-step welcome opens: what their role means (head leader / leader / member wording), set up their profile (instruments, vocal range, saved straight away), their song list (Find it online, one person per song, Pick, Transfer and Give it back), how keys and stage mode work, Sunday setlists (search to add songs, Share to WhatsApp; leaders get a shortcut), FreeShow (Download for FreeShow for everyone, Import from FreeShow for leaders), turn on notifications, getting around (the back arrow to JG Youth, Back on every page, staying signed in, Forgot PIN), and invite someone. Skip or finish both mark it done on the server (`onboarded_at`, `POST /api/worship/me/onboarded`), so it shows once per person on any device. **Replay welcome** in the account menu reopens it.
+
+**What's new:** people who did the welcome before these features (onboarded before `VERSION_2_SINCE` in `WorshipOnboarding.tsx`) get a short 5-step "What's new" once per device instead. When the welcome gains steps again, bump `WELCOME_VERSION` and the date.
 
 Afterwards a **Getting started** checklist on the team page ticks itself off from real data (role picked, first song added, notifications on) and disappears when done or dismissed.
 

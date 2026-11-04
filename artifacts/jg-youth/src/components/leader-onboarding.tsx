@@ -4,8 +4,10 @@ import "driver.js/dist/driver.css";
 import { getLeaderSession } from "@/lib/auth";
 
 // Bumped to v2 when the tour was rewritten for kiosk mode, push notifications,
-// birthdays and PIN accounts — leaders who finished v1 should see what's new.
-const TOUR_SEEN_KEY = "jg_youth_dashboard_tour_seen_v2";
+// birthdays and PIN accounts, and to v3 for the one group check-in message,
+// leader nudges, tap-to-enlarge photos and staying signed in. Leaders who
+// finished an older version see the new one once.
+const TOUR_SEEN_KEY = "jg_youth_dashboard_tour_seen_v3";
 
 const TOUR_STEPS: DriveStep[] = [
   {
@@ -13,7 +15,7 @@ const TOUR_STEPS: DriveStep[] = [
     popover: {
       title: "Welcome to the Leader Dashboard! 👋",
       description:
-        "A lot has landed since you were last shown around: shared-phone <strong>Kiosk Mode</strong>, <strong>push notifications</strong>, <strong>birthdays</strong> and <strong>PIN accounts</strong>. Let's take a quick tour.",
+        "What's new: <strong>one group check-in message</strong> you send in a tap, <strong>notifications</strong> telling you when messages need to go out, <strong>birthday notifications</strong> for everyone, and <strong>tap any profile photo</strong> to see it bigger. You also stay signed in now, and the app reopens where you left off. Let's take a quick tour.",
       side: "bottom",
     },
   },
@@ -52,7 +54,7 @@ const TOUR_STEPS: DriveStep[] = [
     popover: {
       title: "Manage Members",
       description:
-        "View the full directory, edit member details, manage PIN accounts, review membership requests, and see upcoming birthdays. 🎂",
+        "View the full directory, edit member details, manage PIN accounts, review membership requests, and see upcoming birthdays. 🎂<br/><br/>On someone's birthday, every member and leader gets a notification. Tap any profile photo to enlarge it.",
       side: "right",
       align: "start",
     },
@@ -70,9 +72,9 @@ const TOUR_STEPS: DriveStep[] = [
   {
     element: "#tour-nav-follow-ups",
     popover: {
-      title: "Messaging",
+      title: "Messaging 🆕",
       description:
-        "Send automated check-in reminders and WhatsApp follow-up messages to members.",
+        "<strong>One check-in message for the group:</strong> tap <em>Send to group</em> and post it in the WhatsApp group. You'll get a notification an hour before check-in closes.<br/><br/>Below it are the <strong>follow-ups</strong> for members who've been away for weeks. Every leader is notified when new ones need sending, and again at midday while some are still waiting.",
       side: "right",
       align: "start",
     },
@@ -112,7 +114,7 @@ const TOUR_STEPS: DriveStep[] = [
     popover: {
       title: "Your Workspace",
       description:
-        "This is your main active area. Try Kiosk Mode at your next session, and check the Session tab to approve the check-ins that come through it!",
+        "This is your main active area. When a notification says messages are waiting, tap it to land straight on Messaging. That's the tour!",
       side: "top",
       align: "start",
     },

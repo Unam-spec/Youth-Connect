@@ -50,6 +50,18 @@ import { BirthdayBanner } from "@/components/member/BirthdayBanner";
 import { NotificationSetupCard } from "@/components/member/NotificationSetupCard";
 import { OnboardingTour, type TourStep } from "@/components/member/OnboardingTour";
 
+const TOUR_KEY = "jg_tour_completed";
+/** Bump when the member tour gains steps everyone should see once. */
+const TOUR_VERSION = 2;
+/** The tour version finished on this device: 0 for none. Version 1 stored "1". */
+function tourVersionSeen(): number {
+  try {
+    return Number(localStorage.getItem(TOUR_KEY) ?? 0) || 0;
+  } catch {
+    return TOUR_VERSION; // storage blocked: don't show the tour every visit
+  }
+}
+
 export default function MyDashboard() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const [, setLocation] = useLocation();
@@ -225,32 +237,57 @@ export default function MyDashboard() {
       !profile.avatar_url ||
       profile.avatar_url.startsWith("gradient:");
     if (profileIncomplete) return;
-    if (localStorage.getItem("jg_tour_completed")) return;
+    if (tourVersionSeen() >= TOUR_VERSION) return;
     const t = setTimeout(() => setTourOpen(true), 600);
     return () => clearTimeout(t);
   }, [profile, feedbackOpen]);
 
-  const tourSteps: TourStep[] = [
-    {
-      target: checkInSectionRef,
-      title: "Check in each week",
-      body: "Tap here on session nights to check in — scan the venue QR or search your name.",
-    },
-    {
-      target: eventsSectionRef,
-      title: "Browse & RSVP to events",
-      body: "See what's coming up and let us know if you're going. Your RSVPs live under this section.",
-    },
+  // Steps added in tour version 2, shown on their own to members who finished
+  // version 1.
+  const newTourSteps: TourStep[] = [
     {
       target: profileSectionRef,
-      title: "Your profile",
-      body: "Update your details, add a photo, and manage your notification preferences here.",
+      title: "Tap a photo to see it bigger",
+      body: "Tap any profile photo, yours or anyone else's, and it opens full size.",
+    },
+    {
+      title: "Birthdays 🎂",
+      body: "On someone's birthday everyone gets a notification, and a banner shows here so you can wish them.",
+    },
+    {
+      title: "No more signing in every time",
+      body: "You stay signed in, and the app opens where you left off. Worship team? There's a Worship Team button on the home page.",
     },
   ];
+  const tourSteps: TourStep[] =
+    tourVersionSeen() >= 1
+      ? newTourSteps
+      : [
+          {
+            target: checkInSectionRef,
+            title: "Check in each week",
+            body: "Tap here on session nights to check in — scan the venue QR or search your name.",
+          },
+          {
+            target: eventsSectionRef,
+            title: "Browse & RSVP to events",
+            body: "See what's coming up and let us know if you're going. Your RSVPs live under this section.",
+          },
+          {
+            target: profileSectionRef,
+            title: "Your profile",
+            body: "Update your details, add a photo, and manage your notification preferences. Tap any profile photo to see it bigger.",
+          },
+          ...newTourSteps.slice(1),
+        ];
 
   function closeTour() {
     setTourOpen(false);
-    localStorage.setItem("jg_tour_completed", "1");
+    try {
+      localStorage.setItem(TOUR_KEY, String(TOUR_VERSION));
+    } catch {
+      /* ignore */
+    }
   }
 
   const now = new Date();

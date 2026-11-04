@@ -4,7 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
 export interface TourStep {
-  target: RefObject<HTMLElement | null>;
+  /** The element to spotlight. Leave out for a centred card. */
+  target?: RefObject<HTMLElement | null>;
   title: string;
   body: string;
 }
@@ -39,7 +40,7 @@ export function OnboardingTour({
   const step = steps[index];
 
   const measure = useCallback(() => {
-    const el = step?.target.current;
+    const el = step?.target?.current;
     if (!el) {
       setRect(null);
       return;
@@ -57,7 +58,7 @@ export function OnboardingTour({
   // measurements so we catch the position after smooth-scroll settles).
   useLayoutEffect(() => {
     if (!open || !step) return;
-    const el = step.target.current;
+    const el = step.target?.current;
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
     measure();
     const timers = [80, 250, 450].map((t) => window.setTimeout(measure, t));

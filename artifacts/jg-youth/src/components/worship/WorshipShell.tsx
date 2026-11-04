@@ -27,7 +27,7 @@ import {
 } from "@/lib/worship";
 import { enableWorshipPush } from "@/lib/worshipPush";
 import { InviteDialog } from "./InviteDialog";
-import { WorshipOnboarding } from "./WorshipOnboarding";
+import { WorshipOnboarding, welcomeToShow } from "./WorshipOnboarding";
 import { ProfileDialog } from "./ProfileDialog";
 import { useTrackWorshipNav } from "./PageBack";
 
@@ -177,8 +177,10 @@ export function WorshipShell({
   useTrackWorshipNav(location);
   const [profileOpen, setProfileOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
-  // First time in: the welcome sequence opens by itself.
-  const [welcomeOpen, setWelcomeOpen] = useState(!account.onboarded_at);
+  // First time in, the welcome opens by itself; people who did it before the
+  // latest features get a short "What's new" once instead.
+  const [welcomeMode, setWelcomeMode] = useState<"full" | "news">(() => welcomeToShow(account) ?? "full");
+  const [welcomeOpen, setWelcomeOpen] = useState(() => welcomeToShow(account) !== null);
 
   const nav = [
     { href: "/worship", label: "Team", icon: Users, active: location === "/worship" },
@@ -232,7 +234,12 @@ export function WorshipShell({
               <DropdownMenuItem onSelect={() => setInviteOpen(true)}>
                 <UserPlus className="mr-2 h-4 w-4" /> Invite someone
               </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => setWelcomeOpen(true)}>
+              <DropdownMenuItem
+                onSelect={() => {
+                  setWelcomeMode("full");
+                  setWelcomeOpen(true);
+                }}
+              >
                 <Sparkles className="mr-2 h-4 w-4" /> Replay welcome
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -268,7 +275,7 @@ export function WorshipShell({
       {children}
       <ProfileDialog account={account} open={profileOpen} onOpenChange={setProfileOpen} />
       <InviteDialog open={inviteOpen} onOpenChange={setInviteOpen} />
-      <WorshipOnboarding account={account} open={welcomeOpen} onOpenChange={setWelcomeOpen} />
+      <WorshipOnboarding account={account} open={welcomeOpen} onOpenChange={setWelcomeOpen} mode={welcomeMode} />
     </WorshipFrame>
   );
 }

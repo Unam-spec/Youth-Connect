@@ -1,18 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+  ArrowLeftRight,
   BellRing,
   CalendarDays,
   Check,
   ChevronLeft,
   Crown,
+  Globe,
   ListMusic,
   Loader2,
+  MonitorPlay,
   Music,
+  Navigation,
   Send,
   SlidersHorizontal,
+  Sparkles,
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,17 +34,74 @@ import { SongFormDialog } from "./songs";
 
 const SAMPLE = "Way [E]maker, miracle [B]worker";
 
-type StepId = "welcome" | "profile" | "songs" | "keys" | "setlists" | "notify" | "invite";
-const STEPS: StepId[] = ["welcome", "profile", "songs", "keys", "setlists", "notify", "invite"];
+type StepId =
+  | "news"
+  | "welcome"
+  | "profile"
+  | "songs"
+  | "keys"
+  | "setlists"
+  | "freeshow"
+  | "notify"
+  | "around"
+  | "invite";
+/** The full welcome, for someone's first time in. */
+const FULL_STEPS: StepId[] = ["welcome", "profile", "songs", "keys", "setlists", "freeshow", "notify", "around", "invite"];
+/** For people who did the welcome before these features: just what changed. */
+const NEWS_STEPS: StepId[] = ["news", "songs", "setlists", "freeshow", "around"];
 const ICONS: Record<StepId, typeof Music> = {
+  news: Sparkles,
   welcome: Music,
   profile: User,
   songs: ListMusic,
   keys: SlidersHorizontal,
   setlists: CalendarDays,
+  freeshow: MonitorPlay,
   notify: BellRing,
+  around: Navigation,
   invite: Send,
 };
+
+/**
+ * Bump when the welcome gains steps people who already did it should see.
+ * Seen versions are kept per device and person, like the JG Youth tours.
+ */
+export const WELCOME_VERSION = 2;
+/** People onboarded after this already saw version 2's steps. */
+const VERSION_2_SINCE = "2026-11-05T00:00:00Z";
+const seenKey = (accountId: string) => `jg_worship_welcome_seen_${accountId}`;
+
+function markSeen(accountId: string) {
+  try {
+    localStorage.setItem(seenKey(accountId), String(WELCOME_VERSION));
+  } catch {
+    /* private mode: they may see "What's new" again, which is harmless */
+  }
+}
+
+/** Which welcome to open by itself: the full one, "What's new", or none. */
+export function welcomeToShow(account: WorshipAccount): "full" | "news" | null {
+  if (!account.onboarded_at) return "full";
+  if (account.onboarded_at >= VERSION_2_SINCE) return null;
+  try {
+    return Number(localStorage.getItem(seenKey(account.id)) ?? 0) >= WELCOME_VERSION ? null : "news";
+  } catch {
+    return null;
+  }
+}
+
+function Points({ items }: { items: { icon?: typeof Music; text: ReactNode }[] }) {
+  return (
+    <ul className="space-y-2 text-left text-sm text-muted-foreground">
+      {items.map(({ icon: I = Check, text }, i) => (
+        <li key={i} className="flex gap-2">
+          <I className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+          <span>{text}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function roleIntro(role: WorshipAccount["role"]): { title: string; points: string[] } {
   if (role === "owner") {
@@ -48,7 +110,7 @@ function roleIntro(role: WorshipAccount["role"]): { title: string; points: strin
       points: [
         "You accept or decline people who ask to join",
         "You choose who's a leader, and can remove people or reset a forgotten PIN",
-        "You post Sunday setlists and can fix any song in the library",
+        "You post Sunday setlists, import songs from FreeShow, and can fix or move any song",
       ],
     };
   }
@@ -58,15 +120,15 @@ function roleIntro(role: WorshipAccount["role"]): { title: string; points: strin
       points: [
         "You see everything the team sees",
         "Your extra job: accept or decline people who ask to join (you'll get a notification)",
-        "You can post Sunday setlists",
+        "You can post Sunday setlists and import songs from FreeShow",
       ],
     };
   }
   return {
     title: "You're on the team",
     points: [
-      "Keep your own song list with your keys",
-      "See everyone's songs and the Sunday setlists",
+      "Keep your own song list, each song in your key",
+      "See everyone's songs and the Sunday setlists, and share them",
       "Get notified when the team adds songs",
     ],
   };
@@ -81,11 +143,14 @@ export function WorshipOnboarding({
   account,
   open,
   onOpenChange,
+  mode = "full",
 }: {
   account: WorshipAccount;
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  mode?: "full" | "news";
 }) {
+  const STEPS = mode === "news" ? NEWS_STEPS : FULL_STEPS;
   const queryClient = useQueryClient();
   const [, setLocation] = useLocation();
   const [index, setIndex] = useState(0);
@@ -118,6 +183,7 @@ export function WorshipOnboarding({
   });
 
   const finish = (then?: () => void) => {
+    markSeen(account.id);
     if (!account.onboarded_at) {
       // Mark it done locally first, so the next page doesn't reopen it while
       // the save is still on its way.
@@ -173,6 +239,40 @@ export function WorshipOnboarding({
             </span>
           </div>
 
+          {step === "news" && (
+            <div className="space-y-4 text-center">
+              <DialogTitle className="font-[family-name:var(--app-font-heading)] text-2xl">
+                What's new, {first} ✨
+              </DialogTitle>
+              <DialogDescription>A few things have landed since you joined. Here's a 30-second look.</DialogDescription>
+              <div className="rounded-xl border border-border bg-muted/40 p-4">
+                <Points
+                  items={[
+                    { icon: Globe, text: <><b>Find it online</b>: type a song name or paste a link, and the lyrics and chords fill in</> },
+                    { icon: ArrowLeftRight, text: <><b>One person per song</b>: pick unassigned songs, transfer or give them back</> },
+                    {
+                      icon: CalendarDays,
+                      text: isLeader ? (
+                        <>Search songs when building a setlist, and share it to WhatsApp</>
+                      ) : (
+                        <>Share any Sunday setlist to WhatsApp</>
+                      ),
+                    },
+                    {
+                      icon: MonitorPlay,
+                      text: isLeader ? (
+                        <><b>FreeShow</b>: bring your songs in, and send setlists out</>
+                      ) : (
+                        <><b>FreeShow</b>: download any setlist, ready to open in FreeShow</>
+                      ),
+                    },
+                    { icon: Navigation, text: <>Back buttons everywhere, and Forgot PIN on the sign-in page</> },
+                  ]}
+                />
+              </div>
+            </div>
+          )}
+
           {step === "welcome" && (
             <div className="space-y-4 text-center">
               <DialogTitle className="font-[family-name:var(--app-font-heading)] text-2xl">
@@ -217,14 +317,44 @@ export function WorshipOnboarding({
             <div className="space-y-4 text-center">
               <DialogTitle className="font-[family-name:var(--app-font-heading)] text-xl">Your song list</DialogTitle>
               <DialogDescription>
-                Add the songs you lead or play, each in <b>your</b> key. Adding a song lets the rest of the team know.
+                Add the songs you lead or play, each in <b>your</b> key. The team gets a notification.
               </DialogDescription>
+              <Points
+                items={[
+                  {
+                    icon: Globe,
+                    text: (
+                      <>
+                        <b>Find it online</b>: in New song, type the song name or paste a link (e.g. Ultimate Guitar).
+                        Title, artist, key, lyrics and chords fill in for you.
+                      </>
+                    ),
+                  },
+                  {
+                    icon: ListMusic,
+                    text: (
+                      <>
+                        <b>One person per song.</b> Songs nobody has yet are <b>Unassigned</b> in the library. Tap
+                        Pick and it's yours.
+                      </>
+                    ),
+                  },
+                  {
+                    icon: ArrowLeftRight,
+                    text: (
+                      <>
+                        Open your song to <b>Transfer</b> it to someone else, or <b>Give it back</b>.
+                      </>
+                    ),
+                  },
+                ]}
+              />
               <div className="grid gap-2">
                 <Button onClick={() => finish(() => setSongOpen(true))}>
-                  <Music className="mr-2 h-4 w-4" /> Add my first song
+                  <Music className="mr-2 h-4 w-4" /> Add a song
                 </Button>
                 <Button variant="outline" onClick={() => finish(() => setLocation("/worship/library"))}>
-                  <ListMusic className="mr-2 h-4 w-4" /> Pick from the team's library
+                  <ListMusic className="mr-2 h-4 w-4" /> Pick an unassigned song
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">Or tap Next to keep going. You can do this later.</p>
@@ -264,7 +394,7 @@ export function WorshipOnboarding({
               <DialogTitle className="font-[family-name:var(--app-font-heading)] text-xl">Sunday setlists</DialogTitle>
               <DialogDescription>
                 {isLeader
-                  ? "Post the songs for Sunday in order, choose who leads each one, and their key fills in. Then tap Share to WhatsApp for the group."
+                  ? "Post the songs for Sunday: search the library to add them, put them in order and choose who leads each one. Their key fills in."
                   : "Your leaders post the songs for Sunday here, in order, with who's leading and the key. You'll get a notification when one goes up."}
               </DialogDescription>
               <div className="space-y-1.5 rounded-xl border border-border bg-muted/40 p-3 text-left text-sm">
@@ -272,9 +402,51 @@ export function WorshipOnboarding({
                 <p>1. <b>Way Maker</b> · Key: <b>D</b> · Lead: Lerato</p>
                 <p>2. <b>Goodness of God</b> · Key: <b>G</b> · Lead: Thabo</p>
               </div>
+              <p className="text-sm text-muted-foreground">
+                Open any setlist and tap <b>Share to WhatsApp</b> to send it to the group, with a link to the chords.
+              </p>
               {isLeader && (
                 <Button variant="outline" className="w-full" onClick={() => finish(() => setLocation("/worship/setlists"))}>
                   <CalendarDays className="mr-2 h-4 w-4" /> Go to setlists
+                </Button>
+              )}
+            </div>
+          )}
+
+          {step === "freeshow" && (
+            <div className="space-y-4 text-center">
+              <DialogTitle className="font-[family-name:var(--app-font-heading)] text-xl">Using FreeShow?</DialogTitle>
+              <DialogDescription>The app and FreeShow on the church laptop work together.</DialogDescription>
+              <Points
+                items={[
+                  {
+                    icon: MonitorPlay,
+                    text: (
+                      <>
+                        <b>Download for FreeShow</b> on any setlist: every song in its Sunday key, chords and all. In
+                        FreeShow, choose <b>Import → FreeShow project</b>.
+                      </>
+                    ),
+                  },
+                  ...(isLeader
+                    ? [
+                        {
+                          icon: ListMusic,
+                          text: (
+                            <>
+                              <b>Import from FreeShow</b>: on the Songs page, tap <b>FreeShow</b> and pick the Shows
+                              folder (Documents → FreeShow → Shows). Every song lands in the library as unassigned, and
+                              ones already there are skipped.
+                            </>
+                          ),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+              {isLeader && (
+                <Button variant="outline" className="w-full" onClick={() => finish(() => setLocation("/worship/library"))}>
+                  <ListMusic className="mr-2 h-4 w-4" /> Go to Songs
                 </Button>
               )}
             </div>
@@ -287,8 +459,10 @@ export function WorshipOnboarding({
               <ul className="space-y-1.5 text-left text-sm text-muted-foreground">
                 {[
                   "Someone adds a song",
+                  "Someone transfers a song to you",
                   "A Sunday setlist is posted",
                   ...(isLeader ? ["Someone asks to join (you can accept them)"] : []),
+                  ...(account.role === "owner" ? ["Someone forgets their PIN (tap it to reset and send them a new one)"] : []),
                 ].map((p) => (
                   <li key={p} className="flex gap-2">
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
@@ -301,6 +475,45 @@ export function WorshipOnboarding({
                 {pushOn ? "Notifications are on" : "Turn on notifications"}
               </Button>
               <p className="text-xs text-muted-foreground">On iPhone, add the app to your Home Screen first.</p>
+            </div>
+          )}
+
+          {step === "around" && (
+            <div className="space-y-4 text-center">
+              <DialogTitle className="font-[family-name:var(--app-font-heading)] text-xl">Getting around</DialogTitle>
+              <Points
+                items={[
+                  {
+                    icon: ChevronLeft,
+                    text: (
+                      <>
+                        The <b>‹</b> at the top left goes back to the JG Youth home page. You stay signed in.
+                      </>
+                    ),
+                  },
+                  { icon: Navigation, text: <>Every page has a <b>Back</b> button to where you came from.</> },
+                  {
+                    icon: Check,
+                    text: <>You stay signed in for 30 days, and the app reopens where you left off.</>,
+                  },
+                  {
+                    icon: User,
+                    text:
+                      account.role === "owner" ? (
+                        <>
+                          If someone taps <b>Forgot PIN</b>, you'll get the request. Reset it from their name on the
+                          team page and send them the new PIN on WhatsApp.
+                        </>
+                      ) : (
+                        <>
+                          Forgot your PIN? Tap <b>Forgot PIN</b> on the sign-in page. The head leader gets the request
+                          and sends you a new one.
+                        </>
+                      ),
+                  },
+                ]}
+              />
+              {mode === "news" && <p className="text-sm font-medium">That's it, {first} 🙌</p>}
             </div>
           )}
 
@@ -330,7 +543,15 @@ export function WorshipOnboarding({
             )}
             <Button onClick={next} disabled={saveProfile.isPending}>
               {saveProfile.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {index === STEPS.length - 1 ? "Let's go" : index === 0 ? "Get started" : "Next"}
+              {index === STEPS.length - 1
+                ? mode === "news"
+                  ? "Got it"
+                  : "Let's go"
+                : index === 0
+                  ? mode === "news"
+                    ? "Show me"
+                    : "Get started"
+                  : "Next"}
             </Button>
           </div>
         </DialogContent>
