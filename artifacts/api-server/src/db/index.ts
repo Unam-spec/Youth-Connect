@@ -441,6 +441,28 @@ WITH "extra" AS (
 INSERT INTO "worship_member_songs_archive" ("id", "account_id", "song_id", "preferred_key", "notes", "created_at")
 SELECT "id", "account_id", "song_id", "preferred_key", "notes", "created_at" FROM "moved";
 CREATE UNIQUE INDEX IF NOT EXISTS "worship_member_songs_song_unique" ON "worship_member_songs" ("song_id");
+
+-- One way of writing each phone number (same matching as sign-up): numbers
+-- saved as "+0821234567" or "+270821234567" become "+27821234567", so
+-- signing in and the duplicate check find them. A number that would clash
+-- with someone else's is left alone; the head leader sees both under
+-- "Possible duplicates".
+WITH canon AS (
+  SELECT id, created_at, '+' || (CASE
+    WHEN d2 ~ '^270[0-9]{9}$' THEN '27' || substr(d2, 4) ELSE d2 END) AS phone
+  FROM (
+    SELECT id, created_at, (CASE
+      WHEN d ~ '^00' THEN substr(d, 3)
+      WHEN d ~ '^0[0-9]{9}$' THEN '27' || substr(d, 2)
+      ELSE d END) AS d2
+    FROM (SELECT id, created_at, regexp_replace(phone, '[^0-9]', '', 'g') AS d FROM "worship_accounts") raw
+  ) step
+), pick AS (
+  SELECT DISTINCT ON (c.phone) c.id, c.phone FROM canon c
+  WHERE NOT EXISTS (SELECT 1 FROM "worship_accounts" w WHERE w.phone = c.phone)
+  ORDER BY c.phone, c.created_at
+)
+UPDATE "worship_accounts" a SET phone = pick.phone FROM pick WHERE a.id = pick.id;
 `;
 
 export async function runMigrations() {

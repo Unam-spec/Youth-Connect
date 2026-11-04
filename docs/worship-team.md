@@ -45,6 +45,15 @@ The first time someone gets in (the head leader on sign-up, everyone else once a
 
 Afterwards a **Getting started** checklist on the team page ticks itself off from real data (role picked, first song added, notifications on) and disappears when done or dismissed.
 
+## No duplicate sign-ups
+
+Applies to the Worship Team and JG Youth (code: `lib/duplicates.ts`, `lib/phone.ts` `phoneKey`, `lib/profileDuplicates.ts`).
+
+- **Same number:** a number can only be used once, however it's typed ("082 111 2222", "+27 82 111 2222", "0027…", "+27 082…" and "+082…" all match). The person is told it has already been used and to sign in (Worship also points to Forgot PIN). Worship numbers are all saved as +27…; ones saved another way are converted when the server starts.
+- **Same name and details:** JG Youth refuses a sign-up with the same name and date of birth (or the same parent's number) as someone already signed up, on PIN sign-up and on the kiosk. The kiosk tells the leader who it is, so they check them in instead.
+- **Same name only (Worship):** the join form warns "<name> has already signed up" with **Sign in instead** or **I'm a different person**. If they go ahead, the join request shows leaders "Same name as someone already on the team".
+- **Finding old duplicates:** the head leader sees a **Possible duplicates** card on the team page (same number written another way, or same name). JG super admins have **Find duplicates** in Members (same phone, same name and birthday, same name) with **Keep this one** to merge the others into it.
+
 ## Roles: head leader, leaders, members
 
 Shaped like the JG Youth leader system (Super Admin → Leaders → Members). Everyone sees the same pages; leaders just have one extra responsibility.

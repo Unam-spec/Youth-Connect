@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { findProfileDuplicate } from "../lib/profileDuplicates";
 import bcrypt from "bcrypt";
 import { and, eq } from "drizzle-orm";
 import {
@@ -118,6 +119,25 @@ router.post(
         typeof b.parent_phone === "string" && b.parent_phone.trim()
           ? b.parent_phone.trim()
           : null;
+
+      // Already signed up? Tell the leader who, so they check them in instead
+      // of making a second profile.
+      const dup = await findProfileDuplicate({
+        phone,
+        fullName,
+        dateOfBirth: String(b.date_of_birth).trim(),
+        parentPhone,
+      });
+      if (dup) {
+        const who = `${dup.profile.full_name}${dup.profile.username ? ` (@${dup.profile.username})` : ""}`;
+        return res.status(409).json({
+          error:
+            dup.kind === "phone"
+              ? `This number has already been used. It belongs to ${who}. Check them in instead.`
+              : `${who} is already signed up with this name and birthday. Check them in instead.`,
+          duplicate: dup.kind,
+        });
+      }
 
       const pin = generatePin();
       const pinHash = await bcrypt.hash(pin, 12);

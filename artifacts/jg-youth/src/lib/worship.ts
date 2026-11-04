@@ -117,6 +117,8 @@ export class WorshipApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** Set on a 409 for a duplicate sign-up: "phone" or "name". */
+    readonly duplicate?: string,
   ) {
     super(message);
   }
@@ -133,10 +135,10 @@ export async function worshipFetch<T>(path: string, options: RequestInit = {}): 
       ...(options.headers as Record<string, string>),
     },
   });
-  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  const data = (await res.json().catch(() => ({}))) as { error?: string; duplicate?: string };
   if (!res.ok) {
     if (res.status === 401) clearWorshipSession();
-    throw new WorshipApiError(data.error ?? "Something went wrong. Try again.", res.status);
+    throw new WorshipApiError(data.error ?? "Something went wrong. Try again.", res.status, data.duplicate);
   }
   return data as T;
 }

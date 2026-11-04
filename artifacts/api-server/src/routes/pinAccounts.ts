@@ -1,4 +1,6 @@
 import { Router } from "express";
+import { findProfileDuplicate } from "../lib/profileDuplicates";
+import { DUPLICATE_MESSAGES } from "../lib/duplicates";
 import crypto from "node:crypto";
 import bcrypt from "bcrypt";
 import { eq, sql, isNotNull, desc } from "drizzle-orm";
@@ -48,7 +50,17 @@ router.post("/auth/pin-signup", async (req, res) => {
     if (!resolved.ok) return res.status(400).json({ error: resolved.error });
 
     const existing = await findByUsername(uname.value);
-    if (existing) return res.status(409).json({ error: "That username is already taken." });
+    if (existing) {
+      return res.status(409).json({ error: "That username is already taken.", duplicate: "username" });
+    }
+    // The same person signing up twice (same name and birthday, or same
+    // parent's number) gets told to sign in instead.
+    const dup = await findProfileDuplicate({
+      fullName,
+      dateOfBirth: resolved.date_of_birth,
+      parentPhone: body.parent_phone,
+    });
+    if (dup) return res.status(409).json({ error: DUPLICATE_MESSAGES[dup.kind], duplicate: dup.kind });
 
     const pinHash = await bcrypt.hash(pin.value, 12);
 
@@ -76,7 +88,7 @@ router.post("/auth/pin-signup", async (req, res) => {
         .returning();
     } catch (e) {
       // Unique-index race: another signup took the username between check and insert.
-      return res.status(409).json({ error: "That username is already taken." });
+      return res.status(409).json({ error: "That username is already taken.", duplicate: "username" });
     }
 
     const session = await createSession(inserted.id, req.headers["user-agent"]);

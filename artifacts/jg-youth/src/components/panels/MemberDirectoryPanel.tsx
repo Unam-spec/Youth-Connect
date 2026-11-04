@@ -12,7 +12,8 @@ import { useDebouncedValue } from "@/lib/useDebounce";
 import { DashCard, SectionTitle, SkeletonRows, RoleBadge, EmptyState } from "./shared";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { MoreVertical } from "lucide-react";
+import { Copy, MoreVertical } from "lucide-react";
+import { DuplicatesDialog } from "./DuplicatesDialog";
 import { format } from "date-fns";
 
 interface MemberDirectoryPanelProps {
@@ -106,6 +107,7 @@ export function MemberDirectoryPanel({
   const [attendanceRows, setAttendanceRows] = useState<any[]>([]);
   const [mergeKeep, setMergeKeep] = useState<any | null>(null);
   const [mergeFromId, setMergeFromId] = useState<string>("");
+  const [dupsOpen, setDupsOpen] = useState(false);
 
   return (
     <DashCard>
@@ -120,6 +122,12 @@ export function MemberDirectoryPanel({
           <span className="text-xs text-primary/80 font-medium">Max 4 allowed</span>
         </div>
       )}
+      {sessionRole === "super_admin" && (
+        <Button variant="outline" size="sm" className="mb-5 w-full sm:w-auto" onClick={() => setDupsOpen(true)}>
+          <Copy className="mr-2 h-4 w-4" /> Find duplicates
+        </Button>
+      )}
+      <DuplicatesDialog open={dupsOpen} onOpenChange={setDupsOpen} />
       
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SectionTitle

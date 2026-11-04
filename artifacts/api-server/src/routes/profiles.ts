@@ -23,7 +23,8 @@ import { requireLeaderSession } from "../middlewares/requireLeaderSession";
 import { resolveAuth } from "../lib/permissions";
 import { resolveAccount } from "../lib/resolveAccount";
 import { parseMembersDirectoryQuery } from "../lib/membersDirectoryQuery";
-import { normalizePhone } from "../lib/phone";
+import { findDuplicateGroups, findProfileDuplicate } from "../lib/profileDuplicates";
+import { DUPLICATE_MESSAGES } from "../lib/duplicates";
 import { deleteProfileCascade } from "../lib/deleteProfileCascade";
 import { notifyLeadersOfMembershipRequest } from "../lib/notifyLeadersOfMembershipRequest";
 import { mergeProfiles } from "../lib/mergeProfiles";
@@ -34,25 +35,12 @@ import { APP_BASE_URL } from "../lib/appUrl";
 const router = Router();
 
 /**
- * Returns true if another profile already uses this phone (normalized).
- * `excludeId` lets a self-update skip its own row.
+ * Returns true if another profile already uses this phone, however it's
+ * typed ("082…" and "+27 82…" match). `excludeId` lets a self-update skip
+ * its own row.
  */
 async function phoneInUse(phone: unknown, excludeId?: string): Promise<boolean> {
-  const norm = normalizePhone(phone);
-  if (!norm) return false;
-  const rows = await db
-    .select({ id: profilesTable.id })
-    .from(profilesTable)
-    .where(
-      excludeId
-        ? and(
-            sql`lower(btrim(${profilesTable.phone})) = ${norm}`,
-            ne(profilesTable.id, excludeId),
-          )
-        : sql`lower(btrim(${profilesTable.phone})) = ${norm}`,
-    )
-    .limit(1);
-  return rows.length > 0;
+  return (await findProfileDuplicate({ phone, excludeId }))?.kind === "phone";
 }
 
 // GET /profiles/me - Retrieve current logged in Clerk user's profile
@@ -99,13 +87,17 @@ router.get("/profiles/me", async (req: Request, res: Response) => {
 
       // Unsafe Clerk auto-linking stripped completely.
       // Fresh visitor profile is generated directly for new Clerk signups without verified links.
+      // A Clerk phone that's already someone's stays off the new profile, so
+      // the same number never lands on two people (and the insert can't hit
+      // the unique index). They're asked for a number on their first visit.
+      const phoneFree = phone ? !(await phoneInUse(phone)) : false;
       const [created] = await db
         .insert(profilesTable)
         .values({
           clerk_id: clerkId,
           full_name: fullName,
           email,
-          phone,
+          phone: phoneFree ? phone : null,
           role: "visitor",
           heard_from: "clerk_signup",
         })
@@ -137,7 +129,10 @@ router.patch("/profiles/me", async (req: Request, res: Response) => {
     if (!parsed.success)
       return res.status(400).json({ error: parsed.error.flatten() });
     if (parsed.data.phone !== undefined && (await phoneInUse(parsed.data.phone, existing.id))) {
-      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+      return res.status(409).json({
+        error: "This number is already used by another account. If you have two accounts, ask a leader to merge them.",
+        duplicate: "phone",
+      });
     }
     const updateData: Record<string, unknown> = { ...parsed.data };
     const dob = (req.body ?? {}).date_of_birth;
@@ -223,9 +218,13 @@ router.post("/profiles/register/first-timer", async (req: Request, res: Response
       return res.status(400).json({ error: parsed.error.flatten() });
 
     const { clerk_id, ...rest } = parsed.data;
-
-    if (await phoneInUse(parsed.data.phone)) {
-      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    const dup = await findProfileDuplicate({
+      phone: parsed.data.phone,
+      fullName: parsed.data.full_name,
+      parentPhone: parsed.data.parent_phone,
+    });
+    if (dup) {
+      return res.status(409).json({ error: DUPLICATE_MESSAGES[dup.kind], duplicate: dup.kind });
     }
 
     // Generate secure 32-byte hexadecimal link verification token
@@ -347,8 +346,13 @@ router.post("/profiles/register", async (req: Request, res: Response) => {
       return res.status(400).json({ error: parsed.error.flatten() });
     const auth = getAuth(req);
     const { clerk_id, ...rest } = parsed.data;
-    if (await phoneInUse(parsed.data.phone)) {
-      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    const dup = await findProfileDuplicate({
+      phone: parsed.data.phone,
+      fullName: parsed.data.full_name,
+      parentPhone: parsed.data.parent_phone,
+    });
+    if (dup) {
+      return res.status(409).json({ error: DUPLICATE_MESSAGES[dup.kind], duplicate: dup.kind });
     }
     const linkedClerkId = auth?.userId ?? clerk_id ?? null;
     const [profile] = await db
@@ -484,6 +488,18 @@ router.get("/profiles", requireLeaderSession("leader"), async (req: Request, res
 });
 
 // GET /profiles/:id - View profile by ID (protected: leaders)
+// GET /profiles/duplicates - profiles that look like the same person (same
+// phone, same name and birthday, or same name), for super admins to merge.
+// Declared before /profiles/:id so "duplicates" isn't read as an id.
+router.get("/profiles/duplicates", requireLeaderSession("super_admin"), async (req: Request, res: Response) => {
+  try {
+    return res.json({ groups: await findDuplicateGroups() });
+  } catch (err) {
+    req.log.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.get("/profiles/:id", requireLeaderSession("leader"), async (req: Request, res: Response) => {
   try {
     const profile = await db.query.profilesTable.findFirst({
@@ -676,8 +692,14 @@ router.patch("/profiles/:id", requireLeaderSession("leader"), async (req: Reques
     if (whatsapp_opt_in !== undefined) updateData.whatsapp_opt_in = whatsapp_opt_in;
     if (avatar_url !== undefined) updateData.avatar_url = avatar_url;
 
-    if (updateData.phone !== undefined && (await phoneInUse(updateData.phone, req.params.id as string))) {
-      return res.status(409).json({ error: "This number is already registered", duplicate: true });
+    if (updateData.phone !== undefined) {
+      const dup = await findProfileDuplicate({ phone: updateData.phone, excludeId: req.params.id as string });
+      if (dup) {
+        return res.status(409).json({
+          error: `This number is already used by ${dup.profile.full_name}. If they're the same person, merge the two profiles.`,
+          duplicate: "phone",
+        });
+      }
     }
 
     const [updated] = await db

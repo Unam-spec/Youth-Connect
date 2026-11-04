@@ -32,6 +32,12 @@ describe("normalizeWorshipPhone", () => {
     expect(normalizeWorshipPhone("+27 82 123 4567")).toBe("+27821234567");
     expect(normalizeWorshipPhone("082-123-4567")).toBe("+27821234567");
     expect(normalizeWorshipPhone("0027821234567")).toBe("+27821234567");
+    // The phone box with its country code deleted, or a 0 after +27.
+    expect(normalizeWorshipPhone("+0821234567")).toBe("+27821234567");
+    expect(normalizeWorshipPhone("+27 082 123 4567")).toBe("+27821234567");
+  });
+  it("keeps other countries' numbers as they are", () => {
+    expect(normalizeWorshipPhone("+263 77 123 4567")).toBe("+263771234567");
   });
   it("rejects junk", () => {
     expect(normalizeWorshipPhone("hello")).toBeNull();

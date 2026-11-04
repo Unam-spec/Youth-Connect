@@ -13,6 +13,8 @@ import {
   type WorshipAccount,
 } from "@workspace/db";
 import { validatePin } from "../lib/pin";
+import { dedupeGroups, nameKey, nameKeySql } from "../lib/duplicates";
+import { phoneKey } from "../lib/phone";
 import { generatePin } from "../lib/kioskAccount";
 import {
   createWorshipSession,
@@ -110,13 +112,23 @@ router.post("/worship/auth/join", async (req, res) => {
     const instruments = normalizeInstruments(b.instruments);
     if (instruments === undefined) return res.status(400).json({ error: "Unknown instrument." });
 
+    const confirmedDifferent = b.confirm_different_person === true;
     const pinHash = await bcrypt.hash(pin.value, 12);
-    const account = await db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       await tx.execute(OWNER_LOCK);
       const existing = await tx.query.worshipAccountsTable.findFirst({
         where: eq(worshipAccountsTable.phone, phone),
       });
-      if (existing) return null;
+      if (existing) return { duplicate: "phone" as const };
+      // Same name as someone already on the team (or waiting): most likely
+      // them again with another number. They can still go ahead if they're
+      // a different person, and leaders see the match on the request.
+      if (!confirmedDifferent) {
+        const sameName = await tx.query.worshipAccountsTable.findFirst({
+          where: sql`${nameKeySql(worshipAccountsTable.full_name)} = ${nameKey(fullName)}`,
+        });
+        if (sameName) return { duplicate: "name" as const, name: sameName.full_name };
+      }
       const owner = await tx.query.worshipAccountsTable.findFirst({
         where: eq(worshipAccountsTable.role, "owner"),
       });
@@ -133,11 +145,22 @@ router.post("/worship/auth/join", async (req, res) => {
           approved_at: isFirst ? new Date() : null,
         })
         .returning();
-      return row;
+      return { account: row };
     });
-    if (!account) {
-      return res.status(409).json({ error: "That phone number is already on the worship team. Try signing in." });
+    if ("duplicate" in result) {
+      return res.status(409).json(
+        result.duplicate === "phone"
+          ? {
+              duplicate: "phone",
+              error: "This number has already been used on the worship team. Sign in instead, or tap Forgot PIN.",
+            }
+          : {
+              duplicate: "name",
+              error: `${result.name} has already signed up for the worship team. If that's you, sign in with the number you used.`,
+            },
+      );
     }
+    const account = result.account;
 
     if (account.status === "pending") {
       inBackground("join request notify", notifyJoinRequest(account));
@@ -256,6 +279,17 @@ router.patch("/worship/me", requireWorship(), async (req, res) => {
     if (b.full_name !== undefined) {
       const name = typeof b.full_name === "string" ? b.full_name.trim() : "";
       if (!name || name.length > 80) return res.status(400).json({ error: "Please enter your name." });
+      const clash = await db.query.worshipAccountsTable.findFirst({
+        where: and(
+          sql`${nameKeySql(worshipAccountsTable.full_name)} = ${nameKey(name)}`,
+          sql`${worshipAccountsTable.id} <> ${me(req).id}`,
+        ),
+      });
+      if (clash) {
+        return res.status(409).json({
+          error: "Someone on the team already has this name. Add your surname or an initial so people can tell you apart.",
+        });
+      }
       set.full_name = name;
     }
     if (b.instruments !== undefined) {
@@ -384,7 +418,52 @@ router.get("/worship/requests", requireWorship({ approver: true }), async (req, 
       .from(worshipAccountsTable)
       .where(eq(worshipAccountsTable.status, "pending"))
       .orderBy(asc(worshipAccountsTable.created_at));
-    return res.json({ requests: rows.map(publicAccount) });
+    // Flag requests that share a name with someone else, so leaders check
+    // it isn't the same person joining twice.
+    const all = rows.length
+      ? await db
+          .select({ id: worshipAccountsTable.id, full_name: worshipAccountsTable.full_name, status: worshipAccountsTable.status })
+          .from(worshipAccountsTable)
+      : [];
+    return res.json({
+      requests: rows.map((r) => {
+        const twin = all.find((a) => a.id !== r.id && nameKey(a.full_name) === nameKey(r.full_name));
+        return {
+          ...publicAccount(r),
+          same_name_as: twin ? { id: twin.id, full_name: twin.full_name, status: twin.status } : null,
+        };
+      }),
+    });
+  } catch (err) {
+    return fail(req, res, err);
+  }
+});
+
+// GET /worship/duplicates — head leader. People who look like they joined
+// twice: the same phone number written another way (from before numbers were
+// all saved one way), or the same name.
+router.get("/worship/duplicates", requireWorship({ owner: true }), async (req, res) => {
+  try {
+    const rows = await db.select().from(worshipAccountsTable).orderBy(asc(worshipAccountsTable.created_at));
+    const groupBy = (key: (a: (typeof rows)[number]) => string | null) => {
+      const map = new Map<string, typeof rows>();
+      for (const r of rows) {
+        const k = key(r);
+        if (k) map.set(k, [...(map.get(k) ?? []), r]);
+      }
+      return [...map.values()].filter((g) => g.length > 1).map((g) => g.map((a) => a.id));
+    };
+    const groups = dedupeGroups([
+      ...groupBy((a) => phoneKey(a.phone)).map((ids) => ({ reason: "phone", ids })),
+      ...groupBy((a) => nameKey(a.full_name)).map((ids) => ({ reason: "name", ids })),
+    ]);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    return res.json({
+      groups: groups.map((g) => ({
+        reason: g.reason,
+        members: g.ids.map((id) => byId.get(id)!).map((a) => ({ ...publicAccount(a), phone: a.phone })),
+      })),
+    });
   } catch (err) {
     return fail(req, res, err);
   }

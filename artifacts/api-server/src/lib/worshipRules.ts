@@ -1,3 +1,4 @@
+import { phoneKey } from "./phone";
 /**
  * Pure rules for the Worship Team area (no DB), so they're unit-testable.
  * Worship is its own membership, with roles shaped like JG Youth's leader
@@ -42,10 +43,14 @@ export function normalizeWorshipPhone(value: unknown): string | null {
   let digits: string;
   if (/^\+\d+$/.test(cleaned)) digits = cleaned.slice(1);
   else if (/^00\d+$/.test(cleaned)) digits = cleaned.slice(2);
-  else if (/^0\d{9}$/.test(cleaned)) digits = "27" + cleaned.slice(1);
+  else if (/^0\d{9}$/.test(cleaned)) digits = cleaned;
   else return null;
-  if (digits.length < 8 || digits.length > 15) return null;
-  return "+" + digits;
+  // Same matching as JG Youth (lib/phone.ts): "+0821234567" (the phone box
+  // with its country code deleted) and "+27 082…" are 082 123 4567 too, so
+  // one person can't sign up twice by typing their number differently.
+  const key = phoneKey(digits);
+  if (!key || key.length < 8 || key.length > 15) return null;
+  return "+" + key;
 }
 
 const KEY_RE = /^([A-Ga-g])([#b]?)(m?)$/;

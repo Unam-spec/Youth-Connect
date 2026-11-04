@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { setPinSession } from "@/lib/pinSession";
-import { ChevronLeft, UserPlus } from "lucide-react";
+import { AlertTriangle, ChevronLeft, UserPlus } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { computeAge, MIN_AGE, MAX_AGE, todaySAST } from "@/lib/age";
 
@@ -50,6 +50,7 @@ export default function PinSignup() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [submitting, setSubmitting] = useState(false);
+  const [duplicate, setDuplicate] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -58,6 +59,7 @@ export default function PinSignup() {
 
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
+    setDuplicate(null);
     try {
       const res = await fetch("/api/auth/pin-signup", {
         method: "POST",
@@ -79,6 +81,11 @@ export default function PinSignup() {
         });
         toast({ title: "Account created!" });
         setLocation("/account");
+        return;
+      }
+      if (res.status === 409 && data.duplicate !== "username" && data.duplicate) {
+        // The same person signing up again (same name and birthday).
+        setDuplicate(data.error ?? "You've already signed up. Sign in instead.");
         return;
       }
       if (res.status === 409) {
@@ -157,6 +164,17 @@ export default function PinSignup() {
                     <FormMessage />
                   </FormItem>
                 )} />
+                {duplicate && (
+                  <div role="alert" className="flex gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+                    <span>
+                      {duplicate}{" "}
+                      <Link href="/pin-login" className="font-medium text-primary underline">
+                        Sign in
+                      </Link>
+                    </span>
+                  </div>
+                )}
                 <Button type="submit" className="w-full h-12 mt-2" disabled={submitting}>
                   {submitting ? "Creating..." : "Create account"}
                 </Button>

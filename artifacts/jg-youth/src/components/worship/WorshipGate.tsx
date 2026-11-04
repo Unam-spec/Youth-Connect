@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useSearch } from "wouter";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { BellRing, Clock, KeyRound, Loader2, Lock, MessageCircle } from "lucide-react";
+import { AlertTriangle, BellRing, Clock, KeyRound, Loader2, Lock, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +13,7 @@ import {
   useWorshipMe,
   worshipKeys,
   worshipPost,
+  WorshipApiError,
   type WorshipAccount,
   type WorshipSession,
 } from "@/lib/worship";
@@ -160,15 +161,24 @@ function SignInForm() {
   );
 }
 
-function JoinForm() {
+function JoinForm({ onSignIn }: { onSignIn: () => void }) {
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [pin, setPin] = useState("");
   const [instruments, setInstruments] = useState<string[]>([]);
+  // A duplicate sign-up: shown as an alert in the form, not a passing toast.
+  const [dup, setDup] = useState<{ kind: string; message: string } | null>(null);
   const join = useMutation({
-    mutationFn: () =>
-      worshipPost<AuthResponse>("/auth/join", { full_name: name, phone, pin, instruments }),
+    mutationFn: (confirmDifferent: boolean) =>
+      worshipPost<AuthResponse>("/auth/join", {
+        full_name: name,
+        phone,
+        pin,
+        instruments,
+        confirm_different_person: confirmDifferent,
+      }),
+    onMutate: () => setDup(null),
     onSuccess: (r) => {
       setWorshipSession(r);
       queryClient.setQueryData(worshipKeys.me, r.account);
@@ -176,14 +186,17 @@ function JoinForm() {
         toast.success("Welcome! You're the first one here, so you're the head leader.");
       }
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => {
+      if (err instanceof WorshipApiError && err.duplicate) setDup({ kind: err.duplicate, message: err.message });
+      else toast.error(err.message);
+    },
   });
   return (
     <form
       className="space-y-4"
       onSubmit={(e) => {
         e.preventDefault();
-        join.mutate();
+        join.mutate(false);
       }}
     >
       <div className="space-y-1.5">
@@ -203,6 +216,24 @@ function JoinForm() {
         <Label>What do you do on the team?</Label>
         <InstrumentPicker value={instruments} onChange={setInstruments} />
       </div>
+      {dup && (
+        <div role="alert" className="space-y-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3">
+          <p className="flex gap-2 text-sm">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <span>{dup.message}</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" onClick={onSignIn}>
+              Sign in instead
+            </Button>
+            {dup.kind === "name" && (
+              <Button type="button" size="sm" variant="outline" disabled={join.isPending} onClick={() => join.mutate(true)}>
+                I'm a different person
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
       <Button
         type="submit"
         className="w-full"
@@ -222,6 +253,7 @@ function JoinForm() {
 function SignedOut() {
   // The invite link (/worship?join=1) opens straight on "Request to join".
   const startOnJoin = new URLSearchParams(useSearch()).has("join");
+  const [tab, setTab] = useState(startOnJoin ? "join" : "signin");
   return (
     <WorshipFrame>
       <div className="mx-auto max-w-sm pt-8">
@@ -235,7 +267,7 @@ function SignedOut() {
           <p className="text-sm text-muted-foreground">Sign in, or ask to join the team.</p>
         </div>
         <div className="rounded-2xl border border-border bg-card p-5">
-          <Tabs defaultValue={startOnJoin ? "join" : "signin"}>
+          <Tabs value={tab} onValueChange={setTab}>
             <TabsList className="mb-5 grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign in</TabsTrigger>
               <TabsTrigger value="join">Request to join</TabsTrigger>
@@ -244,7 +276,7 @@ function SignedOut() {
               <SignInForm />
             </TabsContent>
             <TabsContent value="join">
-              <JoinForm />
+              <JoinForm onSignIn={() => setTab("signin")} />
             </TabsContent>
           </Tabs>
         </div>

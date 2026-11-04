@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Check, Crown, KeyRound, MessageCircle, MoreVertical, Send, UserMinus, UserPlus, X } from "lucide-react";
+import { AlertTriangle, Check, Crown, KeyRound, MessageCircle, MoreVertical, Send, UserMinus, UserPlus, X } from "lucide-react";
 import { openWhatsApp } from "@/lib/whatsapp";
 import { InviteDialog } from "@/components/worship/InviteDialog";
 import { GettingStarted } from "@/components/worship/GettingStarted";
@@ -45,11 +45,59 @@ function Avatar({ name, className = "h-12 w-12 text-sm" }: { name: string; class
   );
 }
 
+interface DuplicateGroup {
+  reason: string;
+  members: (WorshipAccount & { phone: string })[];
+}
+
+/** Head leader only: people who share a name, in case someone joined twice. */
+function PossibleDuplicates() {
+  const { data } = useQuery({
+    queryKey: ["worship", "duplicates"],
+    queryFn: () => worshipFetch<{ groups: DuplicateGroup[] }>("/duplicates"),
+  });
+  if (!data?.groups.length) return null;
+  return (
+    <section className="mb-6 rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4">
+      <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold">
+        <AlertTriangle className="h-4 w-4 text-amber-500" /> Possible duplicates
+      </h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        These look like the same person twice. If they are, remove the extra one from the ⋮ menu on their card.
+        People who only share a name can be two different people.
+      </p>
+      <ul className="space-y-2">
+        {data.groups.map((g) => (
+          <li key={g.members.map((m) => m.id).join()} className="rounded-xl border border-border bg-card p-3 text-sm">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              {g.reason === "phone" ? "Same phone number" : "Same name"}
+            </p>
+            {g.members.map((m) => (
+              <p key={m.id} className="flex flex-wrap justify-between gap-x-3">
+                <span className="font-medium">
+                  {m.full_name}
+                  {m.status === "pending" && <span className="font-normal text-muted-foreground"> (waiting)</span>}
+                </span>
+                <span className="text-muted-foreground">{m.phone}</span>
+              </p>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function JoinRequests() {
   const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: worshipKeys.requests,
-    queryFn: () => worshipFetch<{ requests: WorshipAccount[] }>("/requests"),
+    queryFn: () =>
+      worshipFetch<{
+        requests: (WorshipAccount & {
+          same_name_as: { id: string; full_name: string; status: string } | null;
+        })[];
+      }>("/requests"),
     refetchInterval: 60_000,
   });
   const act = useMutation({
@@ -59,6 +107,7 @@ function JoinRequests() {
       toast.success(v.action === "approve" ? "Welcome to the team!" : "Request declined");
       queryClient.invalidateQueries({ queryKey: worshipKeys.requests });
       queryClient.invalidateQueries({ queryKey: worshipKeys.members });
+      queryClient.invalidateQueries({ queryKey: ["worship", "duplicates"] });
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -79,6 +128,13 @@ function JoinRequests() {
               <p className="truncate text-xs text-muted-foreground">
                 {r.instruments.length ? r.instruments.map(instrumentLabel).join(", ") : "No role picked yet"}
               </p>
+              {r.same_name_as && (
+                <p className="mt-1 flex items-start gap-1 text-xs text-amber-500">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                  Same name as {r.same_name_as.status === "pending" ? "another request" : "someone already on the team"}.
+                  Check it's not the same person twice.
+                </p>
+              )}
             </div>
             <Button
               size="sm"
@@ -249,6 +305,7 @@ function TeamPage({ me }: { me: WorshipAccount }) {
   return (
     <div>
       {canApprove(me) && <JoinRequests />}
+      {isHeadLeader && <PossibleDuplicates />}
       {data && (
         <GettingStarted me={me} songCount={data.members.find((m) => m.id === me.id)?.song_count ?? 0} />
       )}
