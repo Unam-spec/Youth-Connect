@@ -800,9 +800,13 @@ router.post("/profiles/merge", requireLeaderSession("super_admin"), async (req: 
       ({ mergeClerkId } = await mergeProfiles(keepId, mergeId));
     } catch (err) {
       if (err instanceof Error && err.message === "PROFILE_NOT_FOUND") {
-        return res.status(404).json({ error: "Profile not found" });
+        return res.status(404).json({ error: "One of these profiles no longer exists. Refresh and try again." });
       }
-      throw err;
+      req.log.error({ err, keepId, mergeId }, "Profile merge failed");
+      const detail = (err as { detail?: string })?.detail;
+      return res.status(500).json({
+        error: `Couldn't merge these profiles${detail ? `: ${detail}` : "."} Nothing was changed.`,
+      });
     }
 
     if (mergeClerkId && process.env.CLERK_SECRET_KEY) {
